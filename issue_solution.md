@@ -18,6 +18,67 @@
 
 ---
 
+## Foundational Design Philosophy
+
+当前设计先采用两个底层原则。它们不是对所有未来实现的永久技术限制，但 Miniloop 第一阶段默认围绕这两个原则设计。
+
+### Principle A — 不指望 Python 理解自然语言
+
+Python orchestrator 是 deterministic transport / control layer，不是 semantic reasoner。
+
+因此不应要求 Python 从 Reviewer / Executor 的自由文本中推断：
+
+- 哪一段是 reasoning；
+- 哪一段是 instruction；
+- 哪一段是 evidence；
+- 哪一段代表 ACCEPT / REJECT；
+- 某一句自然语言真正想表达什么控制意图。
+
+Agent-to-agent 的自然语言内容默认视为 **opaque semantic payload**。Python 可以添加它自身确定的 transport metadata，例如 sender、receiver、turn、session，但不应尝试把 payload 的语义拆层。
+
+简化原则：
+
+```text
+LLM 理解 LLM。
+Python 路由 LLM。
+```
+
+### Principle B — 不指望 LLM 稳定输出结构化内容
+
+不能把 Miniloop 的正确运行建立在以下假设上：
+
+> 只要 prompt 写得足够严格，LLM 就会始终生成完全合法且语义稳定的 JSON / XML / marker / schema。
+
+Prompt-only structured output 可能出现格式漂移、字段遗漏、额外解释、合法格式中的错误语义等问题。因此：
+
+- 不应要求 Python 依赖自由生成的 JSON 来理解 Agent 输出；
+- 不应通过字符串搜索，例如 `if "ACCEPT" in output`，决定 authoritative state transition；
+- Agent-to-agent semantic communication 优先使用可被另一个 LLM 直接理解的自然语言原文；
+- 若未来使用 tool calling、schema-constrained output 或其他 runtime-enforced structured control，它应属于独立的 control mechanism，而不是要求 Python 理解自由文本。
+
+### Derived Communication Boundary
+
+当前预测的最小通信边界为：
+
+```text
+Deterministic envelope owned by Python
++
+Verbatim natural-language payload produced by LLM
+```
+
+例如 Python 可以确定：
+
+```text
+sender = reviewer
+receiver = executor
+turn = 4
+payload = <reviewer raw output>
+```
+
+其中 `payload` 不进行语义拆分，直接交给目标 LLM 理解。
+
+---
+
 ## Issue 1 — Reviewer / Executor 如何切换上下文而不加载双倍模型权重
 
 ### Problem
@@ -48,42 +109,52 @@ executor_messages
 
 ---
 
-## Issue 2 — Reviewer 与 Executor 如何主动向对方发送消息
+## Issue 2 — Reviewer 与 Executor 如何向对方发送消息
 
 ### Problem
 
-需要支持：
+Reviewer 需要向 Executor 下达执行或 repair 指令，Executor 需要向 Reviewer 汇报 implementation result、limitation 和 evidence locator。
 
-```text
-Reviewer -> Executor
-EXECUTE
-REPAIR
-CLARIFICATION
+如果要求 LLM 把这些内容稳定拆成 JSON 字段，再由 Python 解析并重新组装，会让 transport correctness 依赖 LLM 的格式化稳定性，同时要求一个没有自然语言理解能力的 Python 层承担语义拆分。
 
-Executor -> Reviewer
-IMPLEMENTED
-EVIDENCE_READY
-BLOCKER
-CLARIFICATION_REQUIRED
-```
-
-LLM 本身没有后台线程，因此不能把“主动通信”理解成两个模型进程自行唤醒对方。
+LLM 本身也没有后台线程，因此不能把“主动通信”理解成两个模型进程自行唤醒对方。
 
 ### Predicted Solution
 
-由本地 Python orchestrator 实现消息路由和 event loop。
+由本地 Python orchestrator 实现 event loop 和 deterministic routing，但**不解析 Agent 自然语言输出的内部语义**。
 
 基本机制：
 
 ```text
-Current role inference
-    -> structured message / tool call
-    -> orchestrator parses message
-    -> append bounded message to target role context
-    -> trigger target role inference
+Reviewer inference
+    -> reviewer raw natural-language output
+    -> Python adds deterministic sender/receiver metadata
+    -> payload forwarded verbatim
+    -> Executor inference
+
+Executor inference
+    -> executor raw natural-language output
+    -> Python adds deterministic sender/receiver metadata
+    -> payload forwarded verbatim
+    -> Reviewer inference
 ```
 
-角色之间只传递明确需要共享的信息，不复制发送方完整 conversation history。
+Reviewer / Executor 各自的高优先级 role instruction（例如 `agent.md` 进入 system instruction）应明确说明：
+
+- 当前角色正在与另一个 LLM Agent 通信，而不是与 Human 对话；
+- 对方具备自然语言理解能力；
+- 当前输出可能被 orchestrator 原样转发给对方；
+- 应直接向 peer agent 表达 execution instruction、review result、evidence locator 或 limitation，而不是依赖固定 JSON 模板。
+
+Python 可以包装自己确定的信息，例如：
+
+```text
+[PEER MESSAGE FROM REVIEWER]
+
+<verbatim reviewer output>
+```
+
+或者维护等价的内部 metadata，但不得要求 Python 判断 raw output 中哪一段属于 instruction / reasoning / evidence。
 
 ### Expected Verification
 
@@ -93,7 +164,7 @@ Current role inference
 Reviewer -> Executor -> Reviewer
 ```
 
-消息往返。
+消息往返，并且 transport 不依赖 prompt-only JSON formatting 或 Python 对自由文本进行语义解析。
 
 ---
 
@@ -132,7 +203,7 @@ Executor 的 `PASS`、测试总结或自然语言汇报不能直接成为 accept
 
 ### Predicted Solution
 
-Executor 汇报实际 evidence locator；Reviewer 通过自己的工具直接读取或重新检查：
+Executor 在自然语言报告中提供实际 evidence locator；Reviewer 通过自己的工具直接读取或重新检查：
 
 - git diff / commit；
 - test result；
@@ -141,6 +212,8 @@ Executor 汇报实际 evidence locator；Reviewer 通过自己的工具直接读
 - 其他 acceptance criteria 所需 evidence。
 
 Reviewer 独立形成 verdict，并独立判断 evidence 是否充分。
+
+Python 不需要从 Executor 报告中抽取 `evidence` JSON 字段；Reviewer 本身负责理解报告并访问 evidence。
 
 ### Expected Verification
 
@@ -154,23 +227,22 @@ Reviewer 独立形成 verdict，并独立判断 evidence 是否充分。
 
 `ACCEPT` 不能只是聊天中的一句话；它需要在满足条件后改变 authoritative Runtime state。
 
+同时，Python 不应通过解析自由文本、搜索 `ACCEPT` 关键字或依赖 prompt-only JSON verdict 来决定状态迁移。
+
 ### Predicted Solution
 
-Reviewer 产生结构化 verdict，例如：
+将 **semantic communication** 与 **control-plane transition** 分离。
 
-```text
-ACCEPT
-REJECT
-```
+Reviewer 可以用自然语言向 Executor / Human 表达 review reasoning；真正触发 Runtime transition 的 control signal 应通过 deterministic orchestration mechanism 实现。
 
-orchestrator 在允许 Runtime transition 前验证：
+可能方案包括 runtime-enforced tool call、显式 orchestrator API 或其他不要求 Python 理解自由文本的机制。具体方案暂不冻结，需由 Miniloop implementation evidence 决定。
 
-- verdict 来自 Reviewer；
+无论采用何种方案，orchestrator 在允许 Runtime transition 前仍应验证：
+
+- transition authority 来自 Reviewer role；
 - 对应当前唯一 Active Step；
 - acceptance 所需 evidence 可定位；
 - transition 不违反 Static。
-
-满足条件后才更新 Runtime。
 
 ---
 
@@ -182,18 +254,11 @@ orchestrator 在允许 Runtime transition 前验证：
 
 ### Predicted Solution
 
-Reviewer / orchestrator 从 authoritative state 编译一个 bounded execution package，例如：
+Reviewer 使用自己的上下文理解 Static / Runtime，并在发给 Executor 的自然语言 peer message 中表达当前 bounded instruction。
 
-```text
-Active Step
-Relevant Static constraints
-Permitted mutation surface
-Required evidence
-Acceptance criteria
-Reviewer instruction
-```
+Orchestrator 负责把该 message 原样路由给 Executor，同时只附加执行当前 Active Step 所需的确定性 context / metadata；不复制 Reviewer 完整 conversation history，也不尝试把 Reviewer 输出自动拆成多个语义字段。
 
-Executor 只获得执行当前 Active Step 所需的信息，加上自己的必要 recent history。
+具体的 bounded context 构造方式可根据 prototype evidence 调整。
 
 ---
 
@@ -237,7 +302,9 @@ Executor 只获得执行当前 Active Step 所需的信息，加上自己的必�
 
 ### Predicted Solution
 
-未来支持结构化 `HUMAN_DECISION_REQUIRED` 状态，由 orchestrator 暂停自动循环、持久化当前状态，并在收到 Human input 后恢复。
+未来支持明确的 `HUMAN_DECISION_REQUIRED` control state，由 orchestrator 暂停自动循环、持久化当前状态，并在收到 Human input 后恢复。
+
+具体 signaling mechanism 不应依赖 Python 解析 LLM 自由文本，后续根据实际 implementation 决定。
 
 ### Current Scope Note
 
@@ -252,12 +319,13 @@ Executor 只获得执行当前 Active Step 所需的信息，加上自己的必�
 Miniloop 至少需要覆盖：
 
 1. Reviewer / Executor 上下文隔离与单模型权重复用；
-2. Reviewer / Executor 之间的自动消息路由；
-3. Reviewer 编译并发送 bounded execution instruction；
+2. Reviewer / Executor 之间基于原始自然语言 payload 的自动消息路由；
+3. Reviewer 向 Executor 表达 bounded execution instruction；
 4. Executor 执行任务、自检并报告 evidence locator；
-5. Reviewer 直接检查 evidence 并形成 `ACCEPT` 或 `REJECT`；
+5. Reviewer 直接检查 evidence 并形成 acceptance decision；
 6. `REJECT` 后可以返回 Executor repair；
-7. `ACCEPT` 后可以推进 Runtime。
+7. `ACCEPT` 后可以推进 Runtime；
+8. Python 不需要理解 Agent 自然语言，Miniloop 也不依赖 LLM 稳定生成 prompt-only structured output。
 
 暂不要求解决：
 
