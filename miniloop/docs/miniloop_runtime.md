@@ -71,274 +71,124 @@ Python Runtime updater 只需要执行这种机械 invariant，不需要理解�
 
 ## Active Step
 
-### Step 1 — Build and demonstrate the first end-to-end Miniloop
+### Step 1 — Codex implementation: build the Miniloop framework skeleton
 
 Status: `ACTIVE`
 
-### Objective
+### Current Objective
 
-实现一个最小但真实可运行的本地 orchestrator，使同一个本地 Qwen 模型可以在 Reviewer 与 Executor 两个隔离 session 之间串行切换，并完成一次由 repository-backed state 驱动的自动闭环。
+停止继续纯理论展开，进入受控 implementation。
 
-目标链路：
+Codex 当前应基于已经锁定的 Static + Runtime 边界，实际搭建 Miniloop 的第一版大框架并运行能够运行的测试。实现过程中：
+
+- 已锁定的架构原则直接实现，不重新设计；
+- 普通 implementation detail 可以基于本机与 repository evidence 做最小、可逆的合理选择；
+- 如果遇到会影响 architecture、role boundary、filesystem isolation、Runtime authority、control-plane semantics、security boundary 或 acceptance semantics 的未确认技术细节，不得自行冻结设计；
+- 对该不确定子项停止扩展，记录 evidence / blocker / options，并回报 Human Owner，由 Human + Reviewer 侧讨论确认；
+- 其他不受该问题阻塞的确定部分继续实现；
+- 不因为存在局部未确认项而停止全部工作。
+
+当前目标不是一次性宣称整个 Step 1 完成，而是先得到一个真实、可运行、可检查的大框架，以实际 evidence 驱动后续设计。
+
+目标链路仍为：
 
 ```text
 Reviewer reads Static + Runtime
     -> Reviewer compiles bounded execution instruction
-    -> orchestrator routes Reviewer output to Executor
-    -> Executor performs a real bounded task
+    -> Python routes Reviewer raw output to Executor
+    -> Executor performs real work in bounded Linux execution environment
     -> Executor self-checks and reports evidence locator
-    -> orchestrator routes Executor output to Reviewer
-    -> Reviewer directly checks evidence
-    -> ACCEPT or REJECT
-    -> if REJECT: repair instruction -> Executor -> Reviewer
-    -> if ACCEPT: Runtime transition
+    -> Python routes Executor raw output to Reviewer
+    -> Reviewer independently checks evidence
+    -> repair or handoff / completion
 ```
 
-### Current Design Direction
+### Locked Architecture — Do Not Redesign During This Implementation Pass
 
-Human Owner 已确认以下两项底层原则，并已同步进入 Static：
+#### A. Python / LLM semantic boundary
 
-1. **不指望 Python 理解自然语言。** Python orchestrator 负责 deterministic transport / control，不负责从 Agent 自由文本中拆解 reasoning、instruction、evidence、verdict 等语义层。
-2. **不指望 LLM 稳定输出 prompt-only 结构化内容。** Miniloop 不依赖 LLM 稳定生成 JSON / XML / marker 后再由 Python 解析才能运行。
+- Python orchestrator 负责 deterministic transport / control，不负责理解 Agent 自由文本语义；
+- Reviewer / Executor 之间传递 verbatim natural-language payload；
+- Python 可以维护 sender、receiver、turn、run_id / session metadata；
+- 不依赖 prompt-only JSON / XML / marker 让 Python理解 instruction、evidence、ACCEPT、REJECT；
+- 不允许通过 `if "ACCEPT" in output` 等自由文本解析推动 authoritative transition；
+- 简化原则：`LLM 理解 LLM；Python 路由 LLM。`
 
-当前 Agent-to-Agent 通信方向为：
+#### B. Same model, isolated sessions
 
-```text
-Deterministic envelope owned by Python
-+
-Verbatim natural-language payload produced by LLM
-```
+- Reviewer / Executor 使用同一个 Ollama model ID / 同一份本地 Qwen weights；
+- Python 分别维护 Reviewer 与 Executor conversation state；
+- 两个 session 使用不同 system / role instruction；
+- 不复制双方完整 history；只显式路由本轮 peer payload；
+- 当前采用串行 inference，不加载两个同模型副本。
 
-Reviewer / Executor 的 role instruction 应明确：当前角色正在与另一个 LLM Agent 通信，而不是与 Human 对话。目标 LLM 负责理解 peer message 的自然语言语义。
+#### C. Ollama turn completion
 
-Python 可以确定并保存 sender、receiver、turn、session 等 transport metadata，但不得据此之外继续解析 LLM payload 的内部语义。
+- 使用 blocking Ollama chat request（例如 `stream=false`）作为单轮 inference completion signal；
+- request 返回只代表当前 turn 生成完成，不代表语义上的 task completion；
+- 不使用 `ollama ps` / busy polling 作为当前 turn 完成信号。
 
-### Locked Python Router v0 Decisions
+#### D. Receiver control plane
 
-以下内容已经由 Human Owner 在当前 Active Step 内确认，后续实现默认据此进行，除非出现新的 evidence 或 Human 明确修改。
-
-#### 1. Single model, two isolated logical sessions
-
-- Reviewer 与 Executor 使用同一个 Ollama model ID / 同一份本地 Qwen weights；
-- Python 分别维护 Reviewer 与 Executor 的 conversation state；
-- 两个 session 使用不同的 role / system instruction；
-- 切换角色时切换的是输入 history / logical session，不是重新加载另一份模型权重；
-- 当前 Miniloop 使用串行 inference，不要求 Reviewer 与 Executor 并行生成。
-
-概念结构：
-
-```text
-reviewer_messages ----\
-                       -> same local Qwen model
-executor_messages ----/
-```
-
-#### 2. Verbatim peer-message routing
-
-Reviewer / Executor 之间传递自然语言原文。Python 不对 payload 做 reasoning / instruction / evidence / verdict 等语义拆分。
-
-Python 只负责它自身可以确定的 transport metadata，例如：
-
-```text
-sender
-receiver
-turn
-run_id / session identity
-payload = <raw LLM output>
-```
-
-发送方的完整 conversation history 不复制给接收方；只把本轮需要交给 peer 的原始输出作为 peer message 放入目标 session。
-
-简化语义：
-
-```text
-LLM 理解 LLM。
-Python 路由 LLM。
-```
-
-#### 3. Agent role instruction must state peer identity
-
-Reviewer / Executor 的 agent / system instruction 应明确：
-
-- 当前角色正在与另一个 LLM Agent 通信，而不是与 Human 对话；
-- peer message 可能由 orchestrator 原样转发；
-- 当前角色应自行理解自然语言中的 instruction、review reasoning、evidence locator、limitation 等语义；
-- 不要求 peer 依赖固定 JSON / XML / marker 才能理解消息。
-
-#### 4. Inference completion signal uses Ollama request lifecycle
-
-Miniloop v0 不通过自然语言判断一个 Agent “是否说完”，也不需要通过 `ollama ps` 或周期轮询模型 busy 状态来判断。
-
-采用 Ollama blocking chat request（例如 `stream = false`）作为 deterministic completion signal：
-
-```text
-Python calls Reviewer
-    -> Ollama request remains in progress
-    -> full response returns
-    -> Reviewer turn is complete
-
-Python routes raw output
-    -> calls Executor
-    -> full response returns
-    -> Executor turn is complete
-```
-
-因此：
-
-- request 未返回 = 当前 inference 尚未完成；
-- request 正常返回 = 当前 inference 已完成，可以进入下一 deterministic routing action。
-
-该信号只表示“本轮 inference 完成”，不表示语义上的 task ACCEPT / REJECT / completion。
-
-#### 5. Persistent receiver control file
-
-Miniloop v0 使用一个本地持久化 receiver control file 表示下一自动控制权属于谁。
-
-当前允许的核心 receiver 值为：
+持久化 receiver control state 的核心值：
 
 ```text
 executor
 human
 ```
 
-语义：
+- Reviewer 拥有 receiver transition authority；
+- Python 在程序启动时和每次 Reviewer inference 完成后读取 receiver；
+- `executor` -> 自动 loop 可以继续并触发 Executor；
+- `human` -> 自动 loop 停止，把控制权交回 Human；
+- Executor 不获得 receiver setter；
+- 使用窄 capability（如 `set_receiver(executor|human)`），而不是 Python解析 Reviewer 自由文本。
 
-```text
-receiver = executor
--> Reviewer 允许自动循环继续
--> Reviewer raw output 路由给 Executor
+#### E. Executor Linux execution boundary
 
-receiver = human
--> Python 停止自动循环
--> 控制权交回 Human
-```
+- Executor 使用 Linux VM / Linux sandbox 内的完整 shell 能力；
+- shell capability 本身不通过 Python command blacklist 限制；
+- filesystem boundary 由 VM / mount visibility 强制，而不是把 `cwd` 误当 sandbox；
+- Executor writable mount 只包含授权 implementation workspace；
+- Static、Runtime、receiver / control plane 不进入 Executor writable workspace；
+- Apple Silicon / macOS-specific execution 移出 generic Linux Executor path，后续需要时单独处理；
+- 当前 demo 优先选择不依赖 Apple-specific toolchain 的 bounded task。
 
-Python 应在程序启动时和每次 Reviewer inference 完成后读取 receiver。如果读取到 `human`，不得继续触发 Executor。
+#### F. Role capability boundary
 
-#### 6. Reviewer owns receiver transition authority
+Reviewer：
 
-Reviewer 是 acceptance / orchestration authority，因此 receiver transition 默认由 Reviewer 决定。
+- 可读取 Static / Runtime；
+- 可读取任务相关 implementation / artifact / evidence；
+- 可独立运行测试 / verification；
+- 可通过受限 updater 修改 Runtime；
+- 可调用 receiver setter；
+- 不承担主要 implementation mutation。
 
-Executor 遇到 blocker、limitation 或无法继续的问题时，通过自然语言原文汇报给 Reviewer；Reviewer 再判断：
+Executor：
 
-```text
-继续自动执行 -> receiver = executor
-需要 Human / 最终停止 -> receiver = human
-```
-
-实现上使用窄 capability，例如：
-
-```text
-set_receiver("executor")
-set_receiver("human")
-```
-
-由 Python 校验允许值并写入 receiver control file。
-
-#### 7. `human` is a generic handoff / stop state
-
-`receiver = human` 只表示下一控制权属于 Human，而不是 Executor。
-
-它可以覆盖：
-
-- Reviewer 判断需要 Human 参与；
-- 当前自动循环最终完成，需要把控制权交回 Human；
-- 其他 Reviewer 判断不应继续自动触发 Executor 的情况。
-
-具体原因由 Runtime / Reviewer natural-language report 表达，而不是编码进 receiver 文件。
-
-#### 8. Local repository operation is primary; GitHub remote is not required for loop routing
-
-Miniloop 的 Reviewer / Executor 主要操作本机 clone / working tree。GitHub remote 不是 Reviewer–Executor transport layer；SSH 只在需要 `git pull` / `git push` 等远端同步时使用。
-
-Miniloop v0 不需要依赖 GitHub API 才能完成核心循环，也不要求自动 push 才能证明本地 Reviewer–Executor loop 成立。
-
-### Locked local execution and capability decisions
-
-#### 9. Executor receives full shell capability inside a Linux VM sandbox
-
-Executor 需要完整 shell 能力，但不直接获得宿主 macOS 的完整 filesystem 访问。
-
-当前方案锁定为：
-
-```text
-macOS host
-├── Ollama / Qwen
-├── Python orchestrator
-├── Static / Runtime / control state
-└── Linux VM sandbox
-      └── Executor full shell
-          └── mounted authorized workspace
-```
-
-Executor 在 Linux VM 内可以使用完整 shell / command semantics；Python 不通过分析 shell 字符串来判断其自然语言或命令语义。
-
-安全边界来自 VM / mount visibility，而不是 `cwd`、shell command blacklist 或 prompt。
-
-#### 10. Apple-specific work is separated from generic Linux execution
-
-涉及 Apple Silicon / macOS-specific toolchain、framework、binary、Xcode、Mach-O 或其他无法在 Linux VM 中真实执行的操作，不强行塞入通用 Linux Executor sandbox。
-
-这些操作应被移动到单独的 host-native execution path，在需要时以明确、独立的 capability / step 执行。
-
-Miniloop 当前 prototype 应优先选择不依赖 Apple-specific host execution 的 bounded demo。
-
-#### 11. Static and Runtime remain outside the Executor writable workspace
-
-该规则与 Linux VM 不冲突，反而由 VM mount boundary 实现。
-
-当前不要求物理移动现有文件路径；可以继续保留：
-
-```text
-miniloop/docs/miniloop_static.md
-miniloop/docs/miniloop_runtime.md
-```
-
-关键要求是 Executor Linux VM 的 writable mount 只包含授权 implementation workspace，不挂载 Static、Runtime 或 control plane 文件。
-
-因此 Executor 不是“看得到 Runtime 但被 prompt 告知不要改”，而是 writable workspace 本身不包含 Runtime / Static。
-
-#### 12. Reviewer capability surface
-
-Reviewer 需要：
-
-- 读取 Static / Runtime；
-- 读取所有当前任务相关 implementation / artifact / evidence；
-- 独立运行测试或验证；
-- 修改 Runtime；
-- 使用 `set_receiver()` 控制下一 receiver。
-
-Reviewer 不承担主要 implementation mutation。
-
-Runtime modification 不使用完全无约束的普通 file write；由轻量 Python Runtime updater 提供机械约束。
-
-#### 13. Executor capability surface
-
-Executor 在授权 Linux VM workspace 内：
-
-- 可以读取允许 workspace 中的所有文件；
-- 可以修改允许 workspace 中除 governance/control 外的 implementation / test / artifact 文件；
-- 可以使用完整 shell 能力执行 build、test、git、本地脚本等操作；
-- 不获得 Runtime / Static 的 writable mount；
+- 在授权 Linux workspace 内拥有完整 shell；
+- 可读取 / 修改该 workspace 中 implementation / tests / artifacts；
+- 不获得 Static / Runtime writable access；
 - 不获得 Runtime updater；
-- 不获得 receiver setter。
+- 不获得 receiver setter；
+- 不负责最终 acceptance。
 
-当前设计优先通过“只把允许 workspace mount 给 Executor”形成边界，而不是靠 Python 对每一个文件路径做自然语言式判断。
+#### G. Runtime mutation invariants
 
-### Locked Runtime structure and mutation rules
-
-Runtime 的理想结构从当前设计起按以下语义维护：
+Runtime 结构按以下语义维护：
 
 ```text
 Done
-  - completed historical record
+  - completed historical records
   - Commit Notes
 
-Other Notes (optional, append-only)
+Other Notes
+  - append-only correction / invalidation / supersession notes
 
-Active Step N
-  - current authoritative step
-  - optional Step N branches / alternatives
+Active Step
+  - current authoritative work
+  - optional branches / alternatives
 
 Pending Tasks
   - non-blocking blockers / deferred work that must not be lost
@@ -346,120 +196,106 @@ Pending Tasks
 Next Steps
 ```
 
-机械写入规则：
+机械规则：
 
-- `Done`：历史记录 immutable；
-- `Commit Notes`：作为 Done provenance immutable；新增时必须标明 Step + commit；
-- `Other Notes`：append-only；每条新 note 必须标明 Step + commit；可追加 correction / invalidation，但不删除旧 note；
-- `Active Step`：允许 Reviewer 根据当前 evidence 更新；
-- Active Step 下的可选 branch / alternative：允许更新；
-- `Pending Tasks`：允许新增、推进和移除，但移除必须因为该 pending item 已实际处理、被吸收进 Active Step / Done，或被明确 supersede；不能因其“不阻塞”就静默丢失；
-- `Next Steps`：允许随当前 evidence 更新。
+- `Done` immutable；
+- 已进入 Done 的 `Commit Notes` immutable；新增 Done / Commit Notes 时必须注明 Step + commit；
+- `Other Notes` append-only；每个新 note 必须注明 Step + commit；历史错误通过追加 correction / supersession 说明，不删除旧记录；
+- `Active Step` mutable；
+- `Pending Tasks` 可新增 / 推进 / 显式关闭，不得静默丢失；
+- `Next Steps` mutable；
+- Python Runtime updater 只执行轻量机械约束，不判断自然语言内容真实性。
 
-Python Runtime updater 的职责是轻量、机械地检查这些结构性约束，不判断 Runtime 自然语言内容的真实语义。
+### Codex Implementation Scope for This Pass
 
-### Required Functional Scope
+优先实际实现并测试：
 
-本 Step 至少需要解决或验证：
+1. Python project / orchestrator skeleton；
+2. Reviewer / Executor 两套隔离 logical session；
+3. 同一 Ollama model ID 的 blocking serial inference wrapper；
+4. deterministic envelope + verbatim peer payload routing；
+5. receiver control file + allowed-value enforcement + reviewer-only setter boundary；
+6. deterministic run / event logging；
+7. lightweight Runtime updater skeleton and mechanical invariant tests；
+8. Executor Linux sandbox abstraction / launcher skeleton；
+9. authorized writable workspace mount boundary；
+10. Reviewer / Executor role instructions / configuration skeleton；
+11. unit / integration tests that do not require unresolved design assumptions；
+12. README / run instructions sufficient to reproduce the implemented skeleton.
 
-1. **Context switching**
-   - Reviewer / Executor 使用同一个本地 Qwen model ID；
-   - 两个角色使用独立 system instruction；
-   - 两个角色使用独立 conversation state；
-   - 角色切换不通过加载两个相同模型副本实现。
+### Technical-Uncertainty Reporting Rule
 
-2. **Message routing**
-   - Reviewer 的自然语言输出可以由 orchestrator 原样路由给 Executor；
-   - Executor 的自然语言输出可以由 orchestrator 原样路由给 Reviewer；
-   - Python 只添加自身确定的 deterministic transport metadata；
-   - Python 不解析 Agent payload 的 reasoning / instruction / evidence / verdict 语义；
-   - Agent-to-Agent transport 不依赖 prompt-only JSON parsing；
-   - orchestrator 自动触发目标角色下一次 inference；
-   - 不需要 Human 手工复制粘贴。
+Codex 遇到以下情况时应回报，而不是自行扩大 contract：
 
-3. **Bounded context construction**
-   - Reviewer 可以读取 Static + Runtime；
-   - Executor 只获得执行当前 Active Step 所需的信息，而不是 Reviewer 的完整 conversation history；
-   - peer message 可以原样进入目标 Agent context，但发送方完整 history 不随消息一起复制。
+- 本机现有 virtualization / container runtime 行为与预期不一致；
+- 需要改变 Static / Runtime authority；
+- 需要让 Executor 看见或修改 governance / control files；
+- 需要 Python 解析 Agent natural language 才能继续；
+- 需要改变 receiver semantics；
+- 需要改变 Reviewer / Executor acceptance authority；
+- 需要额外 host-native privileged capability；
+- 现有 Runtime invariant 无法机械实现而必须解释语义；
+- 实现选择会形成新的不可逆 / 高影响 architecture constraint。
 
-4. **Real Executor action**
-   - Executor 必须在 Linux VM 的授权 workspace 中执行至少一个真实、可验证的 bounded task；
-   - 产生 repository diff、test artifact、log 或其他可直接检查的 evidence；
-   - Executor 运行 self-check 并向 Reviewer 说明可定位的 evidence；
-   - Executor 不需要通过减少 shell 功能来实现 filesystem boundary。
+回报至少包含：
 
-5. **Independent review**
-   - Reviewer 不能仅依据 Executor 自述验收；
-   - Reviewer 必须直接读取或重新检查实际 evidence；
-   - Reviewer 必须形成 `ACCEPT` 或 `REJECT` verdict；
-   - Python 不得通过解析 Reviewer 自由文本中的 `ACCEPT` / `REJECT` 字样来推断 authoritative control state。
+```text
+Observed evidence
+Exact uncertainty / blocker
+Why current contract does not determine it
+Option A / B / ...
+Recommended option if evidence supports one
+What implementation can continue without this decision
+```
 
-6. **Repair path**
-   - 至少一个受控 scenario 必须走通 `REJECT -> REPAIR -> new evidence -> re-review`。
+这些问题若不阻塞整个 Step，应同时记录到 `Pending Tasks`，然后继续其他确定工作。
 
-7. **Runtime progression**
-   - 只有 Reviewer 在 evidence 足够时可以触发当前 Step 的最终 acceptance；
-   - Executor 不能自行完成最终 acceptance；
-   - acceptance transition 必须记录 evidence locator；
-   - Python 不通过理解 Reviewer 自由文本决定是否继续调用 Executor；
-   - Reviewer 可以通过受限 receiver control capability 将下一控制权设置为 `executor` 或 `human`；
-   - Runtime updater 必须保护 Done / Commit Notes 的历史不可变性和 Other Notes 的 append-only 语义。
+### Environment Fact for Implementation
+
+- Host: Apple Silicon Mac, M4 Max, 48 GB Unified Memory；
+- Ollama 已安装，现有 Qwen3.5 35B-class / ~64K context baseline 已能运行；
+- 当前 Miniloop implementation 优先继续使用现有 baseline，不因新模型下载阻塞；
+- Docker 已安装在本机；当前 pass 可以只读检查现有版本 / runtime / settings evidence，但不得擅自升级、重装或进行需要 Human 决策的全局配置变更。
 
 ### Permitted Changes
 
-允许为完成当前 Active Step：
+允许 Codex 为当前 implementation pass：
 
-- 在 `miniloop/` 下创建或修改 orchestrator source code；
-- 创建 Reviewer / Executor system instruction 或 agent configuration；
-- 创建 deterministic transport envelope / routing logic；
-- 创建 receiver control file 及其受限 setter；
-- 创建 Linux VM / sandbox 配置；
-- 创建 Executor writable workspace；
-- 创建 Reviewer / Executor capability wrapper；
-- 创建轻量 Runtime updater；
-- 创建 bounded demo / fixture / test；
-- 创建 run logs、test outputs 或其他 evidence artifact；
-- 创建必要的 README / run instruction；
-- 在 evidence 支持 Reviewer verdict 后更新本 Runtime。
+- 在 `miniloop/` 下创建 / 修改 implementation source、tests、config、workspace、sandbox scripts、logs、README；
+- 创建 receiver control implementation；
+- 创建 Runtime updater implementation；
+- 创建 Reviewer / Executor role instruction；
+- 运行本地只读环境探测；
+- 运行不违反当前边界的 tests / demo；
+- 生成 evidence artifact。
 
-### Restricted Changes
-
-当前 Active Step 不授权 Executor：
+不得：
 
 - 修改 `miniloop/docs/miniloop_static.md`；
-- 修改 `miniloop/docs/miniloop_runtime.md`；
-- 访问或修改 receiver / control plane state；
-- 重新定义 Miniloop Acceptance Criteria；
-- 扩大 scope 到 Web UI、多 Executor、分布式部署或 production-grade agent platform；
-- 为解决当前 Step 而引入必须依赖的云端 LLM API。
+- 把 Step 1 标记为 `COMPLETED`；
+- 重写 `Done` / 旧 Commit Notes / 旧 Other Notes；
+- 自行改变已经锁定的 architecture；
+- 擅自安装 / 升级 Docker 或进行全局系统级配置改变；
+- 自动 push / publish；
+- 引入必须依赖的 cloud LLM API；
+- 扩大到 Web UI、多 Executor、distributed / production-grade platform。
 
-### Required Evidence
+### Required Evidence from Codex Pass
 
-当前 Step 最终验收至少应能定位以下 evidence：
+Codex 结束本轮实现后至少报告：
 
-- orchestrator source code；
-- Reviewer / Executor context separation 的实现位置；
-- 使用同一 model ID 的实现或运行 evidence；
-- deterministic envelope + verbatim natural-language payload routing 的实现位置；
-- 能证明 Python 未依赖自由文本语义拆分进行 Agent-to-Agent transport 的实现或测试；
-- Ollama blocking request completion 驱动下一 inference 的实现位置或运行 evidence；
-- receiver control file / setter 的实现位置及 allowed-value enforcement；
-- `receiver = human` 时 Python 不继续触发 Executor 的测试或运行 evidence；
-- Linux VM Executor sandbox / mount 配置；
-- Executor 能使用完整 shell、但 Static / Runtime / control state 不位于其 writable workspace 的验证 evidence；
-- Runtime updater 对 Done / Commit Notes immutable 和 Other Notes append-only 的验证；
-- 一个完整 end-to-end run log；
-- Executor 实际执行产生的 artifact / diff / test result；
-- Reviewer 直接检查 evidence 的记录；
-- 至少一个 `REJECT -> REPAIR -> re-review` 的运行记录；
-- 最终 `ACCEPT` 所依据的 evidence locator；
-- 可重复运行 demo 的命令或说明。
+- changed files；
+- implementation summary；
+- exact commands / tests run；
+- test results；
+- local environment observations relevant to Linux sandbox；
+- current working features；
+- remaining uncertainties / blockers；
+- Pending Tasks candidates；
+- evidence locators；
+- 未实现内容及原因。
 
-### Acceptance Criteria
-
-当前 Step 的 acceptance 由 `miniloop_static.md` 中的全部 Miniloop Acceptance Criteria 决定。
-
-Reviewer 不得因为局部功能已经跑通而提前将整个 Step 标记为 `COMPLETED`。
+不得仅以自然语言“已完成”替代实际 repository / test evidence。
 
 ---
 
@@ -480,18 +316,11 @@ Reviewer 不得因为局部功能已经跑通而提前将整个 Step 标记为 `
 
 None confirmed.
 
-当前尚未形成 implementation-level evidence，因此不得预先声称 context switching、message routing、tool permission、independent review、VM isolation 或 Runtime transition 已经实现。
+当前没有已知 blocker 阻止 Codex 开始大框架 implementation。
 
-Python Router v0 的 session routing、verbatim peer-message transport、Ollama inference-completion signal、receiver-based handoff / stop mechanism、Linux VM Executor sandbox 方向、角色 capability 边界和 Runtime mutation invariants 已形成当前设计决策。
+implementation-level evidence 尚未形成，因此不得预先声称 Router、context isolation、Runtime updater、VM isolation、receiver handoff 或 end-to-end loop 已经实现。
 
-仍可在 Codex implementation 前继续具体化但不构成 blocker 的实现细节包括：
-
-- receiver control file 的具体路径与最小持久化格式；
-- Linux VM 技术选型与启动方式；
-- Reviewer 独立测试时具体采用 host-side tool、read-only mount 或其他验证 execution path；
-- Runtime updater 的具体函数接口名称。
-
-这些属于 implementation detail；只要实现不违反上述锁定边界，不需要在 Runtime 中提前冻结。
+从现在开始，未确认 technical detail 应优先通过实际 implementation / environment evidence 暴露；只有当该 detail 会影响已锁定 contract 或形成新的高影响边界时，才回到 Human Owner 讨论确认。
 
 ---
 
@@ -503,13 +332,10 @@ Python Router v0 的 session routing、verbatim peer-message transport、Ollama 
 - 完整 Human Decision Gate 的交互、决策输入和自动恢复协议；
 - 无限 repair / clarification loop 的自动检测与终止；
 - production-grade VM / container hardening；
-- 通用 Apple-specific host execution framework。
+- 通用 Apple-specific host execution framework；
+- 多 Executor / Web UI / distributed deployment / production queue / memory database。
 
 `receiver = human` 作为 deterministic stop / handoff primitive 已纳入当前设计，但不等于本阶段必须完成完整 Human Gate workflow。
-
-Apple-specific operation 已确认为 generic Linux sandbox 之外的独立执行类别，但 Miniloop v0 demo 不要求实现完整 host-native execution framework。
-
-这些 deferred 问题不应阻塞当前 Active Step。
 
 ---
 
@@ -517,49 +343,19 @@ Apple-specific operation 已确认为 generic Linux sandbox 之外的独立执�
 
 ### Previous state
 
-`ACTIVE — Step 1`，Router v0 的 context / message / completion / receiver 设计已基本锁定，但 local shell sandbox、Runtime mutation invariant 和 non-blocking issue persistence 尚未确定。
-
-### Evidence
-
-Human Owner 在当前设计讨论中确认：
-
-- Executor 使用 Linux VM 获得完整 shell 能力；
-- Apple-specific work 从 generic Linux execution 中移出，单独执行；
-- Static / Runtime 不进入 Executor writable workspace，该规则与 VM mount boundary 配合；
-- Reviewer 可以读取和测试任务相关文件，并允许通过受限 Runtime updater 修改 Runtime；
-- Executor 可在授权 workspace 内修改 implementation / tests / artifacts，但不能修改 Runtime / Static；
-- `Done` / `Commit Notes` 作为 historical provenance 不允许回写；
-- `Other Notes` 为 append-only，可以追加后续 correction / supersession，但不删除旧记录；
-- 新写入的 Commit Notes 和 Other Notes 必须带 Step + commit provenance；
-- Runtime 新增 `Pending Tasks`，用于保存未立即解决的 non-blocking blocker / work item。
+`ACTIVE — Step 1`，核心 Router、receiver、Linux execution boundary、role capability 和 Runtime mutation invariants 已在设计讨论中锁定，但尚未进入实际 implementation evidence 阶段。
 
 ### Current state
 
-`ACTIVE — Step 1: Build and demonstrate the first end-to-end Miniloop`
+`ACTIVE — Step 1: Codex implementation — build the Miniloop framework skeleton`
 
-当前设计已经收敛到：
+### Transition Meaning
 
-```text
-same local Qwen weights
-+
-two isolated logical sessions
-+
-verbatim peer payload routing
-+
-blocking Ollama request completion
-+
-persistent receiver control file
-+
-Linux VM Executor full-shell sandbox
-+
-governance/control outside Executor writable workspace
-+
-lightweight invariant-enforcing Runtime updater
-```
+当前不再继续以纯设计讨论推进 Step 1。
 
-### Meaning
+Codex 现在应实际实现已经确定的框架部分；普通实现细节由 evidence 驱动做最小可逆选择。遇到 contract 无法决定、会改变关键边界的技术问题时，Codex 应记录并回报 Human Owner，而不是自行扩大设计。
 
-Active Step 没有改变，也尚未产生 implementation acceptance evidence。本次 Runtime 更新仅持久化已经由 Human Owner 确认的 execution sandbox、capability 和 Runtime-history 规则，为后续 Codex implementation 提供稳定边界。
+Active Step 仍然属于原来的 Step 1，没有发生 acceptance，也没有进入 Done。
 
 ---
 
@@ -569,50 +365,27 @@ Active Step 没有改变，也尚未产生 implementation acceptance evidence。
 
 Status: `SUPERSEDED`
 
-Previous assumption:
-
-Reviewer / Executor 需要稳定生成结构化 instruction / report / verdict，再由 Python 解析完成消息路由。
-
-Current decision:
-
-Agent-to-Agent semantic payload 默认使用自然语言原文；Python 只负责 deterministic envelope 和 transport / control，不承担自由文本语义拆分。
+Reviewer / Executor semantic payload 使用自然语言原文；Python 不承担自由文本语义解析。
 
 ### Polling Ollama process/load state as inference-completion signal
 
 Status: `SUPERSEDED`
 
-Previous considered direction:
-
-Python 周期性检查类似 busy / idle 的“信号灯”，用轮询判断 Reviewer / Executor 是否完成一轮 inference。
-
-Current decision:
-
-Miniloop v0 使用 blocking Ollama chat request 的返回作为 deterministic completion signal；模型是否仍常驻内存与当前 inference 是否完成是不同状态，不通过模型 load state 判断。
+使用 blocking Ollama request completion 作为单轮 inference 完成信号。
 
 ### Host-side unrestricted Executor shell
 
 Status: `SUPERSEDED`
 
-Previous considered direction:
-
-Executor 在 macOS host 的固定 cwd 中使用 shell，并主要通过路径约定 / prompt 限制访问范围。
-
-Current decision:
-
-Executor 的完整 shell 运行在 Linux VM sandbox 中；filesystem boundary 由 VM / mount visibility 实现，而不是把固定 cwd 误当成安全边界。
+Executor 完整 shell 放入 Linux execution sandbox；filesystem boundary 由 VM / mount visibility 强制。
 
 ---
 
 ## Next Steps
 
-当前下一步不再重新讨论已锁定的 session / peer-message / completion / receiver / sandbox / Runtime-history 规则。
-
-进入 Codex implementation 前，只需要根据实现便利性选择不影响上述 contract 的具体技术细节，例如：
-
-- Linux VM / container runtime 的具体实现；
-- executor workspace mount path；
-- receiver file path；
-- Runtime updater function names；
-- Reviewer validation execution path。
-
-这些细节如果没有产生新的约束冲突，可以由 Codex 在当前边界内实现并通过 evidence 验证。
+1. 将本 Runtime + Static 作为 authoritative implementation contract 交给 Codex；
+2. Codex 实际搭建 Miniloop framework skeleton 并运行可运行的 tests；
+3. Codex 对不确定 technical detail 提交 evidence-backed report，而不是自行冻结高影响设计；
+4. Human Owner / Reviewer 只针对实际 blocker / uncertainty 做后续确认；
+5. 根据实现 evidence 再决定 repair、继续实现或更新 Pending Tasks；
+6. 在满足全部 Acceptance Criteria 之前，Step 1 保持 `ACTIVE`。
