@@ -4,7 +4,7 @@
 
 在本地 Apple Silicon Mac 上实现并验证一个最小可运行的 Reviewer–Executor 自动闭环（Miniloop）。
 
-该闭环应使用同一个本地 Qwen 模型实例，通过两个上下文隔离的逻辑 session 分别承担 Reviewer 与 Executor，并由本地 orchestrator 完成角色切换、结构化消息传递、工具调用和循环控制。
+该闭环应使用同一个本地 Qwen 模型实例，通过两个上下文隔离的逻辑 session 分别承担 Reviewer 与 Executor，并由本地 orchestrator 完成角色切换、消息路由、工具调用和循环控制。
 
 Miniloop 的目标不是实现完整生产级 Agent 平台，而是验证以下核心链路能够真实运行：
 
@@ -45,21 +45,79 @@ Reviewer 与 Executor 之间的通信必须经过本地 orchestrator 显式路�
 
 ```text
 LLM inference
-    -> structured message / tool call
-    -> orchestrator
+    -> orchestrator receives current role output
+    -> orchestrator routes it to target session
     -> target session inference
 ```
 
 不得假设 LLM 自身拥有独立后台线程或能够在没有 orchestrator 触发的情况下自行唤醒另一角色。
 
-### 4. Repository-backed authoritative state
+Reviewer / Executor 的 role instruction 必须明确当前角色正在与另一个 LLM Agent 通信，而不是与 Human 对话；Agent 输出可以被 orchestrator 原样转发给 peer agent，由目标 LLM 自己理解其中的 instruction、review reasoning、evidence locator 或 limitation。
+
+### 4. Do not rely on Python understanding natural language
+
+Python orchestrator 是 deterministic transport / control layer，不是自然语言 semantic reasoner。
+
+因此 Miniloop 不得要求 Python 从 Reviewer / Executor 的自由文本中可靠推断：
+
+- 哪一段是 reasoning；
+- 哪一段是 execution instruction；
+- 哪一段是 evidence；
+- 哪一段代表 acceptance / rejection；
+- 自然语言内容内部的其他语义分层。
+
+Agent-to-agent 的自由文本输出默认视为 **opaque semantic payload**。
+
+Python 可以添加它自身确定的 transport metadata，例如：
+
+```text
+sender
+receiver
+turn
+session
+```
+
+但不应通过自然语言解析重新构造 Agent 的语义内容。
+
+### 5. Do not rely on LLM producing stable prompt-only structured output
+
+Miniloop 的正确运行不得建立在以下假设上：
+
+> 只要 prompt 要求严格，LLM 就会始终稳定输出完全合法且语义正确的 JSON / XML / marker / schema。
+
+因此：
+
+- Agent-to-agent semantic communication 不应依赖 prompt-only JSON parsing；
+- 不得通过字符串搜索，例如 `if "ACCEPT" in output`，决定 authoritative state transition；
+- 不得要求 Python 解析 LLM 自由生成的结构化文本后才能理解 peer message；
+- Agent-to-agent 消息应优先直接转发自然语言原文，由目标 LLM 负责语义理解；
+- 如果需要机器可执行的 control-plane signal，可以使用独立的 deterministic / runtime-enforced mechanism，但不得把自由文本语义解析当作其基础。
+
+该边界可概括为：
+
+```text
+LLM 理解 LLM。
+Python 路由 LLM。
+```
+
+以及：
+
+```text
+Deterministic transport/control metadata
++
+Opaque natural-language LLM payload
+```
+
+具体 control-plane 实现方式可根据 Miniloop evidence 演化，只要不违反上述原则。
+
+### 6. Repository-backed authoritative state
 
 - Static 与 Runtime 是 Miniloop 的权威治理状态。
 - Conversation history 不是 authoritative project state。
 - Git、source code、test output、run log 和 generated artifact 可以作为共享 evidence surface。
 - Executor 的自然语言总结本身不能替代其所指向的实际 evidence。
 
-### 5. Role separation
+### 7. Role separation
 
 #### Reviewer
 
@@ -94,13 +152,13 @@ Executor 不得：
 - 给自己的工作做最终 `ACCEPT`；
 - 自行扩大 Active Step scope。
 
-### 6. Single authoritative Active Step
+### 8. Single authoritative Active Step
 
 正常执行时，Miniloop Runtime 最多只能有一个 authoritative Active Step。
 
 Repair 仍属于当前 Active Step 的继续执行，不应在未验收当前 Step 时自行激活新的权威 Step。
 
-### 7. Evidence-backed acceptance
+### 9. Evidence-backed acceptance
 
 Reviewer 最终 `ACCEPT` 必须基于 Reviewer 可以直接定位并检查的 evidence，而不是仅基于 Executor 的 `PASS` 或自然语言报告。
 
@@ -169,14 +227,18 @@ Miniloop 只有在以下条件都有可定位 evidence 支持时，才可判定�
 
 必须证明：
 
-- Reviewer 可以通过结构化消息向 Executor 下达 execution instruction；
-- Executor 可以通过结构化消息向 Reviewer 汇报 implementation result / evidence；
-- 消息通过 orchestrator 自动路由；
-- 完整往返不依赖 Human 手工复制粘贴。
+- Reviewer 的自然语言输出可以由 orchestrator 自动转发给 Executor；
+- Executor 的自然语言输出可以由 orchestrator 自动转发给 Reviewer；
+- peer message 的 semantic payload 可以原样保留，不要求 Python 拆分 instruction / reasoning / evidence 字段；
+- role instruction 明确双方是在 LLM-to-LLM communication context 中工作；
+- 完整往返不依赖 Human 手工复制粘贴；
+- transport correctness 不依赖 prompt-only JSON / XML 等格式化输出。
 
 ### C. Bounded Executor context
 
 必须证明 Executor 接收的是当前 Active Step 所需的 bounded execution context，而不是 Reviewer 的完整内部 conversation history。
+
+在满足 bounded context 的前提下，Reviewer 发给 Executor 的 peer message 应允许作为完整自然语言 payload 直接传递，而不要求 Python 进行语义拆分。
 
 ### D. Real execution and evidence exposure
 
@@ -215,6 +277,8 @@ Reviewer REJECT
 
 可以正常运行。
 
+Repair instruction 可以作为 Reviewer 自然语言输出原样路由给 Executor；Miniloop 不得要求 Python 先理解并拆分其语义。
+
 ### G. ACCEPT -> Runtime transition
 
 必须证明：
@@ -222,9 +286,19 @@ Reviewer REJECT
 - Reviewer 可以在 evidence 足够时形成 `ACCEPT`；
 - `ACCEPT` 后 Runtime 才发生对应 authoritative transition；
 - transition 记录 evidence locator；
-- Executor 不能自行完成最终 acceptance 或 Runtime progression。
+- Executor 不能自行完成最终 acceptance 或 Runtime progression；
+- Runtime transition 的 control mechanism 不依赖 Python 从自由文本中搜索或推断 `ACCEPT` 语义，也不依赖 prompt-only structured output 的稳定性。
 
-### H. Reproducible end-to-end run
+### H. No semantic-parser dependency
+
+必须证明 Miniloop 的核心消息往返在以下条件下仍然成立：
+
+- Python 不理解 Reviewer / Executor 自然语言内容；
+- Python 只负责自己能够确定的 sender / receiver / session / turn 等 routing information；
+- Reviewer / Executor 允许存在轻微自然语言格式漂移，只要 peer LLM 仍能理解实际语义；
+- 系统不因 Agent 未严格遵循某个 prompt-only JSON 模板而失去基本消息路由能力。
+
+### I. Reproducible end-to-end run
 
 Repository 中必须保留足够的 source、configuration、test / demo command 和 run evidence，使 Human Owner 能重新运行至少一个完整 Miniloop demonstration，并观察到：
 
