@@ -1,0 +1,61 @@
+{
+  "generated_at_utc": "2026-08-20T19:37:20.591074+00:00",
+  "python": "3.9.6 (default, Jul 10 2026, 15:39:47) \n[Clang 21.0.0 (clang-2100.3.27.1)]",
+  "passed": true,
+  "authoritative_document_sha256": {
+    "miniloop_static.md": "f395c614ad89840d8d9aab9cb2887bf985e1a186d4e6849aaa63e425095ef3a8",
+    "miniloop_runtime.md": "82d16282423199a060d4df18b830947857c0b0d33b2b09f9955097404290587f"
+  },
+  "commands": [
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "compileall",
+        "-q",
+        "miniloop/src",
+        "miniloop/scripts",
+        "miniloop/tests"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "miniloop/tests",
+        "-v"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "test_chat_is_blocking_non_streaming_and_preserves_content (test_ollama.OllamaClientTests) ... ok\ntest_string_tool_arguments_are_rejected_not_parsed (test_ollama.OllamaClientTests) ... ok\ntest_round_trip_repair_and_native_handoff (test_orchestrator.OrchestratorTests) ... ok\ntest_same_model_id_is_enforced (test_orchestrator.OrchestratorTests) ... ok\ntest_startup_human_state_stops_before_any_inference (test_orchestrator.OrchestratorTests) ... ok\ntest_executor_toolbox_has_no_receiver_setter (test_receiver.ReceiverTests) ... ok\ntest_invalid_file_content_fails_closed (test_receiver.ReceiverTests) ... ok\ntest_only_two_persistent_values_are_accepted (test_receiver.ReceiverTests) ... ok\ntest_append_done_preserves_history_and_renders_provenance (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_mutable_sections_change_without_touching_done (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_other_notes_are_append_only_with_provenance (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_pending_add_progress_and_close_are_explicit (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_provenance_and_section_injection_are_mechanically_rejected (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_stale_digest_and_missing_pending_target_do_not_write (test_runtime_updater.RuntimeUpdaterTests) ... ok\ntest_configuration_rejects_governance_inside_mount (test_sandbox.SandboxTests) ... ok\ntest_execution_refuses_unresolved_network_policy_before_docker (test_sandbox.SandboxTests) ... ok\ntest_explicit_network_policy_is_rendered (test_sandbox.SandboxTests) ... ok\ntest_only_authorized_workspace_is_mounted (test_sandbox.SandboxTests) ... ok\ntest_reviewer_workspace_mount_is_read_only (test_sandbox.SandboxTests) ... ok\ntest_envelope_identity_is_deterministic (test_transport.TransportTests) ... ok\ntest_logical_histories_are_independent (test_transport.TransportTests) ... ok\ntest_payload_is_received_verbatim (test_transport.TransportTests) ... ok\n\n----------------------------------------------------------------------\nRan 22 tests in 0.016s\n\nOK\n"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--",
+        "miniloop/docs/miniloop_static.md",
+        "miniloop/docs/miniloop_runtime.md"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

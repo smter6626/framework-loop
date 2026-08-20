@@ -1,0 +1,15 @@
+{
+  "model_requested": "qwen35b-64k:latest",
+  "model_returned": "qwen35b-64k:latest",
+  "done_reason": "stop",
+  "thinking_disabled": true,
+  "content": "",
+  "tool_calls": [
+    {
+      "name": "set_receiver",
+      "arguments": {
+        "receiver": "human"
+      }
+    }
+  ]
+}
