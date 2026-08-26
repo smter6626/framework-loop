@@ -1,0 +1,14 @@
+{
+  "model": "qwen35b-64k:latest",
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_timeout_seconds": 900,
+  "docker_image": "miniloop-executor:0.1",
+  "docker_network_mode": null,
+  "docker_timeout_seconds": 600,
+  "static_path": "docs/miniloop_static.md",
+  "runtime_path": "docs/miniloop_runtime.md",
+  "receiver_path": "control/receiver",
+  "workspace_path": "workspace",
+  "reviewer_instruction_path": "roles/reviewer.md",
+  "executor_instruction_path": "roles/executor.md"
+}

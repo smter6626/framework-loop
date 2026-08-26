@@ -1,0 +1,5 @@
+src/miniloop/__pycache__/
+tests/__pycache__/
+*.pyc
+logs/*.jsonl
+evidence/*.jsonl
