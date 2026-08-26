@@ -1,0 +1,1099 @@
+# 2PCloop Static — Two-PC Codex Reviewer–Executor Loop
+
+## Status and Authority
+
+本文件是 `2PCloop` 的 **Static contract / design baseline**。它记录双机器 Reviewer–Executor 循环的稳定目标、背景、角色边界、实操架构、已知 Issue 与当前对应 solution、实现顺序和验收标准。
+
+本文件**不是 Runtime**，不记录某一步当前是否完成、当前 blocker、临时调试状态或某次运行结果。`2PCloop` 的 Runtime 将在真正开始实现并需要 authoritative execution state 时另行创建；当前明确 **暂不创建 Runtime**。
+
+若后续实现 evidence 证明某项设计假设不成立，可由 Human Owner 修改本 Static；在此之前，Executor 不得自行扩大 scope 或改变本合同。
+
+---
+
+## 1. Objective
+
+在两台独立 Apple Silicon Mac 上，把现有人工 Reviewer–Executor 工作流机械化为一个可运行的双机器循环：
+
+```text
+MacBook Air / Reviewer
+        |
+        | bounded peer instruction
+        v
+remote transport / orchestrator
+        |
+        v
+MacBook Pro / Executor
+        |
+        | implementation + evidence locator
+        v
+remote transport / orchestrator
+        |
+        v
+MacBook Air / Reviewer
+        |
+        +--> REJECT -> repair -> Executor
+        |
+        +--> ACCEPT -> Runtime transition / next Active Step
+        |
+        +--> HUMAN -> stop and request Human Owner
+```
+
+目标是自动化**实操中的消息传递、Codex 调用、Git/evidence 同步与循环控制**，而不是重新证明 Reviewer–Executor 理论。
+
+核心成功条件是：
+
+> Human 不再需要手工复制 Reviewer prompt 到 Executor、再把 Executor 回执复制回 Reviewer；两台机器可以在保留现有治理边界的前提下完成有界的 Reviewer → Executor → Reviewer → repair/accept 循环。
+
+---
+
+## 2. Background
+
+### 2.1 Existing execution-governance model
+
+现有 `structured-llm-execution-framework` 已采用 repository-backed state，而不是 conversation-backed state：
+
+- **Static**：长期稳定目标、硬约束、背景、权限边界与 acceptance criteria；
+- **Runtime**：当前权威执行状态、已完成步骤、唯一 Active Step、blocker、evidence locator、accepted/rejected/superseded 状态；
+- **Git / Artifacts / Evidence**：Reviewer 独立验收的事实边界；
+- **Reviewer prompt**：单次交给 Executor 的 bounded task、局部背景、修改边界和需要返回的 evidence。
+
+长期状态不依赖某个 Codex conversation。实际工作中已经能够随意新建对话并依靠 Static + Runtime + 当前 Reviewer instruction 继续工作，因此 `2PCloop` **不把 conversation continuity 当作 authoritative memory，也不把 cold-session recovery 当成新的核心研究问题**。
+
+### 2.2 Existing role separation
+
+当前人工工作流已经长期遵守：
+
+- Reviewer 负责读取与更新 Static / Runtime、形成 bounded instruction、独立检查 evidence、最终 ACCEPT / REJECT；
+- Executor 负责实现代码、运行测试和 self-check、提供 evidence locator；
+- Executor 不修改 Static / Runtime；
+- Reviewer 默认不替 Executor 修改 implementation code；
+- Executor 的自然语言 `PASS` 或总结不是最终 acceptance evidence。
+
+`2PCloop` 的任务是把这些已存在的操作规则变成更可靠的程序边界，而不是改变角色定义。
+
+### 2.3 Two-machine operating environment
+
+当前可用环境：
+
+- **MacBook Air**：独立 ChatGPT Plus / Codex account；初始计划用作 Reviewer；
+- **MacBook Pro**：另一独立 ChatGPT Plus / Codex account；初始计划用作 Executor；
+- 两台机器都可运行 Codex；
+- 两台机器可以拥有目标 repository 的独立 clone；
+- GitHub 作为 repository/evidence synchronization boundary；
+- 双机可通过 SSH 通信；不同网络时可在 SSH 下增加 Tailscale 等私有网络层。
+
+### 2.4 Initial model-role configuration
+
+当前优先尝试：
+
+```text
+Reviewer (Air):     GPT-5.6 Sol, xhigh
+Executor (MBP):     GPT-5.6 Terra, high
+```
+
+该配置是**当前运行选择，不是架构 invariant，也不是文章理论 claim**。
+
+现有文章对模型能力的相关 claim 只保持在已有观察层面：较好的 Reviewer 通常能够发现 Executor 工作中的问题。`2PCloop` 不要求证明 Terra-high 是最佳 Executor，也不要求证明异构模型优于同构模型。
+
+若某一账号临时 quota 消耗过快，Human 可以人工交换两台机器上的 Reviewer / Executor role prompt 或更换模型/session；这种低频资源调度**不进入自动 role-rebind scope**。
+
+---
+
+## 3. Foundational Design Principles
+
+### Principle A — Python routes; LLMs understand semantics
+
+Orchestrator 是 deterministic transport/control layer，不是 semantic reasoner。
+
+Python 不应从 Reviewer / Executor 自由文本中推断：
+
+- 哪段是 reasoning；
+- 哪段是 instruction；
+- 哪段是 evidence；
+- 是否 ACCEPT / REJECT；
+- 某一句话真正想触发什么状态迁移。
+
+Agent 间自然语言内容视为 opaque payload。Python 只拥有确定的 transport/control metadata。
+
+推荐边界：
+
+```text
+Deterministic envelope owned by software
++
+verbatim natural-language payload produced by Codex
+```
+
+### Principle B — Do not require prompt-only structured output
+
+不能把正确性建立在“模型总能稳定输出合法 JSON/XML/marker”上。
+
+若需要结构化控制，必须来自：
+
+- Python 自己生成的 envelope；
+- runtime-enforced tool/API；
+- reviewer-only control file；
+- 其他 deterministic control channel。
+
+不能使用：
+
+```python
+if "ACCEPT" in output:
+    ...
+```
+
+这种自由文本关键词解析来推进 Runtime。
+
+### Principle C — Git is evidence/state synchronization, not chat transport
+
+两台机器之间的自然语言消息通过 remote transport 传递；Git 用于同步实际 repository state 和 evidence。
+
+```text
+Peer message transport -> SSH / worker RPC
+Repository evidence     -> Git commit / SHA / artifacts
+```
+
+不要依赖 Git commit message、issue comment 或临时文件轮询来承担实时 Agent-to-Agent chat。
+
+### Principle D — Session state is disposable
+
+Codex thread/session 可用于降低重复 context 构造成本，但不是 authoritative state。
+
+任何时刻都应允许：
+
+```text
+old conversation discarded
+        ->
+new Reviewer/Executor thread
+        ->
+reconstruct from Static + Runtime + repository + current peer instruction
+```
+
+不要求自动进行 role swap；Human 可在需要时手工新建 session 或交换角色。
+
+---
+
+## 4. Proposed Practical Architecture
+
+### 4.1 Control-plane placement
+
+第一版优先让 **MacBook Air 同时承担 Reviewer host 与 deterministic orchestrator**。
+
+```text
+┌──────────────────── MacBook Air ────────────────────┐
+│                                                     │
+│  Static / Runtime / Reviewer automation clone       │
+│                 |                                   │
+│                 v                                   │
+│        deterministic Python orchestrator            │
+│                 |                                   │
+│                 v                                   │
+│          Codex Python SDK                           │
+│          Reviewer / Sol xhigh                       │
+│                 |                                   │
+└─────────────────|───────────────────────────────────┘
+                  |
+                  | SSH (Tailscale optional)
+                  | opaque payload + deterministic metadata
+                  v
+┌──────────────────── MacBook Pro ────────────────────┐
+│                                                     │
+│          remote executor worker                     │
+│                 |                                   │
+│                 v                                   │
+│          Codex Python SDK                           │
+│          Executor / Terra high                      │
+│                 |                                   │
+│          implementation / tests                     │
+│                 |                                   │
+└─────────────────|───────────────────────────────────┘
+                  |
+                  | Git push / exact commit SHA
+                  v
+              repository
+                  |
+                  v
+             Reviewer fetch
+```
+
+MBP 不需要后台“理解”Reviewer 是否发送了内容。Air orchestrator 主动通过 SSH 调用 MBP worker；**远程 process invocation 本身就是消息事件**。
+
+### 4.2 Codex invocation
+
+首选当前官方 **Codex Python SDK (`openai-codex`)**：
+
+```text
+thread.run(prompt)
+```
+
+对应 UI 中“把 prompt 输入并发送”的程序化动作；`TurnResult.final_response` 对应本轮最终 Codex 回执。
+
+推荐用途：
+
+- Air reviewer worker：启动/继续 Reviewer thread；
+- MBP executor worker：启动/继续 Executor thread；
+- model、reasoning effort、cwd、sandbox、developer instructions 均由 worker/config 显式设置；
+- 两台机器分别复用各自本地 Codex/ChatGPT authentication，不复制账号 credential。
+
+Fallback：官方 `codex exec` non-interactive mode，通过 stdin 输入 prompt、stdout/final output 接回结果。
+
+**不实现 Codex App GUI automation，不模拟鼠标、键盘、输入框、Enter 或 Send button。**
+
+### 4.3 Message envelope
+
+建议每条跨机消息至少包含：
+
+```text
+protocol_version
+run_id
+turn_id
+message_id
+sender
+receiver
+expected_base_sha
+payload
+```
+
+其中：
+
+- metadata 由 orchestrator 确定；
+- `payload` 是 peer Codex 原始自然语言输出，默认原样传输；
+- prompt 通过 stdin / framed protocol 传递，不作为 shell argv，以避免 quoting、长度和特殊字符问题。
+
+### 4.4 Dedicated automation clones
+
+两台机器必须优先使用独立的 automation working copy，例如：
+
+```text
+Air: ~/loop-workspaces/<project>-reviewer/
+MBP: ~/loop-workspaces/<project>-executor/
+```
+
+不要直接对 Human 日常开发 working tree 做 `reset/clean/checkout`。
+
+每次 turn 开始前可机械检查：
+
+- repository identity 正确；
+- working tree 处于预期状态；
+- 当前 commit 与 `expected_base_sha` 一致；
+- 没有未知 uncommitted Human work。
+
+不满足则 fail closed。
+
+### 4.5 Canonical turn sequence
+
+建议的单轮顺序：
+
+```text
+1. Reviewer reads Static + Runtime + repository evidence.
+2. Reviewer produces one bounded peer instruction.
+3. Reviewer-side orchestrator wraps the raw payload in a deterministic envelope.
+4. Air invokes MBP worker over SSH.
+5. MBP validates message_id, expected_base_sha, repository identity and clean state.
+6. MBP invokes Codex Executor programmatically.
+7. Executor modifies only permitted implementation/test/artifact paths and runs self-checks.
+8. Worker validates post-turn mutation surface.
+9. Executor-side state is committed/pushed or otherwise exposed under an exact immutable SHA/evidence locator.
+10. Executor final response is returned to Air as opaque payload plus deterministic transport metadata.
+11. Reviewer fetches the exact Executor SHA and independently inspects actual evidence.
+12a. REJECT -> Reviewer issues bounded repair instruction -> return to Step 3.
+12b. ACCEPT -> Reviewer performs authorized Runtime transition -> next Active Step.
+12c. HUMAN -> automatic progression stops and Human Owner is requested.
+```
+
+Reviewer verdict prose 与真正的 control-plane transition 必须分离。
+
+---
+
+## 5. Role and Capability Boundaries
+
+### Human Owner
+
+负责：
+
+- 真实目标与主观偏好；
+- Static 的实质修改；
+- 高风险、敏感、不可逆决策；
+- 无法由 evidence 解决的冲突；
+- quota/model/account 异常下的人工 role swap 或模型变更；
+- 需要时恢复/终止 loop。
+
+### Reviewer
+
+允许：
+
+- 读取 Static / Runtime；
+- 读取目标 repository、commit、diff、tests、logs、artifacts；
+- 形成 bounded Executor instruction；
+- 独立运行 read-only verification；
+- 按合同更新 Runtime；
+- Human 明确授权时修改 Static；
+- 最终 ACCEPT / REJECT / HUMAN decision routing。
+
+默认禁止：
+
+- 代替 Executor 修改 implementation code；
+- 根据 Executor 自述直接 ACCEPT；
+- 绕过 evidence boundary。
+
+### Executor
+
+允许：
+
+- 接收当前 bounded instruction；
+- 修改允许的 implementation / test / generated artifact；
+- 运行命令、测试、自检；
+- 返回 implementation result、limitation、blocker 和 evidence locator。
+
+禁止：
+
+- 修改 Static；
+- 修改 authoritative Runtime；
+- 最终 ACCEPT 自己的工作；
+- 扩大 Active Step scope。
+
+### Orchestrator / workers
+
+负责：
+
+- deterministic routing；
+- message IDs / turn IDs / run IDs；
+- remote invocation；
+- authentication/session invocation boundary；
+- expected SHA validation；
+- mutation-surface validation；
+- idempotency；
+- persistent transport logs；
+- mechanical circuit breakers；
+- stop/fail-closed behavior。
+
+不得承担 semantic acceptance。
+
+---
+
+## 6. Known Issues and Proposed Solutions
+
+## Issue 1 — 两台 Mac 如何进行 peer communication
+
+### Problem
+
+Reviewer 需要把 bounded instruction 自动交给另一台机器上的 Executor；Executor 完成后需要把自然语言回执自动交回 Reviewer。不能再依赖 Human copy/paste。
+
+### Proposed Solution
+
+第一版使用 **SSH remote invocation**：
+
+```text
+Air orchestrator
+    -> SSH stdin
+    -> MBP executor_worker
+    -> response stdout/framed response
+    -> Air orchestrator
+```
+
+如果两台机器处于不同网络，可在 SSH 下使用 Tailscale 等私有 overlay network；不要因为跨网络而改 Agent protocol。
+
+### Verification
+
+在完全不调用 Codex 的情况下完成 byte-preserving：
+
+```text
+Air -> MBP echo worker -> Air
+```
+
+并验证 Unicode、多行 Markdown、代码块、引号等 payload 不被修改。
+
+---
+
+## Issue 2 — 如何程序化“按下 Codex 的发送按钮”
+
+### Problem
+
+GUI Codex App 中的输入框/Send/Enter 不适合稳定自动化。
+
+### Proposed Solution
+
+首选官方 Codex Python SDK：
+
+```text
+Thread.run(prompt) -> TurnResult.final_response
+```
+
+Fallback 使用 `codex exec` non-interactive mode，通过 stdin 输入 prompt。
+
+明确不使用 AppleScript/UI OCR/Accessibility/mouse/keyboard simulation 作为主路径。
+
+### Verification
+
+每台机器分别完成：
+
+```text
+local worker -> one bounded Codex prompt -> deterministic return of final_response
+```
+
+并确认使用的是预期本地 account、model、reasoning configuration 和 cwd。
+
+---
+
+## Issue 3 — Executor 回执如何自动重新触发 Reviewer
+
+### Problem
+
+即使 MBP 能运行 Codex，也必须让 Executor 完成事件自动成为 Reviewer 下一 turn 的输入。
+
+### Proposed Solution
+
+Air orchestrator 保持 control loop：
+
+```text
+reviewer_result.final_response
+    -> remote executor turn
+    -> executor_result.final_response
+    -> reviewer_thread.run(executor_payload)
+```
+
+不需要 Air 轮询某个聊天窗口，也不需要 MBP 反向主动连接 Reviewer Codex UI。
+
+### Verification
+
+先用无代码 dry run 完成：
+
+```text
+Reviewer -> Executor -> Reviewer
+```
+
+至少一次完整自动 round trip。
+
+---
+
+## Issue 4 — Git stale state / Reviewer 与 Executor 看见不同 repository state
+
+### Problem
+
+双机 clone 可能处于不同 commit。若随意 `git pull` 后继续，Reviewer 的 instruction 可能基于 A，而 Executor 实际从 B 修改，破坏 evidence chain。
+
+### Proposed Solution
+
+所有 handoff 都携带 `expected_base_sha`。
+
+接收端必须机械验证：
+
+- expected SHA 存在；
+- local state 可安全切换/fast-forward 到 expected SHA；
+- working tree clean；
+- repository/branch identity 正确。
+
+失败则 stop，不允许“尽量继续”。
+
+任务优先在单独 task branch 上串行交棒，避免两端同时 push 无关修改。
+
+### Verification
+
+故意制造 stale clone，确认 worker 在 Codex invocation 前 fail closed。
+
+---
+
+## Issue 5 — SSH 断线后可能发生 duplicate execution
+
+### Problem
+
+可能出现：
+
+```text
+Air sends message
+-> MBP received and started Codex
+-> network disconnects
+-> Air cannot know whether execution occurred
+-> blind retry may execute the same instruction twice
+```
+
+### Proposed Solution
+
+每条消息使用稳定唯一 `message_id`；MBP 持久化 processed/in-progress/completed message ledger。
+
+同一 `message_id` 再次到达时：
+
+- 若 completed：返回已保存 response/result，不重新运行 Codex；
+- 若 in-progress：报告状态或等待既有 execution，不启动第二次；
+- 只有新 ID 才创建新 turn。
+
+### Verification
+
+模拟 response 丢失并重发同一 message，确认只产生一次 Codex turn / mutation。
+
+---
+
+## Issue 6 — 权限边界不能只靠 role prompt
+
+### Problem
+
+即使 Reviewer/Executor prompt 写得正确，模型仍可能误改不属于自己的文件。
+
+### Proposed Solution
+
+第一版至少实现 **post-turn mechanical mutation-surface validation**：
+
+Reviewer 可写范围默认只允许治理文件（例如 Static/Runtime/Reviewer control paths）；Executor 可写范围只允许 implementation/test/artifact paths。
+
+若 `git diff --name-only` 出现越界路径：
+
+```text
+fail closed
+-> do not accept/push as authoritative progression
+-> repair or Human
+```
+
+后续可进一步用 filesystem permissions、sandbox writable roots、separate checkout 或 MCP/tool capability 收紧。
+
+### Verification
+
+构造故意越界修改，确认系统机械拒绝，而不是依赖模型自觉。
+
+---
+
+## Issue 7 — Reviewer 必须独立验收实际 evidence
+
+### Problem
+
+Executor 自述 `tests passed`、`done` 或 `PASS` 不等价于任务完成。
+
+### Proposed Solution
+
+Executor 回执只提供 evidence locator；Reviewer 根据 exact commit SHA 直接读取：
+
+- source；
+- diff；
+- tests/logs；
+- generated artifacts；
+- acceptance criteria 所需其他 evidence。
+
+Reviewer 可以自行重跑验证命令。
+
+### Verification
+
+构造 Executor 自述成功但 repository evidence 不满足 acceptance criteria 的案例，Reviewer 应能 REJECT。
+
+---
+
+## Issue 8 — Reviewer verdict 如何成为 authoritative control transition
+
+### Problem
+
+不能靠解析自然语言中的 `ACCEPT` / `REJECT` 关键字决定 Runtime transition。
+
+### Proposed Solution
+
+保留旧 Miniloop 的语义/控制分离：Reviewer prose 用于 peer communication；真正 routing 通过 reviewer-only deterministic control channel，例如：
+
+- native control tool/API；或
+- reviewer-only `receiver` control file。
+
+至少支持：
+
+```text
+receiver = executor | human
+```
+
+Runtime transition 同样必须经过 Reviewer-authorized control mechanism，而不是 Python 猜测 prose。
+
+### Verification
+
+Reviewer prose 中出现单词 `ACCEPT` 但未调用 control mechanism 时，不得自动推进 Runtime。
+
+---
+
+## Issue 9 — Dedicated clone 与 Human 手工工作冲突
+
+### Problem
+
+自动 worker 可能需要 checkout/reset/clean；若对 Human 日常工作树操作，可能破坏未提交工作。
+
+### Proposed Solution
+
+Reviewer 和 Executor 使用专用 automation clone/worktree；启动时检查 clean state。Human 手工开发 working tree 与自动循环分离。
+
+### Verification
+
+automation reset/checkout 不影响 Human 工作树。
+
+---
+
+## Issue 10 — Codex turn transport success 不等于 implementation success
+
+### Problem
+
+SDK/CLI 正常返回只能证明一次 model turn 结束，不能证明代码正确、测试成功或 acceptance criteria 满足。
+
+### Proposed Solution
+
+Orchestrator 只记录：
+
+```text
+transport succeeded / failed
+Codex turn completed / errored
+```
+
+Implementation correctness 永远由 Reviewer + actual evidence 决定。
+
+### Verification
+
+Codex 正常返回但故意留下 failing test，系统不得自动 ACCEPT。
+
+---
+
+## Issue 11 — Machine sleep / lid / transient network failure
+
+### Problem
+
+双笔记本可能睡眠、合盖、切换 Wi-Fi 或暂时断线，使 SSH 看似“无响应”。
+
+### Proposed Solution
+
+active loop 期间：
+
+- 机器保持供电与可唤醒；
+- 必要时使用 macOS `caffeinate`；
+- remote worker invocation 具有明确 timeout；
+- timeout 不直接等价于 safe retry，必须结合 message ledger 判断是否已执行；
+- transport healthcheck 与 LLM/task failure 分开记录。
+
+### Verification
+
+模拟 MBP unreachable，确认 loop 停在 infrastructure blocker，而不是无限重试。
+
+---
+
+## Issue 12 — Account quota / auth / model availability failure
+
+### Problem
+
+两个 ChatGPT Plus/Codex account 有独立 quota；可能发生 quota exhausted、login expired、目标模型不可用或 reasoning setting 被拒绝。
+
+### Proposed Solution
+
+这些错误归类为 infrastructure/Human blocker：
+
+```text
+STOP -> Human Owner
+```
+
+不自动创建大量新 session，不自动交换 Reviewer/Executor role，不无限 fallback 到未知模型。
+
+Human 可手工：
+
+- 等待 quota reset；
+- 重新认证；
+- 改模型；
+- 新建 conversation/thread；
+- 交换两台机器的 role prompt。
+
+### Verification
+
+模拟 account/model failure，确认不会触发重复代码执行或自动 role swap。
+
+---
+
+## Issue 13 — 无限 repair / clarification loop
+
+### Problem
+
+Reviewer 与 Executor 可能重复：
+
+```text
+REJECT -> repair -> REJECT -> repair ...
+```
+
+### Proposed Solution
+
+第一版不需要理解语义重复，只需 mechanical circuit breaker，例如：
+
+```text
+max_peer_roundtrips_per_run = N
+max_codex_turns_per_run = M
+```
+
+达到上限后转 Human。
+
+### Verification
+
+构造固定拒绝循环，确认达到阈值后停止。
+
+---
+
+## Issue 14 — Human Decision Gate
+
+### Problem
+
+真实任务存在 subjective/high-risk/contract-changing 决策，不能强行自动推进。
+
+### Proposed Solution
+
+Reviewer 通过 deterministic control channel 设置 `receiver=human`；orchestrator 持久化当前 run/turn/base SHA，然后停止。
+
+Human input 后可显式恢复；恢复语义后续实现时再细化。
+
+### Verification
+
+进入 Human Gate 后不得继续远程调用 Executor。
+
+---
+
+## Issue 15 — Payload quoting / encoding / length
+
+### Problem
+
+Reviewer prompt 可能包含 Markdown、代码块、单双引号、Unicode 和很长文本；把 prompt 直接拼进 shell command 容易损坏内容或引入 quoting/injection bug。
+
+### Proposed Solution
+
+payload 通过 stdin 或明确 framing 的 IPC protocol 传输，不作为 shell argv 拼接；统一 UTF-8；transport envelope 与 payload 分离。
+
+### Verification
+
+包含复杂 Markdown/Unicode/代码块的 round trip hash 保持一致。
+
+---
+
+## Issue 16 — Concurrent turns / overlapping mutation
+
+### Problem
+
+若同一 run 同时启动两个 Executor turn，或 Reviewer 在 Executor 尚未提交时启动下一轮，可能破坏唯一 Active Step 和 Git baton。
+
+### Proposed Solution
+
+- 每个 run 默认只允许一个 authoritative in-flight peer turn；
+- worker 使用本地 lock；
+- orchestrator 持久化 turn state；
+- 不实现并行 Executor；
+- 下一 turn 必须引用上一 turn 的确定结果/evidence SHA。
+
+### Verification
+
+并发提交第二请求时应被拒绝或排队，不得同时修改同一 automation clone。
+
+---
+
+## Issue 17 — Crash recovery / process restart
+
+### Problem
+
+Air orchestrator 或 MBP worker 崩溃后，内存中的 run state 会丢失。
+
+### Proposed Solution
+
+持久化最低限度 control-plane evidence：
+
+```text
+run_id
+turn_id
+message_id
+sender/receiver
+expected_base_sha
+transport status
+Codex thread id (if retained)
+result/evidence SHA
+processed-message ledger
+```
+
+自然语言 payload 可 append-only 保存用于 transport evidence，但 repository-backed Static/Runtime/Git 仍是 authoritative task state。
+
+### Verification
+
+在 turn 边界杀掉并重启进程，系统能判断“可重试 / 已完成 / 需要 Human”，而不是盲目重复执行。
+
+---
+
+## Issue 18 — SSH/Tailscale security boundary
+
+### Problem
+
+跨机 worker 不应成为对网络开放的任意命令执行入口。
+
+### Proposed Solution
+
+- 优先 SSH public-key authentication；
+- host key verification 不关闭；
+- 若跨公网，优先使用 Tailscale/私有网络而非暴露自建 HTTP endpoint；
+- remote account 使用最小必要权限；
+- worker 只接受预期 protocol，不把 peer payload直接拼接为 shell command；
+- secrets 不写入 Git/log payload。
+
+### Verification
+
+未授权 host/account 无法调用 worker；恶意 prompt 字符串不能逃逸为 transport-layer shell command。
+
+---
+
+## Issue 19 — Conversation/session continuity 是否需要保持
+
+### Problem
+
+长时间运行时可能自然产生大量 Codex thread history；但现有实际工作流已经证明新建对话能够从 repository-backed state 继续。
+
+### Proposed Solution
+
+Codex thread 只作为短期工作缓存：
+
+- 可以继续已有 thread；
+- 也可以按需创建新 thread；
+- 不需要为了保存 authoritative state 强制长期维持 thread；
+- 不自动复制 Reviewer 完整 history 给 Executor，反之亦然。
+
+此项不是当前实现 blocker。
+
+### Verification
+
+不要求单独作为 2PCloop 第一阶段实验；正常使用中应保持新 thread 可重建。
+
+---
+
+## Issue 20 — Manual role swap
+
+### Problem
+
+某个 Plus account 可能偶发更快耗尽 quota，Human 可能希望交换两台机器的 Reviewer / Executor prompt。
+
+### Proposed Solution
+
+**不实现自动 role swap。**
+
+Human 手工停止 loop、修改配置/role prompt、必要时新建 Codex thread，然后重新启动即可。Static/Runtime/Git 应足以支撑新的 session 继续。
+
+### Verification
+
+仅要求系统可以安全 stop/restart；不要求自动 migration protocol。
+
+---
+
+## 7. Implementation Plan
+
+### Phase 0 — Repository structure and contract
+
+- 建立 `2PCloop` Static；
+- 暂不创建 Runtime；
+- 明确双机、角色、通信、权限与 acceptance boundary。
+
+### Phase 1 — Pure remote transport
+
+目标：完全不调用 Codex。
+
+```text
+Air Python -> SSH -> MBP echo worker -> Air
+```
+
+验证：
+
+- SSH connectivity；
+- stdin/stdout/framing；
+- UTF-8 payload fidelity；
+- timeout behavior；
+- message_id/idempotency skeleton。
+
+### Phase 2 — Single-machine Codex worker probes
+
+在两台机器分别验证：
+
+```text
+worker -> Codex Python SDK -> one bounded prompt -> final_response
+```
+
+确认：
+
+- local authentication；
+- correct account；
+- selected model/reasoning config；
+- cwd/sandbox；
+- new thread + retained thread 两种路径。
+
+### Phase 3 — Dry Reviewer–Executor round trip
+
+不修改代码，只做：
+
+```text
+Air Reviewer
+-> MBP Executor
+-> Air Reviewer
+```
+
+验证无需 Human copy/paste 的自动 peer routing。
+
+### Phase 4 — Dedicated clones + Git baton
+
+- 建立 reviewer/executor automation clone；
+- task branch；
+- expected_base_sha；
+- clean-tree check；
+- exact commit fetch；
+- stale-state rejection；
+- mutation-surface validation。
+
+### Phase 5 — Bounded implementation task
+
+选择一个小型、可验证、无需 Human 主观决策的真实代码任务，完成：
+
+```text
+Reviewer instruction
+-> Executor modification + self-check
+-> exact evidence SHA
+-> Reviewer independent verification
+```
+
+### Phase 6 — Repair path
+
+故意让第一版实现不满足 acceptance criteria，验证：
+
+```text
+Reviewer REJECT
+-> repair instruction
+-> Executor repair
+-> new SHA
+-> Reviewer re-review
+```
+
+### Phase 7 — Control transition / Human Gate
+
+- deterministic reviewer-only receiver/control；
+- Runtime transition authority；
+- Human stop；
+- max-turn circuit breaker。
+
+**Runtime 文件在进入真正实施阶段、需要记录 authoritative Active Step 时再创建。**
+
+### Phase 8 — Robustness
+
+- duplicate message；
+- orchestrator crash；
+- worker crash；
+- SSH timeout；
+- sleep/unreachable；
+- quota/auth/model errors；
+- safe restart。
+
+---
+
+## 8. Acceptance Criteria for a Useful 2PCloop Prototype
+
+第一阶段原型至少应证明：
+
+### A. Automatic peer communication
+
+无需 Human copy/paste，可完成：
+
+```text
+Reviewer -> Executor -> Reviewer
+```
+
+### B. Programmatic Codex invocation
+
+两台机器均通过 Codex SDK 或明确 fallback CLI 被程序触发，不依赖 GUI automation。
+
+### C. Role isolation
+
+Reviewer 与 Executor 使用独立 machine/account/session；完整 conversation history 不跨角色复制。
+
+### D. Mutation authority
+
+Executor 不能 authoritative 修改 Static/Runtime；Reviewer 默认不能 authoritative 修改 implementation；越界 mutation 可被机械检测并 fail closed。
+
+### E. Git/evidence consistency
+
+每次 review 基于明确 immutable commit SHA；stale base 被拒绝。
+
+### F. Independent acceptance
+
+Reviewer 能直接检查 actual repository evidence，而不是相信 Executor prose。
+
+### G. Repair loop
+
+至少一次真实：
+
+```text
+Reviewer -> Executor -> Reviewer REJECT -> Executor repair -> Reviewer
+```
+
+### H. Deterministic control plane
+
+Runtime transition / Human routing 不依赖对自由文本搜索 `ACCEPT`、`REJECT` 或 prompt-only JSON。
+
+### I. Duplicate-execution protection
+
+同一 `message_id` 的 transport retry 不得造成第二次代码执行。
+
+### J. Safe infrastructure failure
+
+SSH、sleep、quota、auth、model unavailable、worker crash 等基础设施错误不会被误判成 task success，也不会触发无限 blind retry。
+
+### K. Human Gate
+
+需要 Human 时 loop 能停止且保留足够 control/evidence locator 以恢复。
+
+---
+
+## 9. Explicit Non-Goals for the Initial Prototype
+
+当前不优先：
+
+- 自动 role swap；
+- 多 Executor 并行；
+- Web UI；
+- GUI Codex App automation；
+- 生产级 distributed scheduler；
+- 长期 memory database / vector database；
+- 通过模型自由文本解析控制状态；
+- 对 Terra-high / Sol-xhigh 做新的理论性能 claim；
+- 证明 Reviewer–Executor 理论本身；
+- 无限制 autonomous execution。
+
+---
+
+## 10. Invariants
+
+实现过程中应尽量保持以下规则为程序级 invariant：
+
+1. 一个 run / task 最多只有一个 authoritative Active Step。
+2. 同一 run 默认最多一个 in-flight peer turn。
+3. Executor 无权 authoritative 修改 Static / Runtime。
+4. Reviewer 默认无权 authoritative 修改 implementation code。
+5. Executor 无权最终 ACCEPT 自己的工作。
+6. Reviewer acceptance 必须能定位并检查实际 evidence。
+7. Runtime transition 必须来自 Reviewer-authorized deterministic control mechanism。
+8. 两端 handoff 必须携带并验证 expected repository SHA。
+9. transport retry 必须具备 message-level idempotency。
+10. conversation/session history 不是 authoritative memory。
+11. Human role swap 是人工操作，不是自动 loop feature。
+12. 基础设施失败不得被解释为任务成功。
+13. Python 不理解 Agent 自由文本语义；LLM 理解 LLM，Python 路由 LLM。
+14. 旧的 superseded/invalidated state 不得仅因为仍存在于 Git history 中而恢复为当前 authority。
+
+---
+
+## 11. Current Design Decision Summary
+
+当前首选最小路径：
+
+```text
+Air / Sol xhigh Reviewer
+        |
+Python orchestrator + Codex Python SDK
+        |
+SSH (Tailscale optional)
+        |
+MBP worker + Codex Python SDK
+        |
+Terra high Executor
+        |
+Git commit / exact SHA / evidence
+        |
+Air Reviewer independent review
+```
+
+关键设计取舍：
+
+- **Codex Python SDK first**；`codex exec` fallback；GUI automation excluded。
+- **SSH first**；跨网络时 Tailscale 只作为 network layer。
+- **Git for evidence/state, SSH for peer messages**。
+- **Dedicated automation clones**，不碰 Human 日常 working tree。
+- **expected SHA + message ID** 同时解决 stale-state 与 duplicate-execution 两类双机问题。
+- **Reviewer/Executor capability isolation 保持现有工作流，不重新定义角色**。
+- **role swap 由 Human 手工处理**。
+- **暂不创建 Runtime**；真正进入实现阶段后再建立 authoritative execution state。
