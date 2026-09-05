@@ -25,6 +25,15 @@ args = sys.argv[1:]
 output_path = Path(args[args.index("--output-last-message") + 1])
 prompt = sys.stdin.buffer.read()
 home = os.environ["CODEX_HOME"]
+binary_name = Path(sys.argv[0]).name
+is_resume = "resume" in args
+
+with Path(sys.argv[0]).with_suffix(".calls").open("a", encoding="utf-8") as calls:
+    calls.write(json.dumps(args) + "\n")
+
+if is_resume and "resume-failure" in binary_name:
+    print(json.dumps({"type": "error", "message": "forced resume failure"}))
+    sys.exit(7)
 
 if b"BEGIN VERBATIM PEER PAYLOAD" not in prompt:
     final = "Executor：请完成本次纯文本传输自检，并向 Reviewer 返回回执。\n".encode()
@@ -34,7 +43,12 @@ else:
     final = b"Reviewer handoff: transport receipt reviewed; whole Step 1 remains active.\n"
 
 output_path.write_bytes(final)
-print(json.dumps({"type": "thread.started", "thread_id": "fake-thread-id"}))
+thread_id = args[args.index("resume") + 1] if is_resume else "fake-thread-id"
+if is_resume and "resume-mismatch" in binary_name:
+    thread_id = "wrong-thread-id"
+is_persistent_create = not is_resume and "--ephemeral" not in args
+if not (is_persistent_create and "missing-thread" in binary_name):
+    print(json.dumps({"type": "thread.started", "thread_id": thread_id}))
 print(json.dumps({
     "type": "turn.completed",
     "usage": {
@@ -49,6 +63,80 @@ print(json.dumps({
 
 
 class TextLoopTests(unittest.TestCase):
+    def run_fake_loop(self, root, *, binary_name="codex", session_mode=None):
+        repo_root = root / "repo"
+        runs_root = root / "runs"
+        reviewer_home = root / "reviewer-home"
+        executor_home = root / "executor-home"
+        for directory in (repo_root, reviewer_home, executor_home):
+            directory.mkdir()
+
+        fake_codex = root / binary_name
+        fake_codex.write_text(FAKE_CODEX, encoding="utf-8")
+        fake_codex.chmod(fake_codex.stat().st_mode | stat.S_IXUSR)
+        kwargs = {}
+        if session_mode is not None:
+            kwargs["session_mode"] = session_mode
+        exit_code, run_root = MODULE.orchestrate(
+            repo_root=repo_root,
+            runs_root=runs_root,
+            codex_bin=str(fake_codex),
+            reviewer_home=reviewer_home,
+            executor_home=executor_home,
+            run_id="test-run",
+            timeout_seconds=10,
+            **kwargs,
+        )
+        return exit_code, run_root, fake_codex
+
+    def test_profile_metadata_exposes_only_selected_config_fields(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            home = Path(temporary_directory)
+            (home / "config.toml").write_text(
+                'model = "test-model"\n'
+                'model_reasoning_effort = "high"\n'
+                'api_key = "must-not-appear"\n',
+                encoding="utf-8",
+            )
+            (home / "auth.json").write_text("must-not-be-read", encoding="utf-8")
+
+            metadata = MODULE.profile_config_metadata(home)
+            self.assertEqual(metadata["model"], "test-model")
+            self.assertEqual(metadata["model_reasoning_effort"], "high")
+            self.assertNotIn("must-not-appear", json.dumps(metadata))
+            self.assertNotIn("must-not-be-read", json.dumps(metadata))
+
+    def test_frozen_experiment_enforces_control_then_treatment(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            experiment_file = root / "experiment.json"
+            frozen = {"git_head": "abc123", "runtime_sha256": "def456"}
+
+            control, control_index = MODULE.prepare_experiment(
+                experiment_file=experiment_file,
+                experiment_id="p4a-test",
+                session_mode=MODULE.CONTROL_MODE,
+                run_id="control",
+                runs_root=root,
+                frozen_context=frozen,
+            )
+            self.assertEqual(control_index, 0)
+            self.assertEqual(control["run_order_index"], 1)
+
+            document = json.loads(experiment_file.read_text())
+            document["runs"][0]["status"] = "completed"
+            experiment_file.write_text(json.dumps(document), encoding="utf-8")
+            treatment, treatment_index = MODULE.prepare_experiment(
+                experiment_file=experiment_file,
+                experiment_id="p4a-test",
+                session_mode=MODULE.TREATMENT_MODE,
+                run_id="treatment",
+                runs_root=root,
+                frozen_context=frozen,
+            )
+            self.assertEqual(treatment_index, 1)
+            self.assertEqual(treatment["run_order_index"], 2)
+
     def test_extracts_normal_usage_event(self):
         events = b'\n'.join(
             [
@@ -109,31 +197,21 @@ class TextLoopTests(unittest.TestCase):
     def test_complete_three_turn_run_with_fake_codex(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            repo_root = root / "repo"
-            runs_root = root / "runs"
-            reviewer_home = root / "reviewer-home"
-            executor_home = root / "executor-home"
-            for directory in (repo_root, reviewer_home, executor_home):
-                directory.mkdir()
-
-            fake_codex = root / "codex"
-            fake_codex.write_text(FAKE_CODEX, encoding="utf-8")
-            fake_codex.chmod(fake_codex.stat().st_mode | stat.S_IXUSR)
-
-            exit_code, run_root = MODULE.orchestrate(
-                repo_root=repo_root,
-                runs_root=runs_root,
-                codex_bin=str(fake_codex),
-                reviewer_home=reviewer_home,
-                executor_home=executor_home,
-                run_id="test-run",
-                timeout_seconds=10,
-            )
+            exit_code, run_root, _ = self.run_fake_loop(root)
 
             self.assertEqual(exit_code, 0)
             manifest = json.loads((run_root / "manifest.json").read_text())
             self.assertEqual(manifest["status"], "completed")
             self.assertEqual(len(manifest["turns"]), 3)
+            self.assertEqual(manifest["session_mode"], MODULE.CONTROL_MODE)
+            self.assertTrue(
+                all(
+                    turn["session_mode"] == MODULE.FRESH_EPHEMERAL
+                    and "--ephemeral" in turn["command"]
+                    and "resume" not in turn["command"]
+                    for turn in manifest["turns"]
+                )
+            )
             self.assertEqual(len(manifest["transports"]), 2)
             self.assertTrue(
                 all(item["preserved_verbatim"] for item in manifest["transports"])
@@ -164,6 +242,87 @@ class TextLoopTests(unittest.TestCase):
             self.assertIn("Turn 1 — reviewer", transcript)
             self.assertIn("Turn 2 — executor", transcript)
             self.assertIn("Turn 3 — reviewer", transcript)
+
+    def test_treatment_command_construction_and_resume_relationship(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            exit_code, run_root, _ = self.run_fake_loop(
+                root, session_mode=MODULE.TREATMENT_MODE
+            )
+
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads((run_root / "manifest.json").read_text())
+            turn1, turn2, turn3 = manifest["turns"]
+            self.assertEqual(turn1["session_mode"], MODULE.NEW_PERSISTENT)
+            self.assertNotIn("--ephemeral", turn1["command"])
+            self.assertEqual(turn1["created_thread_id"], "fake-thread-id")
+            self.assertEqual(turn2["session_mode"], MODULE.FRESH_EPHEMERAL)
+            self.assertIn("--ephemeral", turn2["command"])
+            self.assertEqual(turn3["session_mode"], MODULE.RESUME)
+            self.assertNotIn("--ephemeral", turn3["command"])
+            resume_index = turn3["command"].index("resume")
+            self.assertEqual(
+                turn3["command"][resume_index + 1], turn1["created_thread_id"]
+            )
+            self.assertEqual(
+                turn3["resume_target_thread_id"], "fake-thread-id"
+            )
+            self.assertEqual(
+                turn3["observed_resume_thread_id"], "fake-thread-id"
+            )
+            self.assertTrue(turn3["resume_relationship_verified"])
+            self.assertTrue(
+                all(item["preserved_verbatim"] for item in manifest["transports"])
+            )
+
+    def test_treatment_missing_created_thread_id_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            exit_code, run_root, _ = self.run_fake_loop(
+                root,
+                binary_name="missing-thread-codex",
+                session_mode=MODULE.TREATMENT_MODE,
+            )
+
+            self.assertEqual(exit_code, 1)
+            manifest = json.loads((run_root / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "failed")
+            self.assertEqual(len(manifest["turns"]), 1)
+            self.assertIsNone(manifest["turns"][0]["created_thread_id"])
+
+    def test_resume_process_failure_does_not_fallback_to_fresh(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            exit_code, run_root, fake_codex = self.run_fake_loop(
+                root,
+                binary_name="resume-failure-codex",
+                session_mode=MODULE.TREATMENT_MODE,
+            )
+
+            self.assertEqual(exit_code, 1)
+            manifest = json.loads((run_root / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "failed")
+            self.assertEqual(len(manifest["turns"]), 3)
+            self.assertEqual(manifest["turns"][2]["exit_code"], 7)
+            calls = [json.loads(line) for line in fake_codex.with_suffix(".calls").read_text().splitlines()]
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(sum("resume" in call for call in calls), 1)
+
+    def test_resume_thread_mismatch_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            exit_code, run_root, _ = self.run_fake_loop(
+                root,
+                binary_name="resume-mismatch-codex",
+                session_mode=MODULE.TREATMENT_MODE,
+            )
+
+            self.assertEqual(exit_code, 1)
+            manifest = json.loads((run_root / "manifest.json").read_text())
+            turn3 = manifest["turns"][2]
+            self.assertEqual(turn3["resume_target_thread_id"], "fake-thread-id")
+            self.assertEqual(turn3["observed_resume_thread_id"], "wrong-thread-id")
+            self.assertFalse(turn3["resume_relationship_verified"])
 
 
 if __name__ == "__main__":
