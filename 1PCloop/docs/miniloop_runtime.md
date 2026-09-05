@@ -965,3 +965,76 @@ P4-B = IMPLEMENTED / VALIDATED — AWAITING REVIEW
 ```
 
 P4-B 尚未被 Reviewer `ACCEPT`。当前停止在外部 review gate；不自动进入 persistent Executor、workspace mutation、disposable-file mutation、`multiLanguage_v1` 或 automatic Runtime semantic transition。
+
+---
+
+## Reviewer Decision — P4-B
+
+### 2026-09-05 — P4-B review decision
+
+Status: `ACCEPTED — CONTROL-PLANE MILESTONE`
+
+Step: `Step 1 P4-B`
+
+Reviewed commits:
+
+- `229f5577b3cea1d297096be6c54d596b9d27e507` — P4-B activation；
+- `fe9b48697535107a0d0f1d8c5bb8c4483c616f5d` — deterministic authoritative-context implementation 与 tests；
+- `43f5a727feaa646a5d384e305bce3ddb5e58b0ac` — validation evidence 与 Runtime record。
+
+Review conclusion:
+
+- P4-B 在当前 scope 内通过，无 repair requirement；
+- fresh Reviewer bootstrap 已机械证明完整当前 Static + Runtime bytes 进入 prompt，并记录 source SHA、byte length、line count、Git HEAD 与 prompt offsets；launch 前 source/prompt byte verification 成立；
+- unchanged Reviewer resume 以 session-known/current governance hashes 判断 freshness，未重复注入 governance full bytes，并机械证明恢复目标 Reviewer thread；
+- Runtime hash 变化会进入 `runtime-refresh` 并注入完整新 Runtime；Static hash 变化会 fail-safe rollover 到新 persistent Reviewer thread，并完整 rebootstrap Static + Runtime；
+- missing governance、source/prompt mismatch、persistent thread ID 缺失、resume process failure 和 resume relationship mismatch 均保持 fail closed；
+- Executor 仍为 fresh ephemeral，peer payload byte preservation 与“Python 不解析 Agent natural language / ACCEPT / REJECT”的语义边界未回归；
+- 18 项测试通过，真实 Scenario A/B 与临时 Git fixture Scenario C 足以支持本 control-plane milestone。Scenario C 使用 fake Codex、Static-change 未做真实服务 run，属于已知验证边界，不构成当前 blocker。
+
+Cost interpretation:
+
+- P4-B 的 correctness acceptance 不依赖其单次 aggregate token 指标优于 P4-A；
+- 本次 P4-B Reviewer T1/T3 的真实 usage 与 latency 可作为 observation，但 P4-A/P4-B 的治理文档、role prompt、Executor cache state、随机输出和服务时序不同，因此不能作 benchmark-quality 因果比较；
+- unchanged T3 未重复治理全文这一机制事实已经被 prompt/evidence 直接证明，persistent history 仍计入 reported total input 是正常边界。
+
+Non-blocking boundaries before a medium-scale mutation loop:
+
+1. 当前 `session_known` governance snapshot 只在一次三回合 `orchestrate()` invocation 内存中传递。若后续扩展为多轮 Reviewer→Executor→Reviewer 自循环，必须显式维护并在成功 refresh/rebootstrap 后更新 loop-scoped session-known governance state；不能把本次三回合实现误当作跨任意 cycle / process restart 已自动解决。
+2. P4-B 证明的是 framework governance（Static/Runtime）freshness，不是目标代码仓库 snapshot isolation。进入外部 target-repo mutation 时，应独立记录并检查 target repository、branch、HEAD、working-tree state 与 mutation evidence，不能用 governance Git HEAD 代替 target-repo state。
+3. P3 parser 的多个 `turn.completed` / `cached_input_tokens > input_tokens` 等 robustness 改进仍可保持 non-blocking，不影响 P4-B acceptance。
+
+Architecture interpretation after review:
+
+```text
+Static + Runtime + repository/evidence
+= authoritative external memory
+
+persistent Reviewer session
+= disposable performance working memory
+
+deterministic governance bootstrap / freshness policy
+= accepted current control-plane mechanism
+```
+
+Reviewer persistence 继续是 preferred implementation candidate，而不是永久 architecture invariant。
+
+### Effective-state supersession
+
+本节 supersede 上文 `P4-B = IMPLEMENTED / VALIDATED — AWAITING REVIEW`，旧 evidence 与 provenance 保留不变。
+
+当前有效状态：
+
+```text
+P4-A = ACCEPTED
+P4-B = ACCEPTED
+
+Reviewer persistent + explicit resume
+= PREFERRED IMPLEMENTATION CANDIDATE
+= NOT A PERMANENT ARCHITECTURE INVARIANT
+
+Deterministic authoritative-context reconstruction
+= ACCEPTED CURRENT CONTROL-PLANE MECHANISM
+```
+
+下一候选阶段可以进入 mutation-capable / medium-scale loop 设计与验证，但本次 review **不自动启动** persistent Executor、workspace mutation、automatic Runtime semantic transition 或 `multiLanguage_v1` workload。下一阶段仍需 Human Owner 明确授权。
