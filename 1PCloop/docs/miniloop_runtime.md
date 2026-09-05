@@ -724,3 +724,53 @@ Status: NOT STARTED — REQUIRES HUMAN OWNER ACTIVATION
 P4-B 的候选目标是：在保留更优 Reviewer session mode 的前提下，单独解决 fresh/bootstrap reconstruction 的完整性与成本问题，使 Agent 能机械可验证地获得当前 authoritative Static/Runtime state，同时避免依赖固定 `sed` 行范围或每轮无条件重复灌入整份治理文档。
 
 本次 review **不授权自动启动 P4-B**，也不授权 persistent Executor、workspace mutation、automatic Runtime semantic transition 或 medium-scale workload。下一阶段必须由 Human Owner 明确授权。
+
+---
+
+## Human Owner Activation — P4-B
+
+### 2026-09-05 — Deterministic authoritative-context reconstruction authorized
+
+Status: `P4-B ACTIVE`
+
+Step: `Step 1 P4-B`
+
+Authorization:
+
+- Human Owner 已明确接受上文 P4-A Reviewer decision，并授权进入 `Step 1 / P4-B — Deterministic authoritative-context reconstruction`；
+- 上文 P4-A 的 Done、experiment evidence、review decision 与 provenance 保持不变；
+- 本节 supersede 上文 `P4-B: NOT STARTED — REQUIRES HUMAN OWNER ACTIVATION`，作为当前 effective state。
+
+当前有效状态：
+
+```text
+P4-A = ACCEPTED
+P4-B = ACTIVE
+
+Reviewer persistent + explicit resume
+= preferred implementation candidate
+= not a permanent architecture invariant
+```
+
+P4-B 唯一目标：
+
+- 修复已经由 P4-A 实证的 authoritative-context reconstruction correctness 风险；
+- 由 deterministic orchestration/control layer 机械读取完整当前 Static 与 Runtime，记录 path、SHA-256、byte length、line count、Git HEAD 与 bootstrap/session freshness metadata；
+- fresh Reviewer bootstrap 必须把完整当前 Static 与 Runtime 作为 authoritative input，并可机械验证没有固定行范围截断；
+- Reviewer resume 必须比较 session-known hashes 与 current hashes：unchanged 可以复用 working context，Runtime changed 必须 refresh/reconstruct，Static changed 默认 fail-safe rollover/full rebootstrap；
+- governance file 缺失、bootstrap byte/hash mismatch 或 resume freshness mismatch 必须 fail closed；
+- 保持 peer semantic payload byte preservation，不要求 Python 理解 Agent 自由文本；
+- 单元测试后只做最小真实 Scenario A/B/C 验证，并记录 fresh bootstrap、unchanged resume、changed-Runtime stale-state protection 以及 token/cache/duration evidence；
+- 完成后只进入 `P4-B IMPLEMENTED / VALIDATED — AWAITING REVIEW`，不得自行 `ACCEPT`。
+
+明确禁止：
+
+- 不实现 persistent Executor；
+- 不进入 workspace-write、disposable-file mutation 或 `multiLanguage_v1` workload；
+- 不实现 automatic Runtime semantic transition；
+- Python 不解析 Reviewer / Executor natural language，不搜索 `ACCEPT` / `REJECT` 决定 task state；
+- 不修改 `1PCloop/history/miniloop-skeleton-v0/**`；
+- 不把 Reviewer persistence 宣布为永久架构 invariant；
+- 不构建 RAG、vector DB、semantic Runtime parser 或未经 evidence 支持的复杂增量同步协议。
+
+当前无已知 blocker。Implementation 必须在本 activation record 单独提交后开始。
