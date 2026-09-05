@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -20,7 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_ROOT = REPO_ROOT / "1PCloop"
-ROLES_ROOT = ACTIVE_ROOT / "roles"
 DEFAULT_RUNS_ROOT = ACTIVE_ROOT / "runs"
 DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
 DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
@@ -40,6 +40,14 @@ USAGE_FIELDS = (
     "cache_write_input_tokens",
     "output_tokens",
     "reasoning_output_tokens",
+)
+STATIC_RELATIVE_PATH = Path("1PCloop/docs/miniloop_static.md")
+RUNTIME_RELATIVE_PATH = Path("1PCloop/docs/miniloop_runtime.md")
+AUTHORITATIVE_CONTEXT_MARKER = (
+    b"\n\n--- BEGIN DETERMINISTIC AUTHORITATIVE CONTEXT ---\n"
+)
+AUTHORITATIVE_CONTEXT_END_MARKER = (
+    b"\n--- END DETERMINISTIC AUTHORITATIVE CONTEXT ---\n"
 )
 
 
@@ -199,8 +207,11 @@ def capture_frozen_context(
     }
 
 
-def read_role_prompt(filename: str) -> bytes:
-    return (ROLES_ROOT / filename).read_bytes()
+def read_role_prompt(filename: str, *, repo_root: Path = REPO_ROOT) -> bytes:
+    path = repo_root / "1PCloop/roles" / filename
+    if not path.is_file():
+        raise RuntimeError(f"required role prompt is missing: {path}")
+    return path.read_bytes()
 
 
 def path_is_within(path: Path, root: Path) -> bool:
@@ -315,6 +326,285 @@ def compose_peer_prompt(prefix: bytes, peer_payload: bytes) -> Tuple[bytes, int]
     if prompt[offset : offset + len(peer_payload)] != peer_payload:
         raise AssertionError("peer payload was not preserved verbatim")
     return prompt, offset
+
+
+def count_lines(value: bytes) -> int:
+    """Count logical lines without decoding governance content."""
+    if not value:
+        return 0
+    return value.count(b"\n") + (0 if value.endswith(b"\n") else 1)
+
+
+@dataclass(frozen=True)
+class AuthoritativeDocument:
+    name: str
+    relative_path: str
+    absolute_path: Path
+    content: bytes
+    sha256: str
+    byte_length: int
+    line_count: int
+
+    def metadata(self) -> Dict[str, Any]:
+        return {
+            "path": self.relative_path,
+            "sha256": self.sha256,
+            "bytes": self.byte_length,
+            "lines": self.line_count,
+        }
+
+
+@dataclass(frozen=True)
+class AuthoritativeSnapshot:
+    git_head: str
+    static: AuthoritativeDocument
+    runtime: AuthoritativeDocument
+
+    def hashes(self) -> Dict[str, str]:
+        return {
+            "static_sha256": self.static.sha256,
+            "runtime_sha256": self.runtime.sha256,
+        }
+
+
+@dataclass(frozen=True)
+class AuthoritativePrompt:
+    prompt: bytes
+    payload: bytes
+    payload_offset: int
+    evidence: Dict[str, Any]
+    snapshot: AuthoritativeSnapshot
+    document_offsets: Dict[str, int]
+
+
+def read_authoritative_document(
+    *, repo_root: Path, name: str, relative: Path
+) -> AuthoritativeDocument:
+    path = repo_root / relative
+    if not path.is_file():
+        raise RuntimeError(f"required governance file is missing: {path}")
+    content = path.read_bytes()
+    return AuthoritativeDocument(
+        name=name,
+        relative_path=relative.as_posix(),
+        absolute_path=path,
+        content=content,
+        sha256=sha256_bytes(content),
+        byte_length=len(content),
+        line_count=count_lines(content),
+    )
+
+
+def read_authoritative_snapshot(repo_root: Path) -> AuthoritativeSnapshot:
+    """Read complete governance bytes and bind them to one Git HEAD."""
+    git_head_before = command_stdout(["git", "rev-parse", "HEAD"], cwd=repo_root)
+    static = read_authoritative_document(
+        repo_root=repo_root, name="static", relative=STATIC_RELATIVE_PATH
+    )
+    runtime = read_authoritative_document(
+        repo_root=repo_root, name="runtime", relative=RUNTIME_RELATIVE_PATH
+    )
+    git_head_after = command_stdout(["git", "rev-parse", "HEAD"], cwd=repo_root)
+    if git_head_before != git_head_after:
+        raise RuntimeError("Git HEAD changed while governance context was captured")
+    return AuthoritativeSnapshot(
+        git_head=git_head_before,
+        static=static,
+        runtime=runtime,
+    )
+
+
+def reviewer_context_policy(
+    *,
+    current: AuthoritativeSnapshot,
+    session_known: Optional[AuthoritativeSnapshot],
+    fresh_reason: str,
+) -> Dict[str, Any]:
+    """Choose a byte-injection policy using hashes, never document semantics."""
+    if session_known is None:
+        return {
+            "bootstrap_performed": True,
+            "bootstrap_required": True,
+            "fresh_reason": fresh_reason,
+            "injected_files": ["static", "runtime"],
+            "injection_mode": "full-bootstrap",
+            "refresh_performed": False,
+            "refresh_required": False,
+            "rollover_performed": False,
+            "rollover_required": False,
+        }
+    if session_known.static.sha256 != current.static.sha256:
+        return {
+            "bootstrap_performed": True,
+            "bootstrap_required": True,
+            "fresh_reason": "static-hash-changed",
+            "injected_files": ["static", "runtime"],
+            "injection_mode": "full-rebootstrap-static-change",
+            "refresh_performed": True,
+            "refresh_required": True,
+            "rollover_performed": True,
+            "rollover_required": True,
+        }
+    if session_known.runtime.sha256 != current.runtime.sha256:
+        return {
+            "bootstrap_performed": False,
+            "bootstrap_required": False,
+            "fresh_reason": None,
+            "injected_files": ["runtime"],
+            "injection_mode": "runtime-refresh",
+            "refresh_performed": True,
+            "refresh_required": True,
+            "rollover_performed": False,
+            "rollover_required": False,
+        }
+    return {
+        "bootstrap_performed": False,
+        "bootstrap_required": False,
+        "fresh_reason": None,
+        "injected_files": [],
+        "injection_mode": "resume-unchanged",
+        "refresh_performed": False,
+        "refresh_required": False,
+        "rollover_performed": False,
+        "rollover_required": False,
+    }
+
+
+def build_authoritative_prompt(
+    *,
+    role_prompt: bytes,
+    current: AuthoritativeSnapshot,
+    session_known: Optional[AuthoritativeSnapshot],
+    fresh_reason: str,
+    peer_payload: Optional[bytes] = None,
+) -> Tuple[AuthoritativePrompt, Optional[int]]:
+    """Build a deterministic context envelope with exact document byte ranges."""
+    policy = reviewer_context_policy(
+        current=current,
+        session_known=session_known,
+        fresh_reason=fresh_reason,
+    )
+    control_metadata = {
+        "bootstrap_performed": policy["bootstrap_performed"],
+        "bootstrap_required": policy["bootstrap_required"],
+        "current_git_head": current.git_head,
+        "current_hashes": current.hashes(),
+        "fresh_reason": policy["fresh_reason"],
+        "injected_files": policy["injected_files"],
+        "injection_mode": policy["injection_mode"],
+        "refresh_performed": policy["refresh_performed"],
+        "refresh_required": policy["refresh_required"],
+        "rollover_performed": policy["rollover_performed"],
+        "rollover_required": policy["rollover_required"],
+        "schema_version": 1,
+        "session_known_git_head": (
+            session_known.git_head if session_known is not None else None
+        ),
+        "session_known_hashes": (
+            session_known.hashes() if session_known is not None else None
+        ),
+        "static": current.static.metadata(),
+        "runtime": current.runtime.metadata(),
+    }
+    payload_parts = [
+        AUTHORITATIVE_CONTEXT_MARKER,
+        json.dumps(
+            control_metadata,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ).encode("utf-8"),
+        b"\n",
+    ]
+    document_payload_offsets: Dict[str, int] = {}
+    documents = {"static": current.static, "runtime": current.runtime}
+    for name in policy["injected_files"]:
+        document = documents[name]
+        payload_parts.append(
+            f"--- BEGIN COMPLETE {name.upper()} BYTES ---\n".encode("ascii")
+        )
+        document_payload_offsets[name] = sum(len(part) for part in payload_parts)
+        payload_parts.append(document.content)
+        if document.content and not document.content.endswith(b"\n"):
+            payload_parts.append(b"\n")
+        payload_parts.append(
+            f"--- END COMPLETE {name.upper()} BYTES ---\n".encode("ascii")
+        )
+    payload_parts.append(AUTHORITATIVE_CONTEXT_END_MARKER)
+    payload = b"".join(payload_parts)
+    payload_offset = len(role_prompt)
+    prompt = role_prompt + payload
+    document_offsets = {
+        name: payload_offset + offset
+        for name, offset in document_payload_offsets.items()
+    }
+    peer_payload_offset: Optional[int] = None
+    if peer_payload is not None:
+        prompt, peer_payload_offset = compose_peer_prompt(prompt, peer_payload)
+
+    evidence = {
+        **control_metadata,
+        "authoritative_payload_bytes": len(payload),
+        "authoritative_payload_offset": payload_offset,
+        "authoritative_payload_sha256": sha256_bytes(payload),
+        "document_prompt_offsets": document_offsets,
+        "prompt_bytes": len(prompt),
+        "prompt_sha256": sha256_bytes(prompt),
+        "validation": {
+            "failure": None,
+            "performed_before_launch": False,
+            "prompt_bytes_verified": False,
+            "source_bytes_verified": False,
+        },
+    }
+    return (
+        AuthoritativePrompt(
+            prompt=prompt,
+            payload=payload,
+            payload_offset=payload_offset,
+            evidence=evidence,
+            snapshot=current,
+            document_offsets=document_offsets,
+        ),
+        peer_payload_offset,
+    )
+
+
+def validate_authoritative_prompt(authoritative: AuthoritativePrompt) -> None:
+    """Fail closed unless source, metadata, payload, and prompt bytes agree."""
+    evidence = authoritative.evidence
+    if sha256_bytes(authoritative.prompt) != evidence.get("prompt_sha256"):
+        raise RuntimeError("authoritative prompt hash mismatch")
+    payload_offset = authoritative.payload_offset
+    payload_end = payload_offset + len(authoritative.payload)
+    if authoritative.prompt[payload_offset:payload_end] != authoritative.payload:
+        raise RuntimeError("authoritative payload does not match prompt bytes")
+    if sha256_bytes(authoritative.payload) != evidence.get(
+        "authoritative_payload_sha256"
+    ):
+        raise RuntimeError("authoritative payload hash mismatch")
+
+    documents = {
+        "static": authoritative.snapshot.static,
+        "runtime": authoritative.snapshot.runtime,
+    }
+    injected_files = evidence.get("injected_files")
+    if set(authoritative.document_offsets) != set(injected_files or []):
+        raise RuntimeError("authoritative injected-file metadata mismatch")
+    for name, document in documents.items():
+        content = document.absolute_path.read_bytes() if document.absolute_path.is_file() else None
+        if content != document.content:
+            raise RuntimeError(f"{name} governance bytes changed before launch")
+        if document.sha256 != sha256_bytes(document.content):
+            raise RuntimeError(f"{name} governance SHA-256 mismatch")
+        if document.byte_length != len(document.content):
+            raise RuntimeError(f"{name} governance byte-length mismatch")
+        if document.line_count != count_lines(document.content):
+            raise RuntimeError(f"{name} governance line-count mismatch")
+        if name in authoritative.document_offsets:
+            offset = authoritative.document_offsets[name]
+            if authoritative.prompt[offset : offset + len(document.content)] != document.content:
+                raise RuntimeError(f"{name} governance prompt-byte mismatch")
 
 
 def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
@@ -512,6 +802,7 @@ def run_turn(
     peer_payload: Optional[bytes] = None,
     peer_payload_offset: Optional[int] = None,
     peer_source: Optional[str] = None,
+    authoritative_context: Optional[AuthoritativePrompt] = None,
 ) -> TurnResult:
     turn_dir = run_root / f"turn-{number:02d}-{role}"
     turn_dir.mkdir(parents=True)
@@ -522,6 +813,30 @@ def run_turn(
     final_path = turn_dir / "final.txt"
     process_path = turn_dir / "process.json"
     prompt_path.write_bytes(prompt)
+
+    authoritative_evidence: Optional[Dict[str, Any]] = None
+    authoritative_failure: Optional[str] = None
+    if authoritative_context is not None:
+        authoritative_evidence = copy.deepcopy(authoritative_context.evidence)
+        try:
+            if prompt != authoritative_context.prompt:
+                raise RuntimeError("turn prompt differs from authoritative prompt")
+            validate_authoritative_prompt(authoritative_context)
+        except (OSError, RuntimeError) as exc:
+            authoritative_failure = str(exc)
+            authoritative_evidence["validation"] = {
+                "failure": authoritative_failure,
+                "performed_before_launch": True,
+                "prompt_bytes_verified": False,
+                "source_bytes_verified": False,
+            }
+        else:
+            authoritative_evidence["validation"] = {
+                "failure": None,
+                "performed_before_launch": True,
+                "prompt_bytes_verified": True,
+                "source_bytes_verified": True,
+            }
 
     transport: Optional[Dict[str, Any]] = None
     if peer_payload is not None:
@@ -558,30 +873,35 @@ def run_turn(
     started_at = utc_now()
     started_monotonic = time.monotonic()
     exit_code: Optional[int] = None
-    failure: Optional[str] = None
+    failure: Optional[str] = (
+        f"authoritative-context validation failed: {authoritative_failure}"
+        if authoritative_failure is not None
+        else None
+    )
     stdout = b""
     stderr = b""
 
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=str(repo_root),
-            env=environment,
-            input=prompt,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout_seconds,
-            check=False,
-        )
-        exit_code = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as exc:
-        failure = f"timeout after {timeout_seconds} seconds"
-        stdout = exc.stdout or b""
-        stderr = exc.stderr or b""
-    except OSError as exc:
-        failure = f"unable to launch Codex: {exc}"
+    if authoritative_failure is None:
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=str(repo_root),
+                env=environment,
+                input=prompt,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout_seconds,
+                check=False,
+            )
+            exit_code = completed.returncode
+            stdout = completed.stdout
+            stderr = completed.stderr
+        except subprocess.TimeoutExpired as exc:
+            failure = f"timeout after {timeout_seconds} seconds"
+            stdout = exc.stdout or b""
+            stderr = exc.stderr or b""
+        except OSError as exc:
+            failure = f"unable to launch Codex: {exc}"
 
     duration_seconds = round(time.monotonic() - started_monotonic, 3)
     events_path.write_bytes(stdout)
@@ -620,6 +940,7 @@ def run_turn(
             )
 
     process: Dict[str, Any] = {
+        "authoritative_context": authoritative_evidence,
         "codex_home": str(codex_home),
         "created_thread_id": created_thread_id,
         "cache_hit_ratio": event_metadata["cache_hit_ratio"],
@@ -670,6 +991,7 @@ def write_manifest(
     status: str,
     run_session_mode: str,
     experiment: Optional[Dict[str, Any]] = None,
+    failure: Optional[str] = None,
 ) -> None:
     transports = [
         turn.process["transport"]
@@ -678,6 +1000,7 @@ def write_manifest(
     ]
     manifest = {
         "experiment": experiment,
+        "failure": failure,
         "finished_at": utc_now() if status != "running" else None,
         "repo_root": str(repo_root),
         "run_id": run_id,
@@ -798,8 +1121,32 @@ def orchestrate(
         experiment,
     )
 
+    try:
+        reviewer_session_context = read_authoritative_snapshot(repo_root)
+    except (OSError, RuntimeError) as exc:
+        failure = f"authoritative-context bootstrap failed: {exc}"
+        write_manifest(
+            run_root,
+            repo_root,
+            run_id,
+            started_at,
+            turns,
+            "failed",
+            session_mode,
+            experiment,
+            failure=failure,
+        )
+        write_transcript(run_root, run_id, turns)
+        return 1, run_root
+
     reviewer_initial_mode = (
         FRESH_EPHEMERAL if session_mode == CONTROL_MODE else NEW_PERSISTENT
+    )
+    reviewer_initial_context, _ = build_authoritative_prompt(
+        role_prompt=read_role_prompt("reviewer-initial.md", repo_root=repo_root),
+        current=reviewer_session_context,
+        session_known=None,
+        fresh_reason="reviewer-initial-thread",
     )
 
     turn1 = run_turn(
@@ -810,8 +1157,9 @@ def orchestrate(
         number=1,
         role="reviewer",
         codex_home=reviewer_home,
-        prompt=read_role_prompt("reviewer-initial.md"),
+        prompt=reviewer_initial_context.prompt,
         session_mode=reviewer_initial_mode,
+        authoritative_context=reviewer_initial_context,
     )
     turns.append(turn1)
     if not turn1.success:
@@ -829,7 +1177,7 @@ def orchestrate(
         return 1, run_root
 
     executor_prompt, executor_offset = compose_peer_prompt(
-        read_role_prompt("executor.md"), turn1.final_message
+        read_role_prompt("executor.md", repo_root=repo_root), turn1.final_message
     )
     turn2 = run_turn(
         run_root=run_root,
@@ -860,17 +1208,45 @@ def orchestrate(
         write_transcript(run_root, run_id, turns)
         return 1, run_root
 
-    review_prompt, review_offset = compose_peer_prompt(
-        read_role_prompt("reviewer-review.md"), turn2.final_message
+    try:
+        current_reviewer_context = read_authoritative_snapshot(repo_root)
+    except (OSError, RuntimeError) as exc:
+        failure = f"authoritative-context freshness check failed: {exc}"
+        write_manifest(
+            run_root,
+            repo_root,
+            run_id,
+            started_at,
+            turns,
+            "failed",
+            session_mode,
+            experiment,
+            failure=failure,
+        )
+        write_transcript(run_root, run_id, turns)
+        return 1, run_root
+
+    session_known_context = (
+        reviewer_session_context if session_mode == TREATMENT_MODE else None
     )
-    resume_target_thread_id = (
-        turn1.process["created_thread_id"]
-        if session_mode == TREATMENT_MODE
-        else None
+    reviewer_review_context, review_offset = build_authoritative_prompt(
+        role_prompt=read_role_prompt("reviewer-review.md", repo_root=repo_root),
+        current=current_reviewer_context,
+        session_known=session_known_context,
+        fresh_reason="reviewer-review-fresh-thread",
+        peer_payload=turn2.final_message,
     )
-    reviewer_review_mode = (
-        FRESH_EPHEMERAL if session_mode == CONTROL_MODE else RESUME
-    )
+    if session_mode == CONTROL_MODE:
+        reviewer_review_mode = FRESH_EPHEMERAL
+        resume_target_thread_id = None
+    elif reviewer_review_context.evidence["rollover_required"]:
+        reviewer_review_mode = NEW_PERSISTENT
+        resume_target_thread_id = None
+    else:
+        reviewer_review_mode = RESUME
+        resume_target_thread_id = turn1.process["created_thread_id"]
+    if review_offset is None:
+        raise AssertionError("reviewer peer payload offset was not constructed")
     turn3 = run_turn(
         run_root=run_root,
         repo_root=repo_root,
@@ -879,12 +1255,13 @@ def orchestrate(
         number=3,
         role="reviewer",
         codex_home=reviewer_home,
-        prompt=review_prompt,
+        prompt=reviewer_review_context.prompt,
         session_mode=reviewer_review_mode,
         resume_target_thread_id=resume_target_thread_id,
         peer_payload=turn2.final_message,
         peer_payload_offset=review_offset,
         peer_source=relative_path(turn2.turn_dir / "final.txt", run_root),
+        authoritative_context=reviewer_review_context,
     )
     turns.append(turn3)
 
@@ -933,9 +1310,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             raise SystemExit(f"{label} does not exist: {path}")
     if (args.experiment_file is None) != (args.experiment_id is None):
         raise SystemExit("--experiment-file and --experiment-id must be used together")
-    if args.session_mode == TREATMENT_MODE and args.experiment_file is None:
-        raise SystemExit("reviewer-resume treatment requires frozen experiment metadata")
-
     repo_root = args.repo_root.resolve()
     runs_root = args.runs_root.resolve()
     reviewer_home = args.reviewer_home.resolve()
