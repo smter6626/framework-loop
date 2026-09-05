@@ -1,0 +1,48 @@
+reviewer initial
+
+
+--- BEGIN DETERMINISTIC AUTHORITATIVE CONTEXT ---
+{
+  "bootstrap_performed": true,
+  "bootstrap_required": true,
+  "current_git_head": "1d003d565e265d7aecf6e5aaf48b7a8644782978",
+  "current_hashes": {
+    "runtime_sha256": "d43aa2aa1f2fc7d0d473e924a5fa15034b02338c0abe52e5e1e50b04a6a5ebd8",
+    "static_sha256": "2f263dce848819b2fe5d2773e5fbc210b7b1ef44f86bfe1545e0bdc2ce2aae3b"
+  },
+  "fresh_reason": "reviewer-initial-thread",
+  "injected_files": [
+    "static",
+    "runtime"
+  ],
+  "injection_mode": "full-bootstrap",
+  "refresh_performed": false,
+  "refresh_required": false,
+  "rollover_performed": false,
+  "rollover_required": false,
+  "runtime": {
+    "bytes": 32,
+    "lines": 2,
+    "path": "1PCloop/docs/miniloop_runtime.md",
+    "sha256": "d43aa2aa1f2fc7d0d473e924a5fa15034b02338c0abe52e5e1e50b04a6a5ebd8"
+  },
+  "schema_version": 1,
+  "session_known_git_head": null,
+  "session_known_hashes": null,
+  "static": {
+    "bytes": 30,
+    "lines": 2,
+    "path": "1PCloop/docs/miniloop_static.md",
+    "sha256": "2f263dce848819b2fe5d2773e5fbc210b7b1ef44f86bfe1545e0bdc2ce2aae3b"
+  }
+}
+--- BEGIN COMPLETE STATIC BYTES ---
+# Static
+complete static tail
+--- END COMPLETE STATIC BYTES ---
+--- BEGIN COMPLETE RUNTIME BYTES ---
+# Runtime
+complete runtime tail
+--- END COMPLETE RUNTIME BYTES ---
+
+--- END DETERMINISTIC AUTHORITATIVE CONTEXT ---

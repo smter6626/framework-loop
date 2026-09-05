@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a0721d-4a79-7d63-8d9c-b60cae83eb2b"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Executor: For this transport demonstration, make no file, repository, Static, or Runtime changes. Reply with a brief text-only execution receipt stating that you received this instruction, performed no mutations, and self-checked that your response remains text-only and within scope."}}
+{"type":"turn.completed","usage":{"input_tokens":29247,"cached_input_tokens":11008,"cache_write_input_tokens":0,"output_tokens":148,"reasoning_output_tokens":90}}

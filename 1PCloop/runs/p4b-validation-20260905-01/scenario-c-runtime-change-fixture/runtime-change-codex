@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+output_path = Path(args[args.index("--output-last-message") + 1])
+prompt = sys.stdin.buffer.read()
+home = os.environ["CODEX_HOME"]
+binary_name = Path(sys.argv[0]).name
+is_resume = "resume" in args
+
+if home.endswith("executor-home"):
+    if "runtime-change" in binary_name:
+        runtime_path = Path.cwd() / "1PCloop/docs/miniloop_runtime.md"
+        runtime_path.write_bytes(runtime_path.read_bytes() + b"runtime growth after T1\n")
+    if "static-change" in binary_name:
+        static_path = Path.cwd() / "1PCloop/docs/miniloop_static.md"
+        static_path.write_bytes(static_path.read_bytes() + b"static growth after T1\n")
+
+with Path(sys.argv[0]).with_suffix(".calls").open("a", encoding="utf-8") as calls:
+    calls.write(json.dumps(args) + "\n")
+
+if is_resume and "resume-failure" in binary_name:
+    print(json.dumps({"type": "error", "message": "forced resume failure"}))
+    sys.exit(7)
+
+if b"BEGIN VERBATIM PEER PAYLOAD" not in prompt:
+    final = "Executor：请完成本次纯文本传输自检，并向 Reviewer 返回回执。\n".encode()
+elif home.endswith("executor-home"):
+    final = b"Executor receipt with a literal ``` fence and no repository mutation.\n"
+else:
+    final = b"Reviewer handoff: transport receipt reviewed; whole Step 1 remains active.\n"
+
+output_path.write_bytes(final)
+thread_id = args[args.index("resume") + 1] if is_resume else "fake-thread-id"
+if is_resume and "resume-mismatch" in binary_name:
+    thread_id = "wrong-thread-id"
+is_persistent_create = not is_resume and "--ephemeral" not in args
+if not (is_persistent_create and "missing-thread" in binary_name):
+    print(json.dumps({"type": "thread.started", "thread_id": thread_id}))
+print(json.dumps({
+    "type": "turn.completed",
+    "usage": {
+        "input_tokens": 10,
+        "cached_input_tokens": 4,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3,
+        "reasoning_output_tokens": 2
+    }
+}))

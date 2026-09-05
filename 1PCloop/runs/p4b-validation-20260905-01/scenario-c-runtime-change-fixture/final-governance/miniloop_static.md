@@ -1,0 +1,2 @@
+# Static
+complete static tail

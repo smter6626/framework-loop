@@ -1,0 +1,106 @@
+{
+  "authoritative_context": {
+    "authoritative_payload_bytes": 56095,
+    "authoritative_payload_offset": 1697,
+    "authoritative_payload_sha256": "23170f5f2bc9183bb8a97727098cce1f49140f82b66e4a9e0737455c5b0b4c41",
+    "bootstrap_performed": true,
+    "bootstrap_required": true,
+    "current_git_head": "fe9b48697535107a0d0f1d8c5bb8c4483c616f5d",
+    "current_hashes": {
+      "runtime_sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce",
+      "static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+    },
+    "document_prompt_offsets": {
+      "runtime": 20949,
+      "static": 2839
+    },
+    "fresh_reason": "reviewer-initial-thread",
+    "injected_files": [
+      "static",
+      "runtime"
+    ],
+    "injection_mode": "full-bootstrap",
+    "prompt_bytes": 57792,
+    "prompt_sha256": "fef14c8caeb34ad50c024e1bdc20ebc56cd8450819055bb36a8501ab826f024d",
+    "refresh_performed": false,
+    "refresh_required": false,
+    "rollover_performed": false,
+    "rollover_required": false,
+    "runtime": {
+      "bytes": 36759,
+      "lines": 776,
+      "path": "1PCloop/docs/miniloop_runtime.md",
+      "sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce"
+    },
+    "schema_version": 1,
+    "session_known_git_head": null,
+    "session_known_hashes": null,
+    "static": {
+      "bytes": 18039,
+      "lines": 534,
+      "path": "1PCloop/docs/miniloop_static.md",
+      "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+    },
+    "validation": {
+      "failure": null,
+      "performed_before_launch": true,
+      "prompt_bytes_verified": true,
+      "source_bytes_verified": true
+    }
+  },
+  "cache_hit_ratio": 0.37638,
+  "cache_write_input_tokens": 0,
+  "cached_input_tokens": 11008,
+  "codex_home": "/Users/smterpro/.codex-B",
+  "command": [
+    "/Users/smterpro/.local/state/fnm_multishells/33569_1788620383065/bin/codex",
+    "exec",
+    "--json",
+    "--color",
+    "never",
+    "-c",
+    "approval_policy=\"never\"",
+    "--sandbox",
+    "read-only",
+    "--cd",
+    "/Users/smterpro/Workspace/framework-loop",
+    "--output-last-message",
+    "/Users/smterpro/Workspace/framework-loop/1PCloop/runs/p4b-validation-20260905-01/turn-01-reviewer/final.txt",
+    "-"
+  ],
+  "created_thread_id": "01a0721d-4a79-7d63-8d9c-b60cae83eb2b",
+  "duration_seconds": 7.331,
+  "event_parse": {
+    "blank_lines": 0,
+    "irrelevant_json_events": 2,
+    "malformed_json_lines": 0,
+    "thread_started_events": 1,
+    "turn_completed_events": 1,
+    "usage_events": 1,
+    "valid_json_lines": 4
+  },
+  "events_path": "turn-01-reviewer/events.jsonl",
+  "exit_code": 0,
+  "failure": null,
+  "final_message_path": "turn-01-reviewer/final.txt",
+  "final_message_sha256": "282f71810c65ea8a81f2afa16d19f5621da58e45ee38ca3bc615be03f2e95838",
+  "finished_at": "2026-09-05T15:08:43.950+00:00",
+  "input_tokens": 29247,
+  "observed_resume_thread_id": null,
+  "output_tokens": 148,
+  "prompt_path": "turn-01-reviewer/prompt.txt",
+  "prompt_sha256": "fef14c8caeb34ad50c024e1bdc20ebc56cd8450819055bb36a8501ab826f024d",
+  "reasoning_output_tokens": 90,
+  "resume_relationship_verified": null,
+  "resume_target_thread_id": null,
+  "role": "reviewer",
+  "sandbox": "read-only",
+  "session_mode": "new-persistent",
+  "started_at": "2026-09-05T15:08:36.618+00:00",
+  "stderr_path": "turn-01-reviewer/stderr.txt",
+  "success": true,
+  "thread_id": "01a0721d-4a79-7d63-8d9c-b60cae83eb2b",
+  "transport": null,
+  "turn": 1,
+  "uncached_input_tokens": 18239
+}

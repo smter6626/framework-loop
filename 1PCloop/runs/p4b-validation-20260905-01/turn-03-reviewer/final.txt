@@ -1,0 +1,1 @@
+Accepted for this text-only transport demonstration: the Executor confirmed no mutations and completed the requested scope self-check. This validates only the current basic routing receipt, not whole Step 1 or any Runtime transition.

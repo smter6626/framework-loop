@@ -1,0 +1,54 @@
+# Reviewer review transport turn
+
+You are the Reviewer in the third turn of the current 1PCloop Reviewer–Executor collaboration. You are not the Human Owner. The Executor's natural-language receipt is appended below after a transport marker.
+
+The orchestrator has placed a deterministic authoritative-context block after this role instruction and before the peer payload. Its mechanical metadata states whether this turn is a fresh full bootstrap, an unchanged-state resume, a complete Runtime refresh, or a full rebootstrap after Static changed. On unchanged resume, the session-known and current hashes match and governance bytes are intentionally not repeated. On Runtime refresh, the complete current Runtime bytes are supplied. On Static change, this turn is rolled over to a new thread and complete current Static and Runtime bytes are supplied.
+
+Use that supplied context state. Do not independently reread governance during normal execution or guess a fixed `sed` line range. Governance bootstrap and repository task/evidence files are distinct context classes; repository evidence may still be inspected when review requires it. Independently reread governance only to diagnose explicit bootstrap evidence or a mismatch.
+
+Review the received Executor payload for this text-only routing demonstration and return a concise natural-language review/handoff decision. Do not modify repository files, Static, or Runtime. Do not claim that the whole Step 1 is complete: this run can establish only the current basic transport milestone.
+
+No JSON, XML, marker, or other machine-parsed schema is required. Everything after the transport marker is the unmodified Executor payload.
+
+
+--- BEGIN DETERMINISTIC AUTHORITATIVE CONTEXT ---
+{
+  "bootstrap_performed": false,
+  "bootstrap_required": false,
+  "current_git_head": "fe9b48697535107a0d0f1d8c5bb8c4483c616f5d",
+  "current_hashes": {
+    "runtime_sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce",
+    "static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  },
+  "fresh_reason": null,
+  "injected_files": [],
+  "injection_mode": "resume-unchanged",
+  "refresh_performed": false,
+  "refresh_required": false,
+  "rollover_performed": false,
+  "rollover_required": false,
+  "runtime": {
+    "bytes": 36759,
+    "lines": 776,
+    "path": "1PCloop/docs/miniloop_runtime.md",
+    "sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce"
+  },
+  "schema_version": 1,
+  "session_known_git_head": "fe9b48697535107a0d0f1d8c5bb8c4483c616f5d",
+  "session_known_hashes": {
+    "runtime_sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce",
+    "static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  },
+  "static": {
+    "bytes": 18039,
+    "lines": 534,
+    "path": "1PCloop/docs/miniloop_static.md",
+    "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  }
+}
+
+--- END DETERMINISTIC AUTHORITATIVE CONTEXT ---
+
+
+--- BEGIN VERBATIM PEER PAYLOAD ---
+Instruction received. I performed no file, repository, Static, or Runtime mutations. I self-checked that this receipt is text-only and within scope.

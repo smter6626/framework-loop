@@ -1,0 +1,1 @@
+Executor receipt with a literal ``` fence and no repository mutation.

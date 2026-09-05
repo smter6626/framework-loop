@@ -1,0 +1,5 @@
+executor
+
+
+--- BEGIN VERBATIM PEER PAYLOAD ---
+Executor：请完成本次纯文本传输自检，并向 Reviewer 返回回执。

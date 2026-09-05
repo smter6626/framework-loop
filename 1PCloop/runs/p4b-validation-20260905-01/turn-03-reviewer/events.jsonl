@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a0721d-4a79-7d63-8d9c-b60cae83eb2b"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Accepted for this text-only transport demonstration: the Executor confirmed no mutations and completed the requested scope self-check. This validates only the current basic routing receipt, not whole Step 1 or any Runtime transition."}}
+{"type":"turn.completed","usage":{"input_tokens":30300,"cached_input_tokens":28416,"cache_write_input_tokens":0,"output_tokens":154,"reasoning_output_tokens":108}}

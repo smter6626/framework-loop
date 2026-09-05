@@ -1,0 +1,106 @@
+{
+  "authoritative_context": {
+    "authoritative_payload_bytes": 1349,
+    "authoritative_payload_offset": 17,
+    "authoritative_payload_sha256": "d735f20b8e6085bf0a5014c97db8af4d87299a67e5e93e6b32d8db751501db14",
+    "bootstrap_performed": true,
+    "bootstrap_required": true,
+    "current_git_head": "1d003d565e265d7aecf6e5aaf48b7a8644782978",
+    "current_hashes": {
+      "runtime_sha256": "d43aa2aa1f2fc7d0d473e924a5fa15034b02338c0abe52e5e1e50b04a6a5ebd8",
+      "static_sha256": "2f263dce848819b2fe5d2773e5fbc210b7b1ef44f86bfe1545e0bdc2ce2aae3b"
+    },
+    "document_prompt_offsets": {
+      "runtime": 1250,
+      "static": 1149
+    },
+    "fresh_reason": "reviewer-initial-thread",
+    "injected_files": [
+      "static",
+      "runtime"
+    ],
+    "injection_mode": "full-bootstrap",
+    "prompt_bytes": 1366,
+    "prompt_sha256": "50ee626e10372f3b0742f9a56dba582b40f81c1c649806565ec1e2cb8b391f78",
+    "refresh_performed": false,
+    "refresh_required": false,
+    "rollover_performed": false,
+    "rollover_required": false,
+    "runtime": {
+      "bytes": 32,
+      "lines": 2,
+      "path": "1PCloop/docs/miniloop_runtime.md",
+      "sha256": "d43aa2aa1f2fc7d0d473e924a5fa15034b02338c0abe52e5e1e50b04a6a5ebd8"
+    },
+    "schema_version": 1,
+    "session_known_git_head": null,
+    "session_known_hashes": null,
+    "static": {
+      "bytes": 30,
+      "lines": 2,
+      "path": "1PCloop/docs/miniloop_static.md",
+      "sha256": "2f263dce848819b2fe5d2773e5fbc210b7b1ef44f86bfe1545e0bdc2ce2aae3b"
+    },
+    "validation": {
+      "failure": null,
+      "performed_before_launch": true,
+      "prompt_bytes_verified": true,
+      "source_bytes_verified": true
+    }
+  },
+  "cache_hit_ratio": 0.4,
+  "cache_write_input_tokens": 0,
+  "cached_input_tokens": 4,
+  "codex_home": "/tmp/1pcloop-p4b-runtime-change.jXoaPb/reviewer-home",
+  "command": [
+    "/tmp/1pcloop-p4b-runtime-change.jXoaPb/runtime-change-codex",
+    "exec",
+    "--json",
+    "--color",
+    "never",
+    "-c",
+    "approval_policy=\"never\"",
+    "--sandbox",
+    "read-only",
+    "--cd",
+    "/tmp/1pcloop-p4b-runtime-change.jXoaPb/repo",
+    "--output-last-message",
+    "/tmp/1pcloop-p4b-runtime-change.jXoaPb/runs/test-run/turn-01-reviewer/final.txt",
+    "-"
+  ],
+  "created_thread_id": "fake-thread-id",
+  "duration_seconds": 0.127,
+  "event_parse": {
+    "blank_lines": 0,
+    "irrelevant_json_events": 0,
+    "malformed_json_lines": 0,
+    "thread_started_events": 1,
+    "turn_completed_events": 1,
+    "usage_events": 1,
+    "valid_json_lines": 2
+  },
+  "events_path": "turn-01-reviewer/events.jsonl",
+  "exit_code": 0,
+  "failure": null,
+  "final_message_path": "turn-01-reviewer/final.txt",
+  "final_message_sha256": "59c8a88ccc722bae04f1220ad48ffae3d3f9854898c4abe9c6fc1da84e6c5e9e",
+  "finished_at": "2026-09-05T15:09:41.649+00:00",
+  "input_tokens": 10,
+  "observed_resume_thread_id": null,
+  "output_tokens": 3,
+  "prompt_path": "turn-01-reviewer/prompt.txt",
+  "prompt_sha256": "50ee626e10372f3b0742f9a56dba582b40f81c1c649806565ec1e2cb8b391f78",
+  "reasoning_output_tokens": 2,
+  "resume_relationship_verified": null,
+  "resume_target_thread_id": null,
+  "role": "reviewer",
+  "sandbox": "read-only",
+  "session_mode": "new-persistent",
+  "started_at": "2026-09-05T15:09:41.522+00:00",
+  "stderr_path": "turn-01-reviewer/stderr.txt",
+  "success": true,
+  "thread_id": "fake-thread-id",
+  "transport": null,
+  "turn": 1,
+  "uncached_input_tokens": 6
+}

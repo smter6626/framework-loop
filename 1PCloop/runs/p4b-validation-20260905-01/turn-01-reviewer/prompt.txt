@@ -1,3 +1,590 @@
+# Reviewer initial transport turn
+
+You are the Reviewer in the current 1PCloop Reviewer–Executor collaboration. You are not the Human Owner, and the next recipient of your final response is another LLM Agent acting as Executor.
+
+The orchestrator has placed a deterministic authoritative-context block after this role instruction. It contains mechanically recorded path, SHA-256, byte length, line count, Git HEAD, and the complete current bytes of both `1PCloop/docs/miniloop_static.md` and `1PCloop/docs/miniloop_runtime.md`. Treat those supplied bytes as the governance input for this fresh thread.
+
+Do not independently reread the governance documents during normal execution; in particular, do not use a guessed fixed `sed` line range as a reconstruction mechanism. A separate repository task or evidence file is not part of the governance bootstrap and may still be inspected when the bounded task requires it. Independently reread governance only when diagnosing explicit bootstrap evidence or a mismatch.
+
+Check that this request is consistent with the current text-only routing milestone.
+
+Produce one concise, bounded natural-language instruction addressed to the Executor. For this transport demonstration, instruct the Executor to perform a text-only response and self-check; do not request repository, Static, or Runtime mutation. The instruction should give the Executor enough context to return an execution receipt that you can review in the third turn.
+
+Do not perform final acceptance of the whole Step 1. Do not modify files. Your complete final response will be transported verbatim as an opaque peer payload; no JSON, XML, marker, or other machine-parsed schema is required.
+
+
+--- BEGIN DETERMINISTIC AUTHORITATIVE CONTEXT ---
+{
+  "bootstrap_performed": true,
+  "bootstrap_required": true,
+  "current_git_head": "fe9b48697535107a0d0f1d8c5bb8c4483c616f5d",
+  "current_hashes": {
+    "runtime_sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce",
+    "static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  },
+  "fresh_reason": "reviewer-initial-thread",
+  "injected_files": [
+    "static",
+    "runtime"
+  ],
+  "injection_mode": "full-bootstrap",
+  "refresh_performed": false,
+  "refresh_required": false,
+  "rollover_performed": false,
+  "rollover_required": false,
+  "runtime": {
+    "bytes": 36759,
+    "lines": 776,
+    "path": "1PCloop/docs/miniloop_runtime.md",
+    "sha256": "e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce"
+  },
+  "schema_version": 1,
+  "session_known_git_head": null,
+  "session_known_hashes": null,
+  "static": {
+    "bytes": 18039,
+    "lines": 534,
+    "path": "1PCloop/docs/miniloop_static.md",
+    "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  }
+}
+--- BEGIN COMPLETE STATIC BYTES ---
+# 1PCloop Static
+
+## Objective
+
+在一台 Apple Silicon Mac 上实现并验证一个最小可运行的 Reviewer–Executor 自动闭环（1PCloop）。
+
+当前 active implementation 不再以“单个本地 Ollama/Qwen 模型实例 + 两个逻辑 session”为运行前提，而是使用同一台 M4 Max 上已经独立配置好的两个 ChatGPT/Codex identity：
+
+```text
+Reviewer = dym   = CODEX_HOME=/Users/smterpro/.codex-B
+Executor = cheng = CODEX_HOME=/Users/smterpro/.codex-A
+```
+
+两个角色由 deterministic local orchestrator 显式调用、路由和切换。权威项目状态仍由 Static、Runtime、repository、实际 artifact 与 evidence 承担，而不是依赖任一 Codex conversation history。
+
+目标链路为：
+
+```text
+Reviewer reads Static + Runtime + repository evidence
+    -> Reviewer sends one bounded instruction
+    -> orchestrator invokes Executor
+    -> Executor performs authorized work
+    -> Executor self-checks and reports evidence locator
+    -> orchestrator returns the raw receipt to Reviewer
+    -> Reviewer independently checks actual evidence
+    -> ACCEPT or REJECT
+    -> on REJECT: repair instruction -> Executor -> Reviewer
+    -> on ACCEPT: Runtime transition
+```
+
+1PCloop 的目标不是实现完整生产级 Agent 平台，而是把当前已被人工使用验证的 Reviewer–Executor 工作流机械化，并证明它可以在无人手工复制粘贴 peer message 的情况下真实闭环运行。
+
+---
+
+## Current Execution Environment
+
+### Physical host
+
+当前 active host：
+
+- Apple M4 Max；
+- 48 GB Unified Memory；
+- macOS；
+- Reviewer 与 Executor 位于同一台物理机器。
+
+因此本项目仍属于 **1PCloop**。角色隔离来自独立 Codex identity/profile state，而不是来自两台物理机器。
+
+### Codex identity binding
+
+当前存在两个独立 Codex profile：
+
+```text
+cheng
+  CODEX_HOME=/Users/smterpro/.codex-A
+
+dym
+  CODEX_HOME=/Users/smterpro/.codex-B
+```
+
+已确认两边具有独立的：
+
+- authentication state；
+- session/history state；
+- profile-local application state。
+
+`/Users/smterpro/.codex` 不是 authoritative identity binding。它可以作为人工日常使用的 convenience symlink，但 automated orchestration 不得依赖它判断当前账号。
+
+当前 convenience symlink 指向 `.codex-B`；这个事实不是 1PCloop invariant。
+
+### Default role binding
+
+当前默认角色：
+
+```text
+Reviewer = dym   = .codex-B
+Executor = cheng = .codex-A
+```
+
+角色绑定是 operational configuration，不是理论要求。
+
+如果 usage limit、模型可用性或其他实际原因需要交换账号角色，Human Owner 可以人工重新绑定 Reviewer / Executor。当前 scope **不要求自动 role swap / role migration**。
+
+### Programmatic invocation
+
+1PCloop 的 active automation path 是 Codex CLI / programmatic invocation，不是 GUI automation。
+
+Canonical identity selection：
+
+```text
+CODEX_HOME=/Users/smterpro/.codex-A codex ...
+CODEX_HOME=/Users/smterpro/.codex-B codex ...
+```
+
+已实测：
+
+- A/B 分别执行 `codex exec` 成功；
+- A/B 可以同时运行独立 `codex exec` process；
+- 并发 smoke test 两边均正常返回并以 exit code 0 结束。
+
+因此 GUI App 是否能够同时打开，不属于 1PCloop control path 的限制。
+
+### Shared binary, isolated profiles
+
+Codex executable/runtime installation 在两个 profile 间共享。
+
+已观察到一个 profile 触发 Codex 更新后，另一个 profile 后续启动直接使用更新后的 binary，无需单独再次更新。
+
+以下状态仍保持 profile-local：
+
+- auth/account identity；
+- sessions/history；
+- profile configuration/state。
+
+具体 Codex version、具体模型名称和 reasoning effort 都属于易变 runtime configuration，不写死为 Static requirement。
+
+---
+
+## Hard Constraints
+
+### 1. Single-host dual-identity execution
+
+- Reviewer 与 Executor 必须运行在当前同一台 physical Mac 上，除非 Human Owner 明确改变本项目 scope。
+- 两个角色必须通过两个独立 Codex identity/profile state 承担。
+- Orchestrator 必须对每次 role invocation 显式绑定目标 `CODEX_HOME`。
+- 不得依赖当前 `~/.codex` symlink、当前 GUI foreground app 或人工账号切换来确定角色身份。
+
+### 2. Role identity is not model identity
+
+Reviewer / Executor 的角色由：
+
+- role instruction；
+- responsibility boundary；
+- authoritative input；
+- allowed action；
+- review/acceptance authority；
+
+定义，而不是由某个特定模型名称定义。
+
+因此：
+
+- Reviewer 与 Executor 可以使用不同模型；
+- 模型可以随 Codex availability、usage 或 Human Owner 决策调整；
+- 当前模型配置不能被当作框架 invariant；
+- 不能把“Reviewer = 某型号模型”或“Executor = 某型号模型”写入理论 claim。
+
+### 3. Orchestrator-mediated communication
+
+Reviewer 与 Executor 之间的自动通信必须经过 deterministic orchestrator 显式路由。
+
+“主动发送消息”在本任务中的含义是：
+
+```text
+Codex role inference
+    -> orchestrator receives current role output
+    -> orchestrator routes the peer payload
+    -> target Codex role is invoked
+```
+
+不得假设某个 Codex conversation 可以在没有 orchestrator invocation 的情况下自行唤醒另一角色。
+
+Reviewer / Executor role instruction 必须明确当前角色是在与另一个 LLM Agent 协作，而不是把 peer payload 误认为 Human message 的全部语境。
+
+### 4. Do not rely on Python understanding natural language
+
+Python orchestrator 是 deterministic transport / control layer，不是自然语言 semantic reasoner。
+
+因此 1PCloop 不得要求 Python 从 Reviewer / Executor 的自由文本中可靠推断：
+
+- reasoning；
+- execution instruction；
+- evidence 的语义；
+- acceptance / rejection；
+- limitation；
+- 自由文本内部的其他 semantic field。
+
+Agent-to-agent 自由文本默认视为 **opaque semantic payload**。
+
+Python 可以添加自身确定的 metadata，例如：
+
+```text
+sender
+receiver
+turn
+run id
+process result
+```
+
+但不应通过解析 peer 自然语言重新构造 Agent 的语义内容。
+
+该边界仍概括为：
+
+```text
+LLM 理解 LLM。
+Python 路由 LLM。
+```
+
+以及：
+
+```text
+Deterministic transport/control metadata
++
+Opaque natural-language LLM payload
+```
+
+### 5. Do not rely on prompt-only structured output for authoritative control
+
+1PCloop 的正确运行不得建立在以下假设上：
+
+> 只要 prompt 写得严格，LLM 就会始终稳定输出合法且语义正确的 JSON / XML / marker / schema。
+
+因此：
+
+- Agent-to-agent semantic communication 不应依赖 prompt-only JSON parsing；
+- 不得用 `if "ACCEPT" in output` 一类字符串搜索直接决定 authoritative Runtime transition；
+- 不得要求 Python 先解析 LLM 自由文本后才能把 peer message 交给另一角色；
+- 如果后续需要 machine-executable control-plane signal，应使用独立 deterministic / runtime-enforced mechanism。
+
+### 6. Repository-backed authoritative state
+
+- Static 与 Runtime 是 1PCloop 的权威治理状态。
+- Conversation history 不是 authoritative project state。
+- Git、source code、test output、run log、generated artifact 可以作为共享 evidence surface。
+- Executor 的自然语言总结本身不能替代它所指向的实际 evidence。
+- 新开 Codex session 不应导致项目状态丢失；角色应能从 repository-backed state reconstruct 当前任务。
+
+### 7. Role separation
+
+#### Reviewer
+
+Reviewer 负责：
+
+- 读取 Static 和 Runtime；
+- 检查当前状态一致性；
+- 编译当前唯一 Active Step；
+- 向 Executor 发送 bounded instruction；
+- 独立访问并检查实际 evidence；
+- 形成 `ACCEPT` 或 `REJECT` verdict；
+- `REJECT` 时产生 repair instruction；
+- evidence 足够时推进 Runtime；
+- 只有在 Human Owner 已明确授权 stable-contract 变化时才修改 Static。
+
+Reviewer 默认不承担当前 Active Step 的主要 implementation work。
+
+#### Executor
+
+Executor 负责：
+
+- 接收当前 Active Step 所需的 bounded context；
+- 执行被授权的 implementation / repository mutation；
+- 调用允许的工具；
+- 运行 self-check；
+- 暴露实际 evidence locator；
+- 向 Reviewer 汇报 implementation result、limitation 和 evidence locator。
+
+Executor 默认不得：
+
+- 修改 Static；
+- 推进 Runtime；
+- 给自己的工作做最终 `ACCEPT`；
+- 自行扩大 Active Step scope。
+
+### 8. Prompt-level role isolation first
+
+当前 prototype 优先验证闭环本身。
+
+Reviewer / Executor 的文件职责边界首先由 role prompt / developer instruction 约束，而不是立即新增复杂 filesystem whitelist 或额外 profile sandbox configuration。
+
+原因：
+
+- 当前人工使用中角色边界已经长期可执行；
+- 额外强制配置会增加日常 Codex 使用摩擦；
+- 目前没有 evidence 表明 prompt-level separation 不足。
+
+如果后续真实运行出现越权修改，再基于实际 failure evidence 加强 filesystem/capability isolation。
+
+### 9. Single authoritative Active Step
+
+正常执行时，Runtime 最多只能有一个 authoritative Active Step。
+
+Repair 仍属于当前 Active Step 的继续执行，不应在未验收当前 Step 时自行激活新的权威 Step。
+
+### 10. Evidence-backed acceptance
+
+Reviewer 最终 `ACCEPT` 必须基于 Reviewer 可以直接定位并检查的 evidence，而不是仅基于 Executor 的 `PASS` 或自然语言报告。
+
+Runtime transition 必须能够指出支持该 transition 的 evidence locator。
+
+---
+
+## Stable Background
+
+### Existing governance model
+
+现有 `structured-llm-execution-framework` 的以下语义是 1PCloop 的治理基础：
+
+- Static / Runtime 分离；
+- Reviewer / Executor role separation；
+- repository / artifact evidence；
+- independent review；
+- bounded Active Step；
+- Human Owner authority。
+
+### Context reconstruction already works in practice
+
+现有人工工作流已经长期采用：
+
+```text
+Static
++ Runtime
++ repository/evidence
++ current bounded peer instruction
+```
+
+重新建立 session context。
+
+因此 conversation continuity 不是本项目当前需要重新证明的核心理论问题。自动 prototype 可以优先使用 fresh `codex exec` session，而不是先实现 session-resume machinery。
+
+### Current verified profile behavior
+
+当前已经验证：
+
+```text
+.codex-A / cheng
+  -> independent account/profile
+  -> codex exec works
+
+.codex-B / dym
+  -> independent account/profile
+  -> codex exec works
+```
+
+串行及并发调用均已成功。
+
+当前观察到的具体模型、reasoning effort、sandbox mode 或 Codex version 只能作为 Runtime/evidence 记录，不能上升为永久 Static contract，除非 Human Owner 明确改变要求。
+
+### Superseded implementation assumptions
+
+以下内容属于早期 Miniloop/Ollama prototype 的 implementation assumption，**不再是 active 1PCloop Hard Constraint**：
+
+- Ollama 必须作为 active runtime；
+- Reviewer 与 Executor 必须复用同一个本地 Qwen model ID / weights；
+- Reviewer / Executor 必须只是同一个 local model object 下的两个 logical history array；
+- active prototype 必须依赖本地 27B/35B Qwen inference；
+- 同模型权重复用是当前 1PCloop acceptance prerequisite。
+
+这些旧实现及其 evidence 已保存在：
+
+```text
+1PCloop/history/miniloop-skeleton-v0/
+```
+
+该目录是 historical implementation snapshot，不应为了当前 active 1PCloop 开发而改写。
+
+---
+
+## Explicitly Out of Scope for Current 1PCloop
+
+当前阶段明确不要求优先解决：
+
+1. GUI automation、AppleScript composer control 或模拟键盘/鼠标发送；
+2. 自动账号 role swap / quota-aware role migration；
+3. production-grade quota management；
+4. Reviewer / Executor 的新 filesystem hard-isolation system，除非真实越权 evidence 证明有必要；
+5. conversation history 超长后的复杂压缩/迁移；
+6. 多个并行 Executor；
+7. 双物理机器 transport（属于 `2PCloop`）；
+8. production-grade queue、distributed database、observability 或 fault recovery；
+9. 长期 memory database / vector database；
+10. 把某个具体 Codex 模型组合证明为理论最优；
+11. 修复不影响 fresh execution 的旧 Codex historical-session metadata。
+
+测试任务必须选择不依赖以上能力即可完成的 bounded scenario。
+
+---
+
+## Authority and Approval
+
+- Human Owner 可以修改本 Static、改变角色绑定或改变 1PCloop stable contract。
+- Reviewer 可以解释 Static、形成 verdict，并在 evidence 支持时更新 Runtime。
+- Reviewer 只有在 Human Owner 已明确授权 stable-contract 变化时才应修改 Static。
+- Executor 无权自行修改 Static。
+- Executor 默认无权修改 Runtime。
+- 若实现过程中发现必须改变 Hard Constraints 或 Acceptance Criteria 才能继续，该变化不能由 Executor 静默完成。
+
+---
+
+## Acceptance Criteria
+
+1PCloop 只有在以下条件都有可定位 evidence 支持时，才可判定完成。
+
+### A. Deterministic dual-profile invocation
+
+必须证明：
+
+- Reviewer invocation 显式绑定 `.codex-B`；
+- Executor invocation 显式绑定 `.codex-A`；
+- 角色调用不依赖 `~/.codex` symlink 或 GUI active profile；
+- 两边 auth/session state 保持独立；
+- 可以按 `Reviewer -> Executor -> Reviewer` 顺序稳定调用。
+
+### B. Automatic inter-agent message routing
+
+必须证明：
+
+- Reviewer 自然语言输出可以由 orchestrator 自动转发给 Executor；
+- Executor 自然语言输出可以由 orchestrator 自动转发给 Reviewer；
+- peer message semantic payload 可以原样保留，不要求 Python 拆 instruction / reasoning / evidence 字段；
+- role instruction 明确双方处于 LLM-to-LLM collaboration context；
+- 完整往返不依赖 Human 手工复制粘贴；
+- transport correctness 不依赖 prompt-only JSON / XML 格式。
+
+### C. Bounded Executor context
+
+必须证明 Executor 接收的是当前 Active Step 所需的 bounded execution context，而不是 Reviewer 的完整 conversation history。
+
+在满足 bounded context 的前提下，Reviewer peer message 应允许作为完整自然语言 payload 直接传递。
+
+### D. Real execution and evidence exposure
+
+Executor 必须完成至少一个真实、可验证的 bounded implementation task，并：
+
+- 对 repository 或明确测试 artifact 产生实际结果；
+- 运行 self-check；
+- 暴露 Reviewer 可以直接访问的 evidence locator。
+
+纯语言角色扮演不满足本项。
+
+### E. Independent Reviewer verification
+
+Reviewer 必须直接检查 acceptance 所需的实际 evidence，并独立形成 verdict。
+
+不得把以下流程视为充分验收：
+
+```text
+Executor: PASS
+Reviewer: ACCEPT
+```
+
+除非 Reviewer 另外直接检查了支持该 claim 的 evidence。
+
+### F. REJECT -> REPAIR path
+
+必须至少通过一个受控测试证明：
+
+```text
+Reviewer REJECT
+    -> bounded repair instruction
+    -> Executor repair
+    -> new evidence
+    -> Reviewer re-review
+```
+
+可以正常运行。
+
+Repair instruction 可以作为 Reviewer 自然语言输出原样路由给 Executor；orchestrator 不得要求 Python 先理解并拆分其语义。
+
+### G. ACCEPT -> Runtime transition
+
+必须证明：
+
+- Reviewer 可以在 evidence 足够时形成 `ACCEPT`；
+- `ACCEPT` 后 Runtime 才发生对应 authoritative transition；
+- transition 记录 evidence locator；
+- Executor 不能自行完成最终 acceptance 或 Runtime progression；
+- authoritative transition control 不依赖 Python 从自由文本中字符串搜索或推断 `ACCEPT`。
+
+### H. No semantic-parser dependency
+
+必须证明核心消息往返在以下条件下仍然成立：
+
+- Python 不理解 Reviewer / Executor 自然语言内容；
+- Python 只负责能够确定的 role identity、sender / receiver、process、turn / run metadata；
+- Reviewer / Executor 允许轻微自然语言格式漂移，只要 peer LLM 能理解实际语义；
+- 系统不因 Agent 未严格遵循某个 prompt-only JSON 模板而失去基本路由能力。
+
+### I. Fresh-session reconstruction compatibility
+
+必须证明 automated loop 不依赖某个历史 Codex conversation 才能继续工作。
+
+至少一个 demonstration 应允许角色通过：
+
+```text
+Static
++ Runtime
++ repository/evidence
++ bounded peer message
+```
+
+在 fresh Codex invocation 中恢复执行所需 context。
+
+### J. Reproducible end-to-end run
+
+Repository 中必须保留足够的 source、role instructions、configuration、test/demo command 与 run evidence，使 Human Owner 能重新运行至少一个完整 demonstration，并观察到：
+
+```text
+Reviewer
+-> Executor
+-> Reviewer
+-> optional REJECT / repair
+-> Reviewer ACCEPT
+-> Runtime progression
+```
+
+---
+
+## Immediate Implementation Order
+
+当前优先顺序：
+
+1. **DONE — account/profile bootstrap**：建立 `.codex-A` / `.codex-B` 两个独立 profile；
+2. **DONE — CLI invocation smoke**：分别通过显式 `CODEX_HOME` 调用 A/B；
+3. **DONE — concurrent process smoke**：验证 A/B `codex exec` 可同时正常完成；
+4. **NEXT — text-only routing loop**：实现 Reviewer -> Executor -> Reviewer 的无人复制粘贴三段自动调用；
+5. 让 Executor 修改 disposable artifact；
+6. Reviewer 独立读取 evidence 并 verdict；
+7. 验证 REJECT -> REPAIR；
+8. 接入 ACCEPT -> Runtime authoritative transition；
+9. 再根据实际 failure evidence 增加 circuit breaker、Human Gate 或 capability enforcement。
+
+不要在第 4 步之前提前实现与已观察问题无关的复杂 infrastructure。
+
+---
+
+## Completion Definition
+
+当上述 Acceptance Criteria 全部满足并由 Reviewer 基于实际 evidence 验收后，1PCloop task 才能从 `ACTIVE` 迁移为 `COMPLETED`。
+
+在此之前，即使：
+
+- 两个 Codex profile 均能调用；
+- 两个 CLI process 可以并发；
+- 某个 Executor implementation 单独成功；
+
+也不等于整个 1PCloop 已完成。
+--- END COMPLETE STATIC BYTES ---
+--- BEGIN COMPLETE RUNTIME BYTES ---
 # Miniloop Runtime
 
 ## 任务状态
@@ -774,194 +1361,6 @@ P4-B 唯一目标：
 - 不构建 RAG、vector DB、semantic Runtime parser 或未经 evidence 支持的复杂增量同步协议。
 
 当前无已知 blocker。Implementation 必须在本 activation record 单独提交后开始。
+--- END COMPLETE RUNTIME BYTES ---
 
----
-
-## P4-B Implementation / Validation Evidence
-
-### 2026-09-05 — Deterministic authoritative-context reconstruction completed
-
-Status: `IMPLEMENTED / VALIDATED — AWAITING REVIEW`
-
-Step: `Step 1 P4-B`
-
-Commits:
-
-- `229f5577b3cea1d297096be6c54d596b9d27e507` — Human Owner activation record；
-- `fe9b48697535107a0d0f1d8c5bb8c4483c616f5d` — deterministic authoritative-context bootstrap、hash freshness policy、role prompt、README 与 tests。
-
-Implementation result:
-
-- Orchestrator 以 bytes 读取完整当前 Static 与 Runtime，不再把 Agent 自主 `cat` / 固定范围 `sed` 作为 correctness mechanism；
-- fresh Reviewer thread 的 input 中包含完整 Static + Runtime bytes，并记录 path、SHA-256、byte length、logical line count、Git HEAD、prompt byte offset、payload SHA/bytes 与 launch 前 source/prompt validation；
-- Reviewer session 的 known hashes 与每次 review 前的 current hashes 机械比较；
-- hashes unchanged：`resume-unchanged`，不重复注入治理文件全文；
-- Runtime changed：保持同一 Reviewer thread，执行 `runtime-refresh` 并注入完整当前 Runtime；
-- Static changed：不恢复 stale-contract thread，改为 new persistent Reviewer thread，并执行完整 Static + Runtime rebootstrap；
-- governance missing、snapshot/source changed、payload/prompt mismatch、persistent thread ID missing、resume process failure 或 resume relationship mismatch 均 fail closed；
-- Executor 仍为 fresh `--ephemeral`，只接收 bounded Reviewer peer payload；Executor 没有被改为 persistent；
-- peer payload 仍逐字节传输，Python 仍只处理机械 metadata，不解析 Agent natural language 或 `ACCEPT` / `REJECT`；
-- active role prompts 已区分 governance bootstrap 与 repository task/evidence context，并明确正常执行时不需要 Agent 自主重读治理文件；historical snapshot 未修改。
-
-Tests:
-
-```text
-python3 -m unittest discover -s 1PCloop/tests -v
-Ran 18 tests
-OK
-```
-
-覆盖：完整 Static/Runtime bytes、实际 SHA、任意 1000 行增长、unchanged resume 不重复 full bootstrap、Runtime refresh、Static rollover/full rebootstrap、missing governance、prompt mismatch、peer byte preservation、natural-language non-parsing、P4-A resume relationship 与 failure behavior。
-
-### Scenario A — fresh bootstrap, real Codex
-
-Run:
-
-```text
-run_id = p4b-validation-20260905-01
-implementation_head = fe9b48697535107a0d0f1d8c5bb8c4483c616f5d
-codex_version = codex-cli 0.153.4
-status = completed
-```
-
-Reviewer Turn 1 mechanical evidence:
-
-```text
-session_mode = new-persistent
-thread_id = 01a0721d-4a79-7d63-8d9c-b60cae83eb2b
-injection_mode = full-bootstrap
-injected_files = [static, runtime]
-
-Static
-  sha256 = f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe
-  bytes = 18039
-  lines = 534
-  prompt_offset = 2839
-
-Runtime
-  sha256 = e998c5124c65757f76183fc65a2fc9e0a75cce1e9627ad0ca42b0f2a89403fce
-  bytes = 36759
-  lines = 776
-  prompt_offset = 20949
-
-authoritative_payload_bytes = 56095
-prompt_bytes = 57792
-source_bytes_verified = true
-prompt_bytes_verified = true
-```
-
-Recorded source hashes 与在记录 offset 对 `prompt.txt` 提取的完整 byte slices 的独立 SHA-256 一致。
-
-Fresh bootstrap usage:
-
-```text
-input_tokens = 29247
-cached_input_tokens = 11008
-uncached_input_tokens = 18239
-output_tokens = 148
-reasoning_output_tokens = 90
-duration_seconds = 7.331
-```
-
-### Scenario B — unchanged resume, real Codex
-
-Reviewer Turn 3 mechanical evidence:
-
-```text
-session_known_static_sha256 = current_static_sha256
-session_known_runtime_sha256 = current_runtime_sha256
-injection_mode = resume-unchanged
-injected_files = []
-refresh_required = false
-refresh_performed = false
-authoritative_payload_bytes = 1324
-prompt_bytes = 3192
-
-resume_target_thread_id = 01a0721d-4a79-7d63-8d9c-b60cae83eb2b
-observed_resume_thread_id = 01a0721d-4a79-7d63-8d9c-b60cae83eb2b
-resume_relationship_verified = true
-```
-
-Unchanged resume usage:
-
-```text
-input_tokens = 30300
-cached_input_tokens = 28416
-uncached_input_tokens = 1884
-output_tokens = 154
-reasoning_output_tokens = 108
-duration_seconds = 6.675
-```
-
-两次 peer transport 均为 `preserved_verbatim=true`。真实 events 中没有 Agent 自主执行治理文档 `sed` / `cat` read。
-
-### Scenario C — Runtime changed, temporary Git fixture
-
-使用独立临时 Git repository 与 integration-test fake Codex process，在 Turn 1 后确定性追加 fixture Runtime bytes；authoritative Runtime 历史未被测试污染。
-
-```text
-session_known_runtime_sha256 = d43aa2aa1f2fc7d0d473e924a5fa15034b02338c0abe52e5e1e50b04a6a5ebd8
-session_known_runtime_bytes = 32
-
-current_runtime_sha256 = cd25feeb9e09b28375f067e6e0f8693a436c8cf10080caa78842ec4d84e70deb
-current_runtime_bytes = 56
-
-injection_mode = runtime-refresh
-injected_files = [runtime]
-refresh_required = true
-refresh_performed = true
-source_bytes_verified = true
-prompt_bytes_verified = true
-resume_relationship_verified = true
-```
-
-Turn 3 prompt 在记录 offset 包含完整 56-byte changed Runtime；系统没有把 session-known 32-byte Runtime hash 静默当作 current。该 fixture 验证 deterministic control-plane behavior，不代表真实模型 token/cost。
-
-### Token / cache / duration comparison
-
-Accepted P4-A treatment：
-
-```text
-Reviewer T1: input 60526, cached 41216, uncached 19310, duration 23.825s
-Reviewer T3: input 26014, cached 24320, uncached 1694, duration 10.449s
-Aggregate:   input 102043, cached 77056, uncached 24987, duration 43.362s
-```
-
-P4-B real validation：
-
-```text
-Reviewer T1: input 29247, cached 11008, uncached 18239, duration 7.331s
-Reviewer T3: input 30300, cached 28416, uncached 1884, duration 6.675s
-Aggregate:   input 74389, cached 39424, uncached 34965, duration 19.981s
-```
-
-P4-B unchanged T3 明确没有重复 governance full bytes，但 persistent history 仍计入 reported total input。相对单次 P4-A treatment，P4-B T3 为 `+190` uncached input 与 `-3.774s` duration。P4-B aggregate uncached input 为 `+9978`，主要来自本次 Executor T2 报告 `0` cached / `14842` uncached，与 P4-A Executor cache 状态不同。
-
-该比较只有单次 run，且治理文档、role prompt、stochastic output、service timing 与 cache state 不同；只能作为本次成本观测，不能解释为 benchmark-quality causal result，也没有为减少该不确定性擅自增加 replicate。
-
-Evidence locator:
-
-- `1PCloop/runs/p4b-validation-20260905-01/validation-summary.md`；
-- `1PCloop/runs/p4b-validation-20260905-01/manifest.json`；
-- `1PCloop/runs/p4b-validation-20260905-01/transcript.md`；
-- `1PCloop/runs/p4b-validation-20260905-01/turn-*/`；
-- `1PCloop/runs/p4b-validation-20260905-01/scenario-c-runtime-change-fixture/`；
-- `1PCloop/tests/test_run_text_loop.py`。
-
-Limitations:
-
-- 本次只有一次 real Codex treatment run；没有新增 control 或 replicate；
-- Scenario C 使用真实 orchestrator/process/filesystem path，但 target Agent 是 deterministic fake Codex，适合验证 control-plane stale-state protection，不提供真实 inference cost；
-- 没有做真实 Static-change Codex run；Static rollover/full-rebootstrap 由 integration test 覆盖；
-- Reviewer persistence 仍只是 preferred implementation candidate，不是永久 architecture invariant。
-
-### Effective-state supersession
-
-本节 supersede 上文 `P4-B ACTIVE` 作为当前 effective state；activation 与全部历史 provenance 保留不变。
-
-```text
-P4-A = ACCEPTED
-P4-B = IMPLEMENTED / VALIDATED — AWAITING REVIEW
-```
-
-P4-B 尚未被 Reviewer `ACCEPT`。当前停止在外部 review gate；不自动进入 persistent Executor、workspace mutation、disposable-file mutation、`multiLanguage_v1` 或 automatic Runtime semantic transition。
+--- END DETERMINISTIC AUTHORITATIVE CONTEXT ---
