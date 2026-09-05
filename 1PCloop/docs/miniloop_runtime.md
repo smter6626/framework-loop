@@ -4,11 +4,11 @@
 
 `ACTIVE`
 
-当前 task：实现并验证最小可运行的本地 Reviewer–Executor 自动闭环。
+当前 task：实现并验证最小可运行的单机 Reviewer–Executor 自动闭环。
 
 本 Runtime 记录当前 authoritative execution state。稳定目标、硬约束和最终验收标准见：
 
-`miniloop/docs/miniloop_static.md`
+`1PCloop/docs/miniloop_static.md`
 
 ---
 
@@ -57,258 +57,296 @@ Python Runtime updater 只需要执行这种机械 invariant，不需要理解�
 
 ## Other Notes
 
-当前无已追加的 correction note。
+### 2026-09-05 — Repository path correction / supersession
 
-`Other Notes` 的治理规则已锁定为：
+Status: `ACTIVE CORRECTION`
 
-- append-only；
-- 旧 note 不得删除或直接修改；
-- 后续可以追加新 note 来否定、纠正或 supersede 前面的判断；
-- 每次追加 note 必须写明它对应的 Step 和 commit；
-- 保留旧内容是为了维持可考古性（provenance / trace-back），而不是因为旧判断仍然具有当前 authority。
+Step: `Step 1`
+
+Related commits:
+
+- `ae49a2034dc992df0d7bf54b49305920d9ae8af6` — active `miniloop/` path reorganized as `1PCloop/`, and `issue_solution.md` moved under `1PCloop/docs/`;
+- `9c6664b0f6b933207d16c36146c7510d84289366` — historical `codex/miniloop-skeleton-v0` implementation merged into `main` and preserved as a historical snapshot;
+- `f4bdfae40e8453036b500d6a6a0fccbbdde09ab3` — active Static updated for the verified dual-Codex execution environment.
+
+Correction:
+
+The immutable Step 0 record above preserves the paths that were true when Step 0 was created. The current active locations are:
+
+```text
+1PCloop/docs/miniloop_static.md
+1PCloop/docs/miniloop_runtime.md
+1PCloop/docs/issue_solution.md
+```
+
+Historical implementation snapshot:
+
+```text
+1PCloop/history/miniloop-skeleton-v0/
+```
+
+The historical snapshot is read-only provenance and is not the active implementation path.
+
+### 2026-09-05 — Execution-environment supersession
+
+Status: `SUPERSEDES OLD ACTIVE-STEP ASSUMPTIONS`
+
+Step: `Step 1`
+
+Related commit:
+
+- `f4bdfae40e8453036b500d6a6a0fccbbdde09ab3`
+
+The previous Active Step assumed Ollama + one local Qwen model + two logical sessions + Linux sandbox as the immediate execution path. That is no longer the active implementation target.
+
+The current verified execution environment is one M4 Max host with two independent ChatGPT/Codex identities:
+
+```text
+Reviewer = dym   = /Users/smterpro/.codex-B
+Executor = cheng = /Users/smterpro/.codex-A
+```
+
+The active automation path is explicit per-process `CODEX_HOME` + `codex exec` / programmatic CLI invocation. Model names and reasoning effort are runtime configuration, not architecture invariants.
+
+The old Ollama/Qwen implementation remains useful as historical implementation evidence only.
 
 ---
 
 ## Active Step
 
-### Step 1 — Codex implementation: build the Miniloop framework skeleton
+### Step 1 — Build the live dual-Codex 1PC Reviewer–Executor loop
 
 Status: `ACTIVE`
 
 ### Current Objective
 
-停止继续纯理论展开，进入受控 implementation。
+Implement the first real automatic loop on the verified dual-Codex environment.
 
-Codex 当前应基于已经锁定的 Static + Runtime 边界，实际搭建 Miniloop 的第一版大框架并运行能够运行的测试。实现过程中：
-
-- 已锁定的架构原则直接实现，不重新设计；
-- 普通 implementation detail 可以基于本机与 repository evidence 做最小、可逆的合理选择；
-- 如果遇到会影响 architecture、role boundary、filesystem isolation、Runtime authority、control-plane semantics、security boundary 或 acceptance semantics 的未确认技术细节，不得自行冻结设计；
-- 对该不确定子项停止扩展，记录 evidence / blocker / options，并回报 Human Owner，由 Human + Reviewer 侧讨论确认；
-- 其他不受该问题阻塞的确定部分继续实现；
-- 不因为存在局部未确认项而停止全部工作。
-
-当前目标不是一次性宣称整个 Step 1 完成，而是先得到一个真实、可运行、可检查的大框架，以实际 evidence 驱动后续设计。
-
-目标链路仍为：
+Immediate target:
 
 ```text
-Reviewer reads Static + Runtime
-    -> Reviewer compiles bounded execution instruction
-    -> Python routes Reviewer raw output to Executor
-    -> Executor performs real work in bounded Linux execution environment
-    -> Executor self-checks and reports evidence locator
-    -> Python routes Executor raw output to Reviewer
-    -> Reviewer independently checks evidence
-    -> repair or handoff / completion
+dym / Reviewer
+    -> bounded natural-language instruction
+    -> deterministic Python transport
+    -> cheng / Executor
+    -> raw execution response
+    -> deterministic Python transport
+    -> dym / Reviewer
+    -> review / repair / handoff decision
 ```
 
-### Locked Architecture — Do Not Redesign During This Implementation Pass
+The immediate goal is not to complete all historical Miniloop acceptance criteria at once. The next milestone is a minimal text-only Reviewer→Executor→Reviewer loop with no Human copy/paste between turns.
 
-#### A. Python / LLM semantic boundary
+### Verified Prerequisites
 
-- Python orchestrator 负责 deterministic transport / control，不负责理解 Agent 自由文本语义；
-- Reviewer / Executor 之间传递 verbatim natural-language payload；
-- Python 可以维护 sender、receiver、turn、run_id / session metadata；
-- 不依赖 prompt-only JSON / XML / marker 让 Python理解 instruction、evidence、ACCEPT、REJECT；
-- 不允许通过 `if "ACCEPT" in output` 等自由文本解析推动 authoritative transition；
-- 简化原则：`LLM 理解 LLM；Python 路由 LLM。`
-
-#### B. Same model, isolated sessions
-
-- Reviewer / Executor 使用同一个 Ollama model ID / 同一份本地 Qwen weights；
-- Python 分别维护 Reviewer 与 Executor conversation state；
-- 两个 session 使用不同 system / role instruction；
-- 不复制双方完整 history；只显式路由本轮 peer payload；
-- 当前采用串行 inference，不加载两个同模型副本。
-
-#### C. Ollama turn completion
-
-- 使用 blocking Ollama chat request（例如 `stream=false`）作为单轮 inference completion signal；
-- request 返回只代表当前 turn 生成完成，不代表语义上的 task completion；
-- 不使用 `ollama ps` / busy polling 作为当前 turn 完成信号。
-
-#### D. Receiver control plane
-
-持久化 receiver control state 的核心值：
+#### A. Independent profile homes — VERIFIED
 
 ```text
-executor
-human
+cheng -> /Users/smterpro/.codex-A
+
+dym   -> /Users/smterpro/.codex-B
 ```
 
-- Reviewer 拥有 receiver transition authority；
-- Python 在程序启动时和每次 Reviewer inference 完成后读取 receiver；
-- `executor` -> 自动 loop 可以继续并触发 Executor；
-- `human` -> 自动 loop 停止，把控制权交回 Human；
-- Executor 不获得 receiver setter；
-- 使用窄 capability（如 `set_receiver(executor|human)`），而不是 Python解析 Reviewer 自由文本。
+Verified properties:
 
-#### E. Executor Linux execution boundary
+- separate authentication state;
+- separate session/history/profile-local state;
+- both identities can access the same repository when normal filesystem permission allows it;
+- `~/.codex` is only a convenience symlink and is not authoritative for account identity.
 
-- Executor 使用 Linux VM / Linux sandbox 内的完整 shell 能力；
-- shell capability 本身不通过 Python command blacklist 限制；
-- filesystem boundary 由 VM / mount visibility 强制，而不是把 `cwd` 误当 sandbox；
-- Executor writable mount 只包含授权 implementation workspace；
-- Static、Runtime、receiver / control plane 不进入 Executor writable workspace；
-- Apple Silicon / macOS-specific execution 移出 generic Linux Executor path，后续需要时单独处理；
-- 当前 demo 优先选择不依赖 Apple-specific toolchain 的 bounded task。
-
-#### F. Role capability boundary
-
-Reviewer：
-
-- 可读取 Static / Runtime；
-- 可读取任务相关 implementation / artifact / evidence；
-- 可独立运行测试 / verification；
-- 可通过受限 updater 修改 Runtime；
-- 可调用 receiver setter；
-- 不承担主要 implementation mutation。
-
-Executor：
-
-- 在授权 Linux workspace 内拥有完整 shell；
-- 可读取 / 修改该 workspace 中 implementation / tests / artifacts；
-- 不获得 Static / Runtime writable access；
-- 不获得 Runtime updater；
-- 不获得 receiver setter；
-- 不负责最终 acceptance。
-
-#### G. Runtime mutation invariants
-
-Runtime 结构按以下语义维护：
+Current convenience symlink:
 
 ```text
-Done
-  - completed historical records
-  - Commit Notes
-
-Other Notes
-  - append-only correction / invalidation / supersession notes
-
-Active Step
-  - current authoritative work
-  - optional branches / alternatives
-
-Pending Tasks
-  - non-blocking blockers / deferred work that must not be lost
-
-Next Steps
+/Users/smterpro/.codex -> /Users/smterpro/.codex-B
 ```
 
-机械规则：
+The orchestrator must therefore set `CODEX_HOME` explicitly for every role invocation.
 
-- `Done` immutable；
-- 已进入 Done 的 `Commit Notes` immutable；新增 Done / Commit Notes 时必须注明 Step + commit；
-- `Other Notes` append-only；每个新 note 必须注明 Step + commit；历史错误通过追加 correction / supersession 说明，不删除旧记录；
-- `Active Step` mutable；
-- `Pending Tasks` 可新增 / 推进 / 显式关闭，不得静默丢失；
-- `Next Steps` mutable；
-- Python Runtime updater 只执行轻量机械约束，不判断自然语言内容真实性。
+#### B. Role binding — VERIFIED
 
-### Codex Implementation Scope for This Pass
-
-优先实际实现并测试：
-
-1. Python project / orchestrator skeleton；
-2. Reviewer / Executor 两套隔离 logical session；
-3. 同一 Ollama model ID 的 blocking serial inference wrapper；
-4. deterministic envelope + verbatim peer payload routing；
-5. receiver control file + allowed-value enforcement + reviewer-only setter boundary；
-6. deterministic run / event logging；
-7. lightweight Runtime updater skeleton and mechanical invariant tests；
-8. Executor Linux sandbox abstraction / launcher skeleton；
-9. authorized writable workspace mount boundary；
-10. Reviewer / Executor role instructions / configuration skeleton；
-11. unit / integration tests that do not require unresolved design assumptions；
-12. README / run instructions sufficient to reproduce the implemented skeleton.
-
-### Technical-Uncertainty Reporting Rule
-
-Codex 遇到以下情况时应回报，而不是自行扩大 contract：
-
-- 本机现有 virtualization / container runtime 行为与预期不一致；
-- 需要改变 Static / Runtime authority；
-- 需要让 Executor 看见或修改 governance / control files；
-- 需要 Python 解析 Agent natural language 才能继续；
-- 需要改变 receiver semantics；
-- 需要改变 Reviewer / Executor acceptance authority；
-- 需要额外 host-native privileged capability；
-- 现有 Runtime invariant 无法机械实现而必须解释语义；
-- 实现选择会形成新的不可逆 / 高影响 architecture constraint。
-
-回报至少包含：
+Current default role binding:
 
 ```text
-Observed evidence
-Exact uncertainty / blocker
-Why current contract does not determine it
-Option A / B / ...
-Recommended option if evidence supports one
-What implementation can continue without this decision
+Reviewer = dym / .codex-B
+Executor = cheng / .codex-A
 ```
 
-这些问题若不阻塞整个 Step，应同时记录到 `Pending Tasks`，然后继续其他确定工作。
+Automatic role swapping is not part of the current scope. If account usage or another operational condition requires swapping roles, the Human Owner may do so manually.
 
-### Environment Fact for Implementation
+#### C. CLI invocation — VERIFIED
 
-- Host: Apple Silicon Mac, M4 Max, 48 GB Unified Memory；
-- Ollama 已安装，现有 Qwen3.5 35B-class / ~64K context baseline 已能运行；
-- 当前 Miniloop implementation 优先继续使用现有 baseline，不因新模型下载阻塞；
-- Docker 已安装在本机；当前 pass 可以只读检查现有版本 / runtime / settings evidence，但不得擅自升级、重装或进行需要 Human 决策的全局配置变更。
+Serial smoke tests succeeded from the repository working directory:
 
-### Permitted Changes
+```text
+CODEX_HOME="$HOME/.codex-A" codex exec 'Reply with exactly: CHENG_EXEC_OK'
+-> CHENG_EXEC_OK
 
-允许 Codex 为当前 implementation pass：
+CODEX_HOME="$HOME/.codex-B" codex exec 'Reply with exactly: DYM_EXEC_OK'
+-> DYM_EXEC_OK
+```
 
-- 在 `miniloop/` 下创建 / 修改 implementation source、tests、config、workspace、sandbox scripts、logs、README；
-- 创建 receiver control implementation；
-- 创建 Runtime updater implementation；
-- 创建 Reviewer / Executor role instruction；
-- 运行本地只读环境探测；
-- 运行不违反当前边界的 tests / demo；
-- 生成 evidence artifact。
+Both created fresh Codex sessions and returned normal final responses.
 
-不得：
+#### D. Concurrent CLI processes — VERIFIED
 
-- 修改 `miniloop/docs/miniloop_static.md`；
-- 把 Step 1 标记为 `COMPLETED`；
-- 重写 `Done` / 旧 Commit Notes / 旧 Other Notes；
-- 自行改变已经锁定的 architecture；
-- 擅自安装 / 升级 Docker 或进行全局系统级配置改变；
-- 自动 push / publish；
-- 引入必须依赖的 cloud LLM API；
-- 扩大到 Web UI、多 Executor、distributed / production-grade platform。
+Parallel smoke test succeeded:
 
-### Required Evidence from Codex Pass
+```text
+A exit=0
+CHENG_PARALLEL_OK
 
-Codex 结束本轮实现后至少报告：
+B exit=0
+DYM_PARALLEL_OK
+```
 
-- changed files；
-- implementation summary；
-- exact commands / tests run；
-- test results；
-- local environment observations relevant to Linux sandbox；
-- current working features；
-- remaining uncertainties / blockers；
-- Pending Tasks candidates；
-- evidence locators；
-- 未实现内容及原因。
+Therefore two independent Codex CLI processes using `.codex-A` and `.codex-B` can coexist on the same physical Mac.
 
-不得仅以自然语言“已完成”替代实际 repository / test evidence。
+GUI simultaneous-launch limitations are not relevant to the automated 1PCloop control path.
+
+#### E. Shared executable / isolated profiles — VERIFIED
+
+Observed behavior:
+
+- one profile triggered a Codex application/runtime update;
+- the second profile subsequently launched without performing an independent update;
+- profile authentication/history/config remain separate.
+
+Interpretation for the active implementation:
+
+```text
+shared Codex executable/runtime installation
++
+independent CODEX_HOME state
+```
+
+#### F. Current role capability behavior — OBSERVED
+
+During the successful serial `codex exec` smoke tests:
+
+```text
+cheng / Executor:
+  approval = never
+  sandbox = workspace-write
+
+
+dym / Reviewer:
+  approval = never
+  sandbox = read-only
+```
+
+This aligns with the intended role split, but the current 1PCloop does not depend on adding new filesystem-level isolation rules.
+
+Role boundaries are initially enforced by role instructions and existing profile behavior. Stronger capability enforcement is deferred unless actual violations justify it.
+
+#### G. Conversation continuity — NOT REQUIRED FOR INITIAL LOOP
+
+The first active implementation may use fresh `codex exec` sessions for each turn.
+
+Authoritative context remains external:
+
+```text
+Static
++ Runtime
++ repository / artifacts / evidence
++ current bounded peer instruction
+```
+
+The loop must not require a long-lived Codex conversation to preserve authoritative state.
+
+### Locked Architecture for This Pass
+
+#### Python / LLM semantic boundary
+
+- Python performs deterministic transport/control.
+- Reviewer / Executor peer payload is passed verbatim as natural language.
+- Python may maintain role, sender, receiver, run id, turn id, process status, and other mechanical metadata.
+- Python must not infer semantic acceptance by parsing arbitrary prose.
+- Do not implement `if "ACCEPT" in output`-style authoritative transitions.
+- Principle remains: `LLM understands LLM; Python routes LLM.`
+
+#### Reviewer / Executor responsibility split
+
+Reviewer:
+
+- reads Static / Runtime / repository evidence;
+- compiles bounded Executor instructions;
+- independently evaluates implementation/evidence;
+- owns review/repair/handoff semantics;
+- normally does not perform primary implementation mutation.
+
+Executor:
+
+- performs bounded implementation work;
+- modifies implementation/tests/artifacts as required by the task;
+- runs execution-side checks;
+- reports evidence;
+- does not self-accept;
+- does not modify Static / Runtime by default.
+
+Current enforcement priority is prompt-level role instruction. Do not introduce extra profile/config friction unless actual evidence shows it is needed.
+
+### Implementation Scope for the Next Pass
+
+Implement only enough to prove the transport loop:
+
+1. create a minimal Python orchestrator under the active `1PCloop/` implementation area;
+2. explicitly invoke Reviewer with `CODEX_HOME=/Users/smterpro/.codex-B`;
+3. capture Reviewer final response;
+4. route that raw response to Executor with `CODEX_HOME=/Users/smterpro/.codex-A`;
+5. capture Executor final response;
+6. route Executor raw response back to Reviewer;
+7. save deterministic run/turn logs or transcripts sufficient to inspect all three turns;
+8. do not require GUI automation;
+9. do not require session resume;
+10. do not yet require code mutation, Runtime mutation, receiver tools, repair-limit logic, or Linux sandbox enforcement.
+
+### Acceptance for This Immediate Milestone
+
+The text-only routing milestone is satisfied only if evidence shows:
+
+1. Reviewer is actually invoked through `.codex-B`;
+2. Executor is actually invoked through `.codex-A`;
+3. Reviewer output reaches Executor without Human copy/paste;
+4. Executor output reaches Reviewer without Human copy/paste;
+5. all Codex invocations terminate normally;
+6. the complete three-turn transcript is inspectable;
+7. Python does not semantically parse the peer natural-language payload.
+
+Passing this milestone does not complete Step 1. It only proves the basic live transport loop.
 
 ---
 
 ## Pending Tasks
 
-当前无已确认且需要持久化的 non-blocking pending item。
+### P1 — Stale rollout path in legacy Codex-A state
 
-本 section 的语义已锁定：
+Status: `NON-BLOCKING`
 
-- 当发现一个真实问题 / blocker，但它不阻塞当前 Active Step，且没有立即被处理掉时，必须记录到 `Pending Tasks`；
-- “不阻塞当前步骤”不能成为不记录问题的理由；
-- pending item 后续可以被处理、吸收进某个 Active Step、明确 supersede 或关闭；
-- pending item 的生命周期变化必须显式记录，不能静默消失。
+Observed during the first `.codex-A` fresh `codex exec` smoke test:
+
+```text
+state db returned stale rollout path for thread ...
+/Users/smterpro/.codex/sessions/...
+```
+
+The same invocation then successfully created a fresh session, returned `CHENG_EXEC_OK`, and completed normally. Parallel A/B `codex exec` also completed with exit code 0.
+
+Current interpretation:
+
+- likely legacy absolute-path metadata from pre-profile migration/copied state;
+- does not block fresh-session `codex exec`;
+- do not repair now;
+- revisit only if old-session resume/history enumeration becomes required or if the warning begins affecting fresh invocations.
+
+### P2 — Profile-internal references to `/Users/smterpro/.codex`
+
+Status: `DEFERRED / NON-BLOCKING`
+
+Some profile-local plugin / node-repl configuration contains absolute references to `/Users/smterpro/.codex`, which currently resolves to `.codex-B`.
+
+The initial 1PCloop transport milestone does not require browser/plugin/node-repl subsystems. Do not modify these configurations now.
+
+Revisit only if a required 1PCloop capability demonstrably launches a child subsystem under the wrong profile.
 
 ---
 
@@ -316,26 +354,37 @@ Codex 结束本轮实现后至少报告：
 
 None confirmed.
 
-当前没有已知 blocker 阻止 Codex 开始大框架 implementation。
+The following prerequisites are already verified and are not blockers:
 
-implementation-level evidence 尚未形成，因此不得预先声称 Router、context isolation、Runtime updater、VM isolation、receiver handoff 或 end-to-end loop 已经实现。
+- dual profile authentication;
+- explicit `CODEX_HOME` account selection;
+- serial `codex exec`;
+- concurrent A/B `codex exec`;
+- shared repository accessibility.
 
-从现在开始，未确认 technical detail 应优先通过实际 implementation / environment evidence 暴露；只有当该 detail 会影响已锁定 contract 或形成新的高影响边界时，才回到 Human Owner 讨论确认。
+The current unimplemented item is the deterministic Reviewer→Executor→Reviewer transport itself.
 
 ---
 
 ## Explicitly Deferred for This Task
 
-当前 Miniloop 不处理：
+Do not implement during the immediate text-only routing milestone:
 
-- conversation history 超过约 60K tokens 后的 context management；
-- 完整 Human Decision Gate 的交互、决策输入和自动恢复协议；
-- 无限 repair / clarification loop 的自动检测与终止；
-- production-grade VM / container hardening；
-- 通用 Apple-specific host execution framework；
-- 多 Executor / Web UI / distributed deployment / production queue / memory database。
+- automatic role swapping;
+- GUI automation;
+- new filesystem hard-isolation configuration;
+- Linux VM/container sandbox enforcement;
+- full Human Decision Gate interaction/resume protocol;
+- automatic infinite repair-loop detection;
+- production-grade crash recovery;
+- multi-Executor or distributed deployment;
+- Web UI;
+- long-history context management;
+- old Codex session migration/repair;
+- browser/plugin/node-repl profile cleanup;
+- performance comparison between different models/reasoning efforts.
 
-`receiver = human` 作为 deterministic stop / handoff primitive 已纳入当前设计，但不等于本阶段必须完成完整 Human Gate workflow。
+These may be revisited after the live transport loop produces evidence that they are necessary.
 
 ---
 
@@ -343,19 +392,35 @@ implementation-level evidence 尚未形成，因此不得预先声称 Router、c
 
 ### Previous state
 
-`ACTIVE — Step 1`，核心 Router、receiver、Linux execution boundary、role capability 和 Runtime mutation invariants 已在设计讨论中锁定，但尚未进入实际 implementation evidence 阶段。
+`ACTIVE — Step 1: build the Miniloop framework skeleton using Ollama/Qwen and isolated logical sessions.`
+
+That state produced useful historical implementation work, later preserved under:
+
+```text
+1PCloop/history/miniloop-skeleton-v0/
+```
+
+but it is no longer the active runtime target.
 
 ### Current state
 
-`ACTIVE — Step 1: Codex implementation — build the Miniloop framework skeleton`
+`ACTIVE — Step 1: build the live single-machine dual-Codex Reviewer→Executor→Reviewer loop.`
 
 ### Transition Meaning
 
-当前不再继续以纯设计讨论推进 Step 1。
+The project has moved from an Ollama/Qwen-centric prototype path to a verified dual-Codex Plus profile environment on one M4 Max.
 
-Codex 现在应实际实现已经确定的框架部分；普通实现细节由 evidence 驱动做最小可逆选择。遇到 contract 无法决定、会改变关键边界的技术问题时，Codex 应记录并回报 Human Owner，而不是自行扩大设计。
+The governance architecture remains the same at the level that matters:
 
-Active Step 仍然属于原来的 Step 1，没有发生 acceptance，也没有进入 Done。
+- Static / Runtime are authoritative external state;
+- Reviewer and Executor remain distinct roles;
+- Python routes; LLMs interpret;
+- Reviewer independently evaluates Executor work;
+- Human Owner remains final authority.
+
+Only the concrete inference/session substrate has changed.
+
+The next implementation action is now fully operational rather than theoretical: automate the already-verified CLI identities into a three-turn Reviewer→Executor→Reviewer text loop.
 
 ---
 
@@ -365,27 +430,40 @@ Active Step 仍然属于原来的 Step 1，没有发生 acceptance，也没有�
 
 Status: `SUPERSEDED`
 
-Reviewer / Executor semantic payload 使用自然语言原文；Python 不承担自由文本语义解析。
+Reviewer / Executor semantic payload uses natural-language text; Python does not own arbitrary free-text semantic parsing.
 
 ### Polling Ollama process/load state as inference-completion signal
 
 Status: `SUPERSEDED`
 
-使用 blocking Ollama request completion 作为单轮 inference 完成信号。
+The current active inference substrate is Codex CLI. Process/command completion is the immediate mechanical turn-completion signal; semantic task completion remains a Reviewer judgment.
 
-### Host-side unrestricted Executor shell
+### Same local model / same Qwen weights as a hard requirement
 
-Status: `SUPERSEDED`
+Status: `SUPERSEDED FOR ACTIVE 1PCLOOP`
 
-Executor 完整 shell 放入 Linux execution sandbox；filesystem boundary 由 VM / mount visibility 强制。
+Reviewer and Executor are bound to independent Codex identities. Their model selections may differ and may change over time. Model identity is not a role invariant.
+
+### Linux sandbox as prerequisite for first live loop
+
+Status: `DEFERRED`
+
+The immediate goal is to prove the live Reviewer→Executor→Reviewer transport. Stronger sandbox/capability enforcement is added only when evidence requires it.
+
+### GUI Codex application as automation surface
+
+Status: `REJECTED / NOT REQUIRED`
+
+The active control path uses explicit per-process `CODEX_HOME` and Codex CLI/programmatic invocation. GUI simultaneous-launch behavior does not constrain the automated loop.
 
 ---
 
 ## Next Steps
 
-1. 将本 Runtime + Static 作为 authoritative implementation contract 交给 Codex；
-2. Codex 实际搭建 Miniloop framework skeleton 并运行可运行的 tests；
-3. Codex 对不确定 technical detail 提交 evidence-backed report，而不是自行冻结高影响设计；
-4. Human Owner / Reviewer 只针对实际 blocker / uncertainty 做后续确认；
-5. 根据实现 evidence 再决定 repair、继续实现或更新 Pending Tasks；
-6. 在满足全部 Acceptance Criteria 之前，Step 1 保持 `ACTIVE`。
+1. Implement the minimal text-only Python routing prototype.
+2. Run one complete automated `dym Reviewer -> cheng Executor -> dym Reviewer` three-turn cycle.
+3. Save exact prompts/responses/process results as evidence.
+4. Verify that no Human copy/paste is required between turns.
+5. Verify that Python transports peer text verbatim rather than interpreting it.
+6. If the text-only milestone passes, move to a disposable code/artifact mutation task where Executor writes and Reviewer independently inspects.
+7. Only after that evidence exists, decide which control-plane features from the historical Miniloop skeleton should be reused next.
