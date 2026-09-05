@@ -658,3 +658,69 @@ P4-A 完成后必须先由 Reviewer / Human Owner 审阅结果，再决定是否
 ## 当前阻塞项
 
 未确认任何阻塞项。
+
+---
+
+## Reviewer Decision — P4-A
+
+### 2026-09-05 — P4-A review decision
+
+Status: `ACCEPTED — EXPERIMENTAL MILESTONE`
+
+Step: `Step 1 P4-A`
+
+Reviewed commits:
+
+- `0496fba156083f08e7d1975069330ec131d4ad0e` — P4-A implementation；
+- `3026ffe150d8dae9a22f1e21ed226203c2f5ecb0` — P4-A evidence 与 Runtime record。
+
+Review conclusion:
+
+- P4-A 在当前实验 scope 内通过，无 repair requirement；
+- Treatment 已机械证明 Reviewer Turn 3 恢复了 Turn 1 创建的同一 persistent Reviewer thread，`resume_relationship_verified=true`，且不存在 resume-to-fresh fallback；
+- 本次 paired evidence 中，Reviewer T3 `uncached_input_tokens` 从 `9599` 降到 `1694`，减少 `7905`（`-82.3523%`）；aggregate uncached input 从 `30594` 降到 `24987`，减少 `5607`（`-18.3271%`）；aggregate input 从 `108418` 降到 `102043`（`-5.8800%`）；aggregate duration 从 `55.199s` 降到 `43.362s`（`-21.4442%`）；
+- 因此 `persistent Reviewer + explicit resume` 可以保留为下一工程阶段的 **preferred implementation candidate**；
+- 该结论不把 Reviewer persistence 冻结为永久 architecture invariant。本次只有一个 `Control -> Treatment` pair，仍存在 cache-warm order、stochastic downstream prompt、单次 latency 与配置观测边界等已记录限制；
+- 当前不要求为了继续工程工作先补 reversed-order replicate；若后续需要 benchmark-quality 因果结论，可再单独补充。
+
+Critical reconstruction finding:
+
+- P4-A 同时实证了 authoritative-context reconstruction correctness 风险；
+- Control Reviewer T3 只读取 Static `1-240` 与 Runtime `1-260`，没有读到从 Runtime 第 `361` 行开始的当前 Active Step；
+- Treatment Reviewer T1 也以固定 `sed` 范围读取并遗漏两份治理文件尾部；
+- 因此“Agent 执行了 Static/Runtime read”不能被视为“Agent 已完整重建 authoritative context”的充分证据；
+- session resume 可以减少重复 reconstruction，但不能修复首次 bootstrap 本身的不完整读取。
+
+Architecture interpretation:
+
+```text
+Static + Runtime + repository/evidence
+= authoritative memory
+
+persistent role session
+= disposable performance working memory
+```
+
+正确性仍必须可以在 session 丢失、rollover 或 fresh restart 后从 authoritative external state 重建；session persistence 只能优化成本与 working continuity，不能成为正确性的唯一来源。
+
+### Effective-state supersession
+
+本节 supersede 上文仍写作 `P4-A EXPERIMENT COMPLETED — AWAITING REVIEW` 的旧 active-state 文本；旧记录保留用于 provenance，不回写删除。
+
+当前有效状态：
+
+```text
+P4-A — Reviewer-session resume paired experiment
+Status: ACCEPTED
+
+Reviewer persistent + explicit resume
+Status: PREFERRED IMPLEMENTATION CANDIDATE
+        NOT A PERMANENT ARCHITECTURE INVARIANT
+
+P4-B — Deterministic authoritative-context reconstruction
+Status: NOT STARTED — REQUIRES HUMAN OWNER ACTIVATION
+```
+
+P4-B 的候选目标是：在保留更优 Reviewer session mode 的前提下，单独解决 fresh/bootstrap reconstruction 的完整性与成本问题，使 Agent 能机械可验证地获得当前 authoritative Static/Runtime state，同时避免依赖固定 `sed` 行范围或每轮无条件重复灌入整份治理文档。
+
+本次 review **不授权自动启动 P4-B**，也不授权 persistent Executor、workspace mutation、automatic Runtime semantic transition 或 medium-scale workload。下一阶段必须由 Human Owner 明确授权。
