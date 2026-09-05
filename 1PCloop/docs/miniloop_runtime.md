@@ -93,6 +93,46 @@ Meaning:
 
 双 profile 身份选择和 CLI 调用前置条件已经完成；当前尚未完成的是 Reviewer→Executor→Reviewer 的自动文本路由。
 
+### Step 1 milestone — Verify text-only Reviewer→Executor→Reviewer transport
+
+Status: `COMPLETED`
+
+Result:
+
+- 已实现 active `1PCloop/` 下的最小 Codex CLI 文本路由循环；
+- 真实运行路径为：
+
+```text
+Reviewer (.codex-B)
+  -> Executor (.codex-A)
+  -> Reviewer (.codex-B)
+```
+
+- 三次 Codex invocation 均正常结束，exit code 均为 `0`；
+- 两次 peer payload 分别为 `420` 和 `411` bytes；
+- 两次发送方 `final.txt` 与接收方 `peer-payload.txt` 的 SHA-256 一致；
+- 两次 transport 均记录 `preserved_verbatim=true`；
+- 当前三个 turn 均显式使用 `read-only` sandbox；
+- Orchestrator 不解析 peer natural-language payload 的语义，也不根据 `ACCEPT` / `REJECT` 等自由文本推进 Runtime；
+- Reviewer 仅接受基础 transport milestone，没有接受整个 Step 1，也没有授权 Runtime transition。
+
+Evidence locator:
+
+- commit `7ef5c7aafcf66bbbf65e3bcca410a39c97035fac` — `Implement dual-Codex text routing loop`；
+- `1PCloop/scripts/run_text_loop.py`；
+- `1PCloop/runs/text-loop-20260905-01/manifest.json`；
+- `1PCloop/runs/text-loop-20260905-01/transcript.md`；
+- `1PCloop/README.md`。
+
+Commit Notes:
+
+- Step: `Step 1 text transport milestone`
+- Implementation/evidence commit: `7ef5c7aafcf66bbbf65e3bcca410a39c97035fac`
+
+Meaning:
+
+基础 Reviewer→Executor→Reviewer 自动文本 transport 已通过。该完成记录只证明 profile invocation、opaque peer payload routing、process completion 和可检查 run evidence；不证明 mutation、independent implementation acceptance、repair loop、Runtime transition 或 Human Gate 已完成。
+
 ---
 
 ## Other Notes
@@ -160,66 +200,102 @@ Decision:
 
 不再轮询 Ollama process/load state 作为 inference-completion signal。当前 active inference substrate 是 Codex CLI；process/command completion 是直接的机械回合完成信号，语义上的 task completion 仍由 Reviewer 判断。
 
+### 2026-09-05 — Text-routing milestone review / token-cache direction
+
+Status: `REVIEWED — BASIC TRANSPORT ACCEPTED`
+
+Step: `Step 1`
+
+Reviewed commit:
+
+- `7ef5c7aafcf66bbbf65e3bcca410a39c97035fac`
+
+Review conclusion:
+
+- 当前 transport implementation 的核心边界成立：显式 `CODEX_HOME`、opaque peer payload、逐字节保存/核对、process result 落盘以及 Python 不理解自由文本语义；
+- 当前三个 turn 全部使用 `--ephemeral`。这不等价于关闭服务端 prompt cache，但意味着 Reviewer 的第三回合不会直接继承第一回合的 Codex session working context；
+- 因而在进入 workspace mutation 之前，应优先增加 token/cache 可观测性并做 session-resume 对照实验，避免在不知道真实 cached/uncached input 成本的情况下继续扩大循环；
+- authoritative memory 仍然是 Static + Runtime + repository/evidence；Codex session 只能作为可丢失、可重建的 performance working memory，正确性不得依赖 session 持久化；
+- prompt/cache 优化原则是稳定内容前置、动态 peer payload 后置，并尽量保持固定前缀字节稳定；
+- `events.jsonl` 属于 machine-readable control evidence，可以由 Python 机械提取 thread/session identifier 和 usage fields；这不违反“LLM 理解 LLM；Python 路由 LLM”的语义边界；
+- Reviewer 不应把“payload 字节未改变”表述成自己的语义审查结论。byte identity 的证明责任属于 orchestrator 的 SHA/byte comparison；Reviewer 负责语义上的 instruction/evidence review；
+- `1PCloop/runs/` 如果长期累积并进入普通 repository inspection，会形成上下文污染和额外 token 开销。后续应区分 raw local run logs 与 curated evidence，避免无限增长的 run history 自动进入 Agent 工作上下文。
+
+Recommended next sequence:
+
+```text
+1. 从 events.jsonl 机械提取 usage / thread metadata
+2. 跑一次当前 --ephemeral baseline
+3. 保存 input / cached_input / uncached_input / output / reasoning token 指标
+4. 实现 Reviewer session resume，并保持 Static / Runtime / repository 为 authoritative state
+5. 用同一类 transport task 做 ephemeral vs resume 对照
+6. 只有在获得实际成本/缓存 evidence 后，再决定是否让 Executor 也长期 resume
+7. 随后进入 disposable-file mutation + independent review milestone
+```
+
 ---
 
 ## 当前活跃步骤
 
-### Step 1 — 构建在线的双 Codex 1PC Reviewer–Executor 循环
+### Step 1 — 测量上下文成本并验证 resumable role session
 
 状态：`ACTIVE`
 
 ### 当前目标
 
-在已验证的双 Codex 环境上实现最小的纯文本 Reviewer→Executor→Reviewer 自动循环，回合之间不需要 Human 复制粘贴。
+在已经通过的基础文本 transport 上增加 token/cache 可观测性，并用可复现实验判断 role-session resume 是否能减少重复上下文重建和 uncached input，同时保持 Static / Runtime / repository 的外部权威状态不变。
 
-当前角色绑定、`CODEX_HOME` 和调用方式以 Static 的 [Current Execution Environment](miniloop_static.md#current-execution-environment) 为准；通信、上下文和角色边界以 Static 的 [Hard Constraints](miniloop_static.md#hard-constraints) 为准。
+当前阶段不把“session resume 更省”当作已证实结论；必须先记录 baseline，再做对照。
 
 ### 本里程碑交付范围
 
-1. 在 active `1PCloop/` implementation area 下创建最小 Python orchestrator；
-2. 按当前角色绑定依次调用 Reviewer、Executor、Reviewer，并原样路由两次 peer natural-language payload；
-3. 捕获三次调用的 final response 与 process result；
-4. 保存可检查的确定性 run/turn log 或 transcript。
+1. 从现有 `codex exec --json` 的 `events.jsonl` 中机械提取可用的 thread/session identifier 与 usage metadata；
+2. 在 `process.json` / `manifest.json` 中记录至少以下可用字段：
+
+```text
+thread_id
+input_tokens
+cached_input_tokens
+uncached_input_tokens
+cache_hit_ratio
+output_tokens
+reasoning_output_tokens
+```
+
+3. 对当前 `--ephemeral` 三回合 transport 重跑 baseline；
+4. 实现 Reviewer 的 session persistence/resume，使第三回合可以继续第一回合的 Reviewer session；
+5. 使用等价 transport task 对比 ephemeral 与 Reviewer-resume 的 token、cache 和 latency；
+6. 保持 peer natural-language payload 仍为 opaque transport，不允许为了 usage instrumentation 引入 semantic parser。
 
 ### 本里程碑验收
 
-- 适用 Static [Acceptance Criteria A](miniloop_static.md#a-deterministic-dual-profile-invocation)、[B](miniloop_static.md#b-automatic-inter-agent-message-routing) 和 [H](miniloop_static.md#h-no-semantic-parser-dependency)；
-- evidence 必须包含完整三回合 transcript，并能确认全部 Codex invocation 正常终止；
-- Python 只维护确定性 transport/control metadata，不对 peer natural-language payload 做语义解析；
-- 通过本里程碑只证明基础 live transport loop，不代表完成整个 `Step 1`。
+- usage/thread metadata 的解析只针对 Codex 官方 machine-readable event，不解析 Agent final response 的自然语言；
+- baseline 与 resume run 都保存可检查的原始 JSONL 和派生机械指标；
+- 对每个 run 可以机械计算或明确标记不可获得的 `cached_input_tokens`、`uncached_input_tokens` 和 cache hit ratio；
+- Reviewer resume 不得使 conversation history 变成 authoritative memory；fresh-session reconstruction 仍必须在架构上可行；
+- 不因本阶段通过而自动进入 implementation acceptance 或 Runtime mutation loop。
 
-### 本里程碑边界
+### 当前设计边界
 
-Static 的 [Explicitly Out of Scope for Current 1PCloop](miniloop_static.md#explicitly-out-of-scope-for-current-1pcloop) 全部适用。此外，本里程碑暂不要求：
-
-- session resume；
-- code / artifact mutation；
-- Runtime mutation；
-- receiver tools；
-- repair-limit logic；
-- automatic infinite repair-loop detection；
-- 完整 Human Decision Gate interaction/resume protocol；
-- Linux VM/container sandbox enforcement；
-- Web UI。
-
-通过本里程碑后，按 Static 的 [Immediate Implementation Order](miniloop_static.md#immediate-implementation-order) 进入 disposable mutation 和 independent review；只有在新 evidence 存在后，才决定 historical Miniloop skeleton 中哪些 control-plane feature 值得复用。
+- Static / Runtime / repository/evidence = authoritative memory；
+- Reviewer / Executor session = non-authoritative performance working memory；
+- Static contract 发生显著变化时，允许/建议 role session rollover，而不是依赖旧 session 中的 superseded contract；
+- Runtime 更新时，resume session 必须能够重新读取或明确刷新当前 Runtime；
+- 当前只要求先验证 Reviewer resume；Executor persistent session 是否启用由实验结果决定；
+- workspace mutation 继续延后到本轮成本/cache evidence 完成之后。
 
 ### 当前运行观察
 
-最近一次串行 `codex exec` smoke test 记录了以下 profile behavior：
+基础 transport run `text-loop-20260905-01` 已证明：
 
 ```text
-cheng / Executor:
-  approval = never
-  sandbox = workspace-write
-
-
-dym / Reviewer:
-  approval = never
-  sandbox = read-only
+Reviewer (.codex-B) -> Executor (.codex-A) -> Reviewer (.codex-B)
+all process exit codes = 0
+transport payloads = 420 bytes / 411 bytes
+preserved_verbatim = true / true
 ```
 
-该记录与预期角色分工一致，但不是角色身份或 architecture invariant；权威角色边界仍以 Static 为准。
+但当前 run 没有把 usage/cache fields 提升到 `process.json` / `manifest.json`，因此无法从现有 manifest 直接回答 cached/uncached input 成本。该缺口是当前 Active Step 的第一优先级。
 
 ---
 
@@ -254,6 +330,32 @@ state db returned stale rollout path for thread ...
 初始 1PCloop transport milestone 不要求 browser / plugin / node-repl subsystems。当前不要修改这些 configuration。
 
 仅在所需 1PCloop capability 可被证明会在错误 profile 下启动 child subsystem 时重新评估。
+
+### P3 — Usage/cache instrumentation
+
+状态：`ACTIVE`
+
+需要从 `events.jsonl` 中机械提取 Codex machine-readable usage/thread metadata，并提升到 `process.json` / `manifest.json`，形成 current `--ephemeral` baseline。
+
+该项完成前，不对 session resume 的 token/cache 收益作定量结论。
+
+### P4 — Role-session resume policy
+
+状态：`PENDING P3`
+
+在 P3 baseline 之后实现 Reviewer session resume 并做同任务对照。第一版只要求 Reviewer 持久化；Executor 是否 persistent 由 evidence 决定。
+
+### P5 — Raw run-log growth / curated evidence boundary
+
+状态：`DEFERRED / NON-BLOCKING`
+
+当前 milestone run 可以作为 evidence 保留，但长期运行时不应默认让无限增长的 raw `1PCloop/runs/` 成为 Agent 普通 repository inspection 的上下文负担。
+
+后续在 mutation milestone 前后确定：
+
+- raw runs 是否默认本地保留 / gitignore；
+- 哪些 accepted run 提炼为 curated `1PCloop/evidence/`；
+- 保留哪些最小 artifact 足以复现 transport/process claims。
 
 ---
 
