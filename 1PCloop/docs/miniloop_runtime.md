@@ -324,35 +324,146 @@ Observed evidence:
 - 因本次运行使用 `--ephemeral`，不能仅凭记录到的 `thread_id` 宣称该 session 可 resume；
 - P4 的 resume 成本/收益仍需单独、等价的对照 evidence，当前 baseline 不作该结论。
 
+### 2026-09-05 — P3 review / P4-A activation
+
+Status: `P3 ACCEPTED — P4-A ACTIVE`
+
+Step: `Step 1 P4-A`
+
+Reviewed commits:
+
+- `b8ed49f5283c58ca8b314b49498f1881c63830a1` — P3 instrumentation、tests 与真实 `--ephemeral` baseline；
+- `edffa4da603b5e930ba87eea7ecbb54752d83ccb` — P3 evidence 与 Runtime 状态同步。
+
+Review conclusion:
+
+- P3 在当前 scope 内通过，无 repair requirement；usage/thread parser 保持 machine-readable boundary，baseline evidence 可用于启动下一阶段；
+- 当前 baseline 已证明 fresh/ephemeral 三回合并非零缓存命中：总 input `167734`，cached `127104`，uncached `40630`，aggregate cache hit `0.757771`。因此 P4 的问题不是“从零缓存变成有缓存”，而是 Reviewer session resume 能否进一步降低 uncached input、重复 context reconstruction 和 latency；
+- baseline 原始事件显示 Reviewer Turn 1、Executor Turn 2、Reviewer Turn 3 都实际重新读取了 Static / Runtime。重复 authoritative-state reconstruction 已经是实测行为，而不是纯理论风险；
+- 当前 Agent 自主使用 `sed` / `cat` 读取 governance docs。随着 Runtime 增长，固定行范围读取可能漏掉后部的当前 Active Step；这属于“内容未进入 context”的 reconstruction correctness 风险，不能由 session resume 本身修复；
+- byte-level transport identity 继续由 orchestrator 的 SHA/byte comparison 证明；Reviewer 只负责语义审查；
+- 当前 parser 的潜在 robustness 改进（例如多个 `turn.completed`、`cached_input_tokens > input_tokens` anomaly）是 non-blocking，不要求在 P4-A 前单独返工。
+
+P4-A experiment decision:
+
+- Human Owner 已明确授权启动 P4；
+- P4 第一阶段严格限定为 paired experiment，只改变 Reviewer session lifecycle；
+- Control 与 Treatment 必须在同一 repository HEAD、同一 Static/Runtime、同一 role prompts、同一角色绑定、同一 sandbox、同一 Codex/profile model configuration 下运行；
+- 两组实验全部完成前，不得为了记录中间结果修改 Runtime 或其他会改变输入上下文的治理文件；
+- Control：保持 Reviewer / Executor / Reviewer 三个 turn 全部 fresh `--ephemeral`；
+- Treatment：Reviewer Turn 1 创建正常可持久化 thread，Executor 仍 fresh `--ephemeral`，Reviewer Turn 3 resume Turn 1 的同一 Reviewer thread；
+- Treatment 不允许通过“先 `--ephemeral` 再 resume”的方式模拟 persistent Reviewer；应以当前 CLI 实际支持的正常持久化 thread + `codex exec resume` 机制实现，并先根据本机 `codex exec resume --help` / 实际 CLI schema 验证命令形式；
+- P4-A 不改变 Executor session lifecycle，不进入 workspace-write，不进入 disposable mutation，不实现 automatic Runtime semantic transition；
+- P4-A 完成后只根据真实 evidence 判断 Reviewer resume 是否值得保留，不预设 resume 一定更省。
+
 ---
 
 ## 当前活跃步骤
 
-### Step 1 — P3 已完成；等待 Human Owner 决定是否启动 P4
+### Step 1 — P4-A Reviewer-session resume paired experiment
 
-状态：`AWAITING HUMAN DIRECTION`
+状态：`ACTIVE`
 
 ### 当前目标
 
-P3 的 usage/cache instrumentation 与真实 `--ephemeral` baseline 已完成。当前没有被授权自动执行的下一阶段；保持现有 transport 和 capability boundary，等待 Human Owner 明确决定是否启动 P4 Reviewer-session resume 对照实验。
+在 P3 instrumentation 基础上实现并执行一个严格配对的 Reviewer session lifecycle 对照实验，测量 `ephemeral control` 与 `Reviewer persistent + resume treatment` 在 token/cache/latency 上的真实差异。
 
-### 当前运行观察
+本阶段只回答一个问题：
 
-Baseline run `usage-baseline-20260905-01` 已证明：
+> 在其他条件保持一致时，仅把 Reviewer 的第三回合从 fresh ephemeral thread 改为 resume Reviewer 第一回合的持久化 thread，是否能降低 uncached input、重复上下文重建或 latency？
+
+不在本阶段回答 Executor 是否应 persistent，也不进入代码 mutation。
+
+### P4-A 实验矩阵
 
 ```text
-Reviewer (.codex-B) -> Executor (.codex-A) -> Reviewer (.codex-B)
-all process exit codes = 0
-preserved_verbatim = true / true
-all sandboxes = read-only
-all invocations = --ephemeral
-total input/cached/uncached = 167734 / 127104 / 40630
-aggregate cache_hit_ratio = 0.757771
-total output/reasoning = 1388 / 484
-total duration_seconds = 68.078
+Control
+  Turn 1 Reviewer (.codex-B) = fresh --ephemeral
+  Turn 2 Executor (.codex-A) = fresh --ephemeral
+  Turn 3 Reviewer (.codex-B) = fresh --ephemeral
+
+Treatment
+  Turn 1 Reviewer (.codex-B) = new persistent thread (no --ephemeral)
+  Turn 2 Executor (.codex-A) = fresh --ephemeral
+  Turn 3 Reviewer (.codex-B) = resume Turn 1 Reviewer thread
 ```
 
-当前不把 `thread_id` 等同于已验证可恢复的 session，也不据此推断 resume 收益。P4、workspace-write、disposable mutation、automatic Runtime semantic transition 均未启动。
+### 配对实验约束
+
+Control 与 Treatment 必须保持：
+
+- 同一 `git HEAD`；
+- 同一 `miniloop_static.md` 与 `miniloop_runtime.md` 内容；
+- 同一三个 role prompt 内容；
+- 同一 Reviewer/Executor `CODEX_HOME` 绑定；
+- 同一 `read-only` sandbox；
+- 同一 approval policy；
+- 同一 Codex executable/version；
+- 同一 profile model / reasoning-effort 配置；
+- 同一 transport task 语义与相同的 deterministic orchestration behavior。
+
+两组运行开始前应机械记录至少：
+
+```text
+git_head
+codex_version
+static_sha256
+runtime_sha256
+role_prompt_sha256(s)
+reviewer_codex_home
+executor_codex_home
+requested/observed model configuration if mechanically available
+requested/observed reasoning effort if mechanically available
+session_mode for each turn
+```
+
+如果当前 JSONL 不可靠提供 model/reasoning 字段，不得伪造；可以从 experiment-start snapshot 的 profile configuration 中机械记录可确认值，或只记录对应配置文件 hash + 明确 limitation。
+
+### 实现要求
+
+1. 保留 P3 现有 usage/thread instrumentation 与原始 JSONL；
+2. 扩展 orchestrator，使同一实现可以明确运行 `ephemeral control` 与 `reviewer-resume treatment`，不要复制两套独立脚本；
+3. Treatment Reviewer Turn 1 必须生成可被后续恢复的正常持久化 thread，并记录其 `thread_id`；
+4. Treatment Reviewer Turn 3 必须显式 resume 该 `thread_id`，并把 resume relationship 作为机械 metadata 落盘；
+5. Executor 在 P4-A 中仍保持 `--ephemeral`；
+6. 三个 turn 仍全部 `read-only`；
+7. peer payload 仍原样 transport，继续做 byte/SHA 验证；
+8. Python 不解析 Reviewer/Executor 自由文本，不用 `ACCEPT` / `REJECT` 推进状态；
+9. Control 与 Treatment 都保存 `events.jsonl`、`process.json`、`manifest.json`、prompt/final/transport evidence；
+10. 记录并比较每个 turn 与 aggregate 的：
+    - `input_tokens`
+    - `cached_input_tokens`
+    - `uncached_input_tokens`
+    - `cache_hit_ratio`
+    - `output_tokens`
+    - `reasoning_output_tokens`
+    - `duration_seconds`
+11. 主要判断指标优先看 Reviewer Turn 3 与全局 `uncached_input_tokens`，cache-hit ratio 只作为辅助；高 cache-hit ratio 本身不等价于更低总 token/cost；
+12. 若 resume 失败、thread 不可恢复、CLI schema 与预期不符或实验条件无法锁定，fail closed 并保存 evidence，不退化成静默 fresh session；
+13. 不在两组 paired run 中间修改 Runtime/Static/role prompts；两组都完成后才允许更新 Runtime；
+14. P4-A 完成后给出 evidence-backed comparison，不允许只凭单次主观延迟或 cache ratio 宣称优胜。
+
+### Reconstruction correctness 约束
+
+P4-A 不同时优化 context-read policy，以免把变量混在一起；但必须记录当前 read behavior 作为 evidence。
+
+当前已知风险：Agent 可能用固定 `sed` 行范围或整份 `cat` 自主读取 Static/Runtime。P4-A 中暂不修改这些 role prompts，以保持 Control/Treatment 可比性；实验报告必须明确：session resume 只能测试 session lifecycle，不能证明 authoritative reconstruction 已最优或完整。
+
+如果 P4-A 完成，下一候选阶段为 P4-B：在固定更优 session mode 后，再单独优化 Reviewer/Executor 的 authoritative context-read policy，避免把两种优化收益混在同一个实验里。
+
+### P4-A 验收条件
+
+P4-A 可以提交给 Reviewer 审阅，当且仅当：
+
+- Control 和 Treatment 都在同一 frozen experiment context 下完成；
+- 两组均保持三个 process 正常结束或对失败做完整 evidence 记录；
+- Treatment 机械证明 Reviewer Turn 3 使用了 Turn 1 的目标 thread，而不是创建 fresh replacement；
+- 两组 token/cache/duration 指标均可比较，缺失字段明确为 `null`；
+- transport byte identity 仍成立；
+- tests 覆盖 control/treatment command construction、resume metadata 和 failure behavior；
+- 实验结束前 Static/Runtime/role prompts 未在 Control 与 Treatment 之间变化；
+- Runtime 最终只在 paired experiment 完成后更新；
+- 未进入 Executor persistence、workspace mutation 或 automatic Runtime transition。
 
 ---
 
@@ -398,20 +509,18 @@ state db returned stale rollout path for thread ...
 
 ### P4 — Role-session resume policy
 
-状态：`NOT STARTED / REQUIRES HUMAN OWNER ACTIVATION`
+状态：`ACTIVE — P4-A PAIRED EXPERIMENT`
 
-若 Human Owner 后续明确启动 P4，则实现 Reviewer session resume 并使用等价 transport task 对比 ephemeral 与 Reviewer-resume 的 token、cache 和 latency。第一版只要求 Reviewer 持久化；Executor 是否 persistent 由 evidence 决定。
+P4 当前只授权 P4-A：Reviewer session lifecycle paired experiment。
 
-P4 必须继续满足：
+P4-A 完成后必须先由 Reviewer / Human Owner 审阅结果，再决定是否：
 
-- Static / Runtime / repository/evidence 仍为 authoritative memory；
-- Reviewer / Executor session 仅为 non-authoritative performance working memory；
-- Runtime 更新后，resume session 必须重新读取或明确刷新当前 Runtime；
-- fresh-session reconstruction 在架构上仍然可行；
-- Static contract 显著变化时可以 rollover role session；
-- peer natural-language payload 保持 opaque，不引入 Python semantic parser；
-- baseline 与 resume run 都保存可检查的原始 JSONL 和派生机械指标；
-- 不因 P4 实验自动进入 workspace mutation、implementation acceptance 或 Runtime mutation loop。
+- 保留 Reviewer persistent/resume；
+- 启动 P4-B context-read optimization；
+- 测试 Executor persistent session；
+- 或放弃 session persistence，返回 fresh reconstruction 路径。
+
+未经新的 evidence-backed decision，不自动进入上述任一分支。
 
 ### P5 — Raw run-log growth / curated evidence boundary
 
