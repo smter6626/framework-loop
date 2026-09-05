@@ -133,6 +133,83 @@ Meaning:
 
 基础 Reviewer→Executor→Reviewer 自动文本 transport 已通过。该完成记录只证明 profile invocation、opaque peer payload routing、process completion 和可检查 run evidence；不证明 mutation、independent implementation acceptance、repair loop、Runtime transition 或 Human Gate 已完成。
 
+### Step 1 P3 — Usage/cache instrumentation + current ephemeral baseline
+
+Status: `COMPLETED`
+
+Result:
+
+- 已按当前 Codex CLI 的实际 JSON event schema，从原始 `events.jsonl` 机械提取 `thread_id` 与 `turn.completed.usage`；
+- 每个 turn 的 `process.json` 已记录 `input_tokens`、`cached_input_tokens`、`cache_write_input_tokens`、`uncached_input_tokens`、`cache_hit_ratio`、`output_tokens` 与 `reasoning_output_tokens`；
+- `manifest.json` 已汇总三个 turn 的 thread identifier、usage availability、token/cache total 与 duration；
+- usage 字段缺失或类型不符合 schema 时记录为 `null`，不会被误记为 `0`；
+- parser 只读取 machine-readable control event，不解析 Reviewer / Executor 的自然语言，也不会根据 `ACCEPT` / `REJECT` 推进 Runtime；
+- 原始 `events.jsonl` 保持 Codex CLI stdout 的原始字节，metadata 仅为派生结果；
+- 已完成一次真实 `--ephemeral` 三回合 baseline，三次调用均为 `read-only`，角色绑定保持 `.codex-B` / `.codex-A` / `.codex-B`；
+- 两次 peer payload 均通过逐字节一致性检查，三个 process exit code 均为 `0`。
+
+Baseline:
+
+```text
+Turn 1 Reviewer (.codex-B)
+  thread_id              = 01a071c8-a6f8-7ef0-a2dc-f23dc9a23983
+  input_tokens           = 56387
+  cached_input_tokens    = 42240
+  uncached_input_tokens  = 14147
+  cache_hit_ratio        = 0.749109
+  output_tokens          = 477
+  reasoning_output_tokens = 183
+  duration_seconds       = 20.577
+
+Turn 2 Executor (.codex-A)
+  thread_id              = 01a071c8-f661-7dc2-acdc-5b8e8dd62e05
+  input_tokens           = 56133
+  cached_input_tokens    = 38528
+  uncached_input_tokens  = 17605
+  cache_hit_ratio        = 0.686370
+  output_tokens          = 297
+  reasoning_output_tokens = 0
+  duration_seconds       = 23.096
+
+Turn 3 Reviewer (.codex-B)
+  thread_id              = 01a071c9-50ba-7aa0-8f98-f01b8ede1b7e
+  input_tokens           = 55214
+  cached_input_tokens    = 46336
+  uncached_input_tokens  = 8878
+  cache_hit_ratio        = 0.839207
+  output_tokens          = 614
+  reasoning_output_tokens = 301
+  duration_seconds       = 24.405
+
+Total
+  input_tokens           = 167734
+  cached_input_tokens    = 127104
+  uncached_input_tokens  = 40630
+  cache_hit_ratio        = 0.757771
+  output_tokens          = 1388
+  reasoning_output_tokens = 484
+  duration_seconds       = 68.078
+```
+
+Evidence locator:
+
+- commit `b8ed49f5283c58ca8b314b49498f1881c63830a1` — instrumentation、tests 与真实 ephemeral baseline；
+- `1PCloop/scripts/run_text_loop.py`；
+- `1PCloop/tests/test_run_text_loop.py`；
+- `1PCloop/runs/usage-baseline-20260905-01/manifest.json`；
+- `1PCloop/runs/usage-baseline-20260905-01/transcript.md`；
+- `1PCloop/runs/usage-baseline-20260905-01/turn-*/events.jsonl`；
+- `1PCloop/runs/usage-baseline-20260905-01/turn-*/process.json`。
+
+Commit Notes:
+
+- Step: `Step 1 P3`
+- Implementation/evidence commit: `b8ed49f5283c58ca8b314b49498f1881c63830a1`
+
+Meaning:
+
+P3 已完成并建立当前 `--ephemeral` baseline。该 evidence 只描述本次实际 token/cache/latency，不证明 `codex exec resume` 一定更省，也不启动 P4、workspace mutation、automatic Runtime semantic transition 或任何 persistent Executor session。
+
 ---
 
 ## Other Notes
@@ -233,69 +310,49 @@ Recommended next sequence:
 7. 随后进入 disposable-file mutation + independent review milestone
 ```
 
+### 2026-09-05 — P3 CLI event-schema observation
+
+Status: `OBSERVED`
+
+Step: `Step 1 P3`
+
+Observed evidence:
+
+- 当前真实 `codex exec --json` 输出以 `thread.started.thread_id` 提供可用 thread identifier；未观察到独立的 `session_id` 字段；
+- usage 位于 `turn.completed.usage`，本次可用字段为 `input_tokens`、`cached_input_tokens`、`cache_write_input_tokens`、`output_tokens` 和 `reasoning_output_tokens`；
+- `uncached_input_tokens` 与 `cache_hit_ratio` 是由 input/cached input 机械计算的派生值；
+- 因本次运行使用 `--ephemeral`，不能仅凭记录到的 `thread_id` 宣称该 session 可 resume；
+- P4 的 resume 成本/收益仍需单独、等价的对照 evidence，当前 baseline 不作该结论。
+
 ---
 
 ## 当前活跃步骤
 
-### Step 1 — 测量上下文成本并验证 resumable role session
+### Step 1 — P3 已完成；等待 Human Owner 决定是否启动 P4
 
-状态：`ACTIVE`
+状态：`AWAITING HUMAN DIRECTION`
 
 ### 当前目标
 
-在已经通过的基础文本 transport 上增加 token/cache 可观测性，并用可复现实验判断 role-session resume 是否能减少重复上下文重建和 uncached input，同时保持 Static / Runtime / repository 的外部权威状态不变。
-
-当前阶段不把“session resume 更省”当作已证实结论；必须先记录 baseline，再做对照。
-
-### 本里程碑交付范围
-
-1. 从现有 `codex exec --json` 的 `events.jsonl` 中机械提取可用的 thread/session identifier 与 usage metadata；
-2. 在 `process.json` / `manifest.json` 中记录至少以下可用字段：
-
-```text
-thread_id
-input_tokens
-cached_input_tokens
-uncached_input_tokens
-cache_hit_ratio
-output_tokens
-reasoning_output_tokens
-```
-
-3. 对当前 `--ephemeral` 三回合 transport 重跑 baseline；
-4. 实现 Reviewer 的 session persistence/resume，使第三回合可以继续第一回合的 Reviewer session；
-5. 使用等价 transport task 对比 ephemeral 与 Reviewer-resume 的 token、cache 和 latency；
-6. 保持 peer natural-language payload 仍为 opaque transport，不允许为了 usage instrumentation 引入 semantic parser。
-
-### 本里程碑验收
-
-- usage/thread metadata 的解析只针对 Codex 官方 machine-readable event，不解析 Agent final response 的自然语言；
-- baseline 与 resume run 都保存可检查的原始 JSONL 和派生机械指标；
-- 对每个 run 可以机械计算或明确标记不可获得的 `cached_input_tokens`、`uncached_input_tokens` 和 cache hit ratio；
-- Reviewer resume 不得使 conversation history 变成 authoritative memory；fresh-session reconstruction 仍必须在架构上可行；
-- 不因本阶段通过而自动进入 implementation acceptance 或 Runtime mutation loop。
-
-### 当前设计边界
-
-- Static / Runtime / repository/evidence = authoritative memory；
-- Reviewer / Executor session = non-authoritative performance working memory；
-- Static contract 发生显著变化时，允许/建议 role session rollover，而不是依赖旧 session 中的 superseded contract；
-- Runtime 更新时，resume session 必须能够重新读取或明确刷新当前 Runtime；
-- 当前只要求先验证 Reviewer resume；Executor persistent session 是否启用由实验结果决定；
-- workspace mutation 继续延后到本轮成本/cache evidence 完成之后。
+P3 的 usage/cache instrumentation 与真实 `--ephemeral` baseline 已完成。当前没有被授权自动执行的下一阶段；保持现有 transport 和 capability boundary，等待 Human Owner 明确决定是否启动 P4 Reviewer-session resume 对照实验。
 
 ### 当前运行观察
 
-基础 transport run `text-loop-20260905-01` 已证明：
+Baseline run `usage-baseline-20260905-01` 已证明：
 
 ```text
 Reviewer (.codex-B) -> Executor (.codex-A) -> Reviewer (.codex-B)
 all process exit codes = 0
-transport payloads = 420 bytes / 411 bytes
 preserved_verbatim = true / true
+all sandboxes = read-only
+all invocations = --ephemeral
+total input/cached/uncached = 167734 / 127104 / 40630
+aggregate cache_hit_ratio = 0.757771
+total output/reasoning = 1388 / 484
+total duration_seconds = 68.078
 ```
 
-但当前 run 没有把 usage/cache fields 提升到 `process.json` / `manifest.json`，因此无法从现有 manifest 直接回答 cached/uncached input 成本。该缺口是当前 Active Step 的第一优先级。
+当前不把 `thread_id` 等同于已验证可恢复的 session，也不据此推断 resume 收益。P4、workspace-write、disposable mutation、automatic Runtime semantic transition 均未启动。
 
 ---
 
@@ -333,17 +390,28 @@ state db returned stale rollout path for thread ...
 
 ### P3 — Usage/cache instrumentation
 
-状态：`ACTIVE`
+状态：`COMPLETED`
 
-需要从 `events.jsonl` 中机械提取 Codex machine-readable usage/thread metadata，并提升到 `process.json` / `manifest.json`，形成 current `--ephemeral` baseline。
+已从 `events.jsonl` 机械提取 Codex machine-readable usage/thread metadata，并提升到 `process.json` / `manifest.json`；真实 `--ephemeral` baseline 见 commit `b8ed49f5283c58ca8b314b49498f1881c63830a1` 与 `1PCloop/runs/usage-baseline-20260905-01/`。
 
-该项完成前，不对 session resume 的 token/cache 收益作定量结论。
+当前 evidence 不对 session resume 的 token/cache 收益作定量结论。
 
 ### P4 — Role-session resume policy
 
-状态：`PENDING P3`
+状态：`NOT STARTED / REQUIRES HUMAN OWNER ACTIVATION`
 
-在 P3 baseline 之后实现 Reviewer session resume 并做同任务对照。第一版只要求 Reviewer 持久化；Executor 是否 persistent 由 evidence 决定。
+若 Human Owner 后续明确启动 P4，则实现 Reviewer session resume 并使用等价 transport task 对比 ephemeral 与 Reviewer-resume 的 token、cache 和 latency。第一版只要求 Reviewer 持久化；Executor 是否 persistent 由 evidence 决定。
+
+P4 必须继续满足：
+
+- Static / Runtime / repository/evidence 仍为 authoritative memory；
+- Reviewer / Executor session 仅为 non-authoritative performance working memory；
+- Runtime 更新后，resume session 必须重新读取或明确刷新当前 Runtime；
+- fresh-session reconstruction 在架构上仍然可行；
+- Static contract 显著变化时可以 rollover role session；
+- peer natural-language payload 保持 opaque，不引入 Python semantic parser；
+- baseline 与 resume run 都保存可检查的原始 JSONL 和派生机械指标；
+- 不因 P4 实验自动进入 workspace mutation、implementation acceptance 或 Runtime mutation loop。
 
 ### P5 — Raw run-log growth / curated evidence boundary
 
