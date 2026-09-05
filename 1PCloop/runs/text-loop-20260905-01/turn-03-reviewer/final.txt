@@ -1,0 +1,3 @@
+ACCEPT — the Executor’s opaque, text-only receipt reached the Reviewer unchanged, and its stated no-mutation scope matches the bounded demonstration.
+
+This accepts only the current basic Reviewer→Executor→Reviewer transport milestone. It does not establish full Step 1, independent evidence verification, or authorize any Runtime transition.

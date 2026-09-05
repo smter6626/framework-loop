@@ -1,0 +1,43 @@
+{
+  "codex_home": "/Users/smterpro/.codex-A",
+  "command": [
+    "/Users/smterpro/.local/state/fnm_multishells/22694_1788598912074/bin/codex",
+    "exec",
+    "--ephemeral",
+    "--json",
+    "--color",
+    "never",
+    "-c",
+    "approval_policy=\"never\"",
+    "--sandbox",
+    "read-only",
+    "--cd",
+    "/Users/smterpro/Workspace/framework-loop",
+    "--output-last-message",
+    "/Users/smterpro/Workspace/framework-loop/1PCloop/runs/text-loop-20260905-01/turn-02-executor/final.txt",
+    "-"
+  ],
+  "duration_seconds": 12.84,
+  "events_path": "turn-02-executor/events.jsonl",
+  "exit_code": 0,
+  "failure": null,
+  "final_message_path": "turn-02-executor/final.txt",
+  "final_message_sha256": "67ee7de77e76c362a320dc9517ebf137b05c6bb845084d299ee494918e50ede7",
+  "finished_at": "2026-09-05T13:08:03.530+00:00",
+  "prompt_path": "turn-02-executor/prompt.txt",
+  "prompt_sha256": "46edd4ef91c942e99c0ea1b4338e92d8158e13b7df41218884dba70261567faf",
+  "role": "executor",
+  "sandbox": "read-only",
+  "started_at": "2026-09-05T13:07:50.690+00:00",
+  "stderr_path": "turn-02-executor/stderr.txt",
+  "success": true,
+  "transport": {
+    "byte_length": 420,
+    "peer_payload_path": "turn-02-executor/peer-payload.txt",
+    "preserved_verbatim": true,
+    "prompt_offset": 939,
+    "sha256": "4ce7c58e63709e6496787f24de7fefe83c9cc5ca0a05a46e0d7359325b439aab",
+    "source_final_message": "turn-01-reviewer/final.txt"
+  },
+  "turn": 2
+}
