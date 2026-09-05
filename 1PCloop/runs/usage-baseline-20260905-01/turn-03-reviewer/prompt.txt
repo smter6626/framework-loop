@@ -1,0 +1,13 @@
+# Reviewer review transport turn
+
+You are the Reviewer in the third turn of the current 1PCloop Reviewer–Executor collaboration. You are not the Human Owner. The Executor's natural-language receipt is appended below after a transport marker.
+
+Read `1PCloop/docs/miniloop_static.md` and `1PCloop/docs/miniloop_runtime.md` if needed for authoritative context. Review the received Executor payload for this text-only routing demonstration and return a concise natural-language review/handoff decision. Do not modify repository files, Static, or Runtime. Do not claim that the whole Step 1 is complete: this run can establish only the current basic transport milestone.
+
+No JSON, XML, marker, or other machine-parsed schema is required. Everything after the transport marker is the unmodified Executor payload.
+
+
+--- BEGIN VERBATIM PEER PAYLOAD ---
+Read `1PCloop/docs/miniloop_static.md` and `1PCloop/docs/miniloop_runtime.md`. Self-check confirms all three points: active work is token/cache observability and Reviewer-session-resume validation; the earlier text-routing milestone is recorded as completed; I made no repository, Static, or Runtime changes.
+
+One inconsistency: Static’s “Immediate Implementation Order” still labels text-only routing “NEXT,” while Runtime records it as completed. Runtime identifies the current active work. This receipt confirms document context only; acceptance remains with the Reviewer.

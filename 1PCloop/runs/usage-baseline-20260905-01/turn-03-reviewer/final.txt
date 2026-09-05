@@ -1,0 +1,5 @@
+ACCEPT — basic text-transport milestone only.
+
+The receipt matches Runtime: text routing is completed, and the active work is token/cache observability plus Reviewer-session-resume validation. The Static “NEXT” entry is stale relative to authoritative Runtime but does not invalidate this transport receipt.
+
+No repository, Static, or Runtime changes are claimed or accepted. Step 1 remains active and incomplete.

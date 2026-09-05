@@ -1,0 +1,3 @@
+Read `1PCloop/docs/miniloop_static.md` and `1PCloop/docs/miniloop_runtime.md`. Self-check confirms all three points: active work is token/cache observability and Reviewer-session-resume validation; the earlier text-routing milestone is recorded as completed; I made no repository, Static, or Runtime changes.
+
+One inconsistency: Static’s “Immediate Implementation Order” still labels text-only routing “NEXT,” while Runtime records it as completed. Runtime identifies the current active work. This receipt confirms document context only; acceptance remains with the Reviewer.

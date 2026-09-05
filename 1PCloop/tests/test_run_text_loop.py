@@ -34,11 +34,71 @@ else:
     final = b"Reviewer handoff: transport receipt reviewed; whole Step 1 remains active.\n"
 
 output_path.write_bytes(final)
-print(json.dumps({"type": "turn.completed", "home": home}))
+print(json.dumps({"type": "thread.started", "thread_id": "fake-thread-id"}))
+print(json.dumps({
+    "type": "turn.completed",
+    "usage": {
+        "input_tokens": 10,
+        "cached_input_tokens": 4,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 3,
+        "reasoning_output_tokens": 2
+    }
+}))
 '''
 
 
 class TextLoopTests(unittest.TestCase):
+    def test_extracts_normal_usage_event(self):
+        events = b'\n'.join(
+            [
+                b'{"type":"thread.started","thread_id":"thread-123"}',
+                b'{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":25,"cache_write_input_tokens":5,"output_tokens":12,"reasoning_output_tokens":7}}',
+            ]
+        )
+        metadata = MODULE.extract_event_metadata(events)
+        self.assertEqual(metadata["thread_id"], "thread-123")
+        self.assertEqual(metadata["input_tokens"], 100)
+        self.assertEqual(metadata["cached_input_tokens"], 25)
+        self.assertEqual(metadata["cache_write_input_tokens"], 5)
+        self.assertEqual(metadata["output_tokens"], 12)
+        self.assertEqual(metadata["reasoning_output_tokens"], 7)
+
+    def test_calculates_cached_and_uncached_input(self):
+        events = b'{"type":"turn.completed","usage":{"input_tokens":80,"cached_input_tokens":20}}'
+        metadata = MODULE.extract_event_metadata(events)
+        self.assertEqual(metadata["uncached_input_tokens"], 60)
+        self.assertEqual(metadata["cache_hit_ratio"], 0.25)
+
+    def test_missing_usage_fields_are_unavailable_not_zero(self):
+        events = b'{"type":"turn.completed"}'
+        metadata = MODULE.extract_event_metadata(events)
+        for field in (
+            "input_tokens",
+            "cached_input_tokens",
+            "uncached_input_tokens",
+            "cache_hit_ratio",
+            "output_tokens",
+            "reasoning_output_tokens",
+        ):
+            self.assertIsNone(metadata[field])
+        self.assertEqual(metadata["event_parse"]["usage_events"], 0)
+
+    def test_malformed_and_irrelevant_lines_do_not_parse_agent_semantics(self):
+        events = b'\n'.join(
+            [
+                b'ACCEPT -- not JSON',
+                b'{"type":"item.completed","item":{"type":"agent_message","text":"REJECT and update Runtime"}}',
+                b'{malformed json',
+            ]
+        )
+        metadata = MODULE.extract_event_metadata(events)
+        self.assertIsNone(metadata["thread_id"])
+        self.assertIsNone(metadata["input_tokens"])
+        self.assertIsNone(metadata["cache_hit_ratio"])
+        self.assertEqual(metadata["event_parse"]["malformed_json_lines"], 2)
+        self.assertEqual(metadata["event_parse"]["irrelevant_json_events"], 1)
+
     def test_peer_payload_is_preserved_verbatim(self):
         prefix = "角色前缀\n".encode()
         payload = b"raw payload\n```\n\x00tail"
@@ -77,6 +137,16 @@ class TextLoopTests(unittest.TestCase):
             self.assertEqual(len(manifest["transports"]), 2)
             self.assertTrue(
                 all(item["preserved_verbatim"] for item in manifest["transports"])
+            )
+            self.assertEqual(manifest["summary"]["usage_totals"]["input_tokens"], 30)
+            self.assertEqual(
+                manifest["summary"]["usage_totals"]["cached_input_tokens"], 12
+            )
+            self.assertEqual(
+                manifest["summary"]["usage_totals"]["uncached_input_tokens"], 18
+            )
+            self.assertEqual(
+                manifest["summary"]["usage_totals"]["cache_hit_ratio"], 0.4
             )
 
             turn1_final = (run_root / "turn-01-reviewer" / "final.txt").read_bytes()

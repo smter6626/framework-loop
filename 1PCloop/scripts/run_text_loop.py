@@ -26,6 +26,13 @@ DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
 DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
 PEER_MARKER = b"\n\n--- BEGIN VERBATIM PEER PAYLOAD ---\n"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+USAGE_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_write_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+)
 
 
 def utc_now() -> str:
@@ -74,6 +81,84 @@ def compose_peer_prompt(prefix: bytes, peer_payload: bytes) -> Tuple[bytes, int]
     return prompt, offset
 
 
+def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
+    """Extract control metadata without reading agent-message natural language."""
+    thread_id: Optional[str] = None
+    usage: Dict[str, Optional[Any]] = {field: None for field in USAGE_FIELDS}
+    counts = {
+        "blank_lines": 0,
+        "irrelevant_json_events": 0,
+        "malformed_json_lines": 0,
+        "thread_started_events": 0,
+        "turn_completed_events": 0,
+        "usage_events": 0,
+        "valid_json_lines": 0,
+    }
+
+    for raw_line in events_jsonl.splitlines():
+        if not raw_line.strip():
+            counts["blank_lines"] += 1
+            continue
+        try:
+            event = json.loads(raw_line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            counts["malformed_json_lines"] += 1
+            continue
+        counts["valid_json_lines"] += 1
+        if not isinstance(event, dict):
+            counts["irrelevant_json_events"] += 1
+            continue
+
+        event_type = event.get("type")
+        if event_type == "thread.started":
+            counts["thread_started_events"] += 1
+            candidate = event.get("thread_id")
+            if isinstance(candidate, str) and candidate:
+                thread_id = candidate
+            continue
+
+        if event_type == "turn.completed":
+            counts["turn_completed_events"] += 1
+            candidate_usage = event.get("usage")
+            if isinstance(candidate_usage, dict):
+                counts["usage_events"] += 1
+                usage = {
+                    field: (
+                        candidate_usage[field]
+                        if type(candidate_usage.get(field)) is int
+                        and candidate_usage[field] >= 0
+                        else None
+                    )
+                    for field in USAGE_FIELDS
+                }
+            continue
+
+        counts["irrelevant_json_events"] += 1
+
+    input_tokens = usage["input_tokens"]
+    cached_input_tokens = usage["cached_input_tokens"]
+    if input_tokens is not None and cached_input_tokens is not None:
+        uncached_input_tokens: Optional[int] = input_tokens - cached_input_tokens
+        cache_hit_ratio: Optional[float] = (
+            round(cached_input_tokens / input_tokens, 6) if input_tokens > 0 else None
+        )
+    else:
+        uncached_input_tokens = None
+        cache_hit_ratio = None
+
+    return {
+        "cache_hit_ratio": cache_hit_ratio,
+        "cache_write_input_tokens": usage["cache_write_input_tokens"],
+        "cached_input_tokens": cached_input_tokens,
+        "event_parse": counts,
+        "input_tokens": input_tokens,
+        "output_tokens": usage["output_tokens"],
+        "reasoning_output_tokens": usage["reasoning_output_tokens"],
+        "thread_id": thread_id,
+        "uncached_input_tokens": uncached_input_tokens,
+    }
+
+
 def fenced_block(value: bytes) -> str:
     text = value.decode("utf-8")
     longest = max((len(match.group(0)) for match in re.finditer(r"`+", text)), default=0)
@@ -93,6 +178,47 @@ class TurnResult:
     @property
     def success(self) -> bool:
         return bool(self.process["success"])
+
+
+def summarize_turns(turns: List[TurnResult]) -> Dict[str, Any]:
+    total_fields = USAGE_FIELDS + ("uncached_input_tokens",)
+
+    def total_if_complete(field: str) -> Optional[int]:
+        values = [turn.process.get(field) for turn in turns]
+        if not values or any(type(value) is not int for value in values):
+            return None
+        return sum(values)
+
+    usage_totals = {field: total_if_complete(field) for field in total_fields}
+    total_input = usage_totals["input_tokens"]
+    total_cached = usage_totals["cached_input_tokens"]
+    usage_totals["cache_hit_ratio"] = (
+        round(total_cached / total_input, 6)
+        if total_input is not None
+        and total_cached is not None
+        and total_input > 0
+        else None
+    )
+    availability_fields = total_fields + ("cache_hit_ratio",)
+    return {
+        "duration_seconds": round(
+            sum(float(turn.process["duration_seconds"]) for turn in turns), 3
+        ),
+        "successful_turns": sum(1 for turn in turns if turn.success),
+        "thread_ids": [
+            turn.process["thread_id"]
+            for turn in turns
+            if turn.process.get("thread_id") is not None
+        ],
+        "turn_count": len(turns),
+        "usage_available_turns": {
+            field: sum(
+                1 for turn in turns if turn.process.get(field) is not None
+            )
+            for field in availability_fields
+        },
+        "usage_totals": usage_totals,
+    }
 
 
 def run_turn(
@@ -192,6 +318,7 @@ def run_turn(
     duration_seconds = round(time.monotonic() - started_monotonic, 3)
     events_path.write_bytes(stdout)
     stderr_path.write_bytes(stderr)
+    event_metadata = extract_event_metadata(events_path.read_bytes())
     final_message = final_path.read_bytes() if final_path.is_file() else b""
     success = exit_code == 0 and bool(final_message)
     if not success and failure is None:
@@ -199,8 +326,12 @@ def run_turn(
 
     process: Dict[str, Any] = {
         "codex_home": str(codex_home),
+        "cache_hit_ratio": event_metadata["cache_hit_ratio"],
+        "cache_write_input_tokens": event_metadata["cache_write_input_tokens"],
+        "cached_input_tokens": event_metadata["cached_input_tokens"],
         "command": command,
         "duration_seconds": duration_seconds,
+        "event_parse": event_metadata["event_parse"],
         "events_path": relative_path(events_path, run_root),
         "exit_code": exit_code,
         "failure": failure,
@@ -211,15 +342,20 @@ def run_turn(
             sha256_bytes(final_message) if final_message else None
         ),
         "finished_at": utc_now(),
+        "input_tokens": event_metadata["input_tokens"],
+        "output_tokens": event_metadata["output_tokens"],
         "prompt_path": relative_path(prompt_path, run_root),
         "prompt_sha256": sha256_bytes(prompt),
         "role": role,
+        "reasoning_output_tokens": event_metadata["reasoning_output_tokens"],
         "sandbox": "read-only",
         "started_at": started_at,
         "stderr_path": relative_path(stderr_path, run_root),
         "success": success,
+        "thread_id": event_metadata["thread_id"],
         "transport": transport,
         "turn": number,
+        "uncached_input_tokens": event_metadata["uncached_input_tokens"],
     }
     write_json(process_path, process)
     return TurnResult(number, role, turn_dir, final_message, process)
@@ -243,6 +379,7 @@ def write_manifest(
         "repo_root": str(repo_root),
         "run_id": run_id,
         "schema_version": 1,
+        "summary": summarize_turns(turns),
         "started_at": started_at,
         "status": status,
         "transports": transports,
@@ -252,7 +389,20 @@ def write_manifest(
 
 
 def write_transcript(run_root: Path, run_id: str, turns: List[TurnResult]) -> None:
-    lines = [f"# 1PCloop transcript — {run_id}", ""]
+    summary = summarize_turns(turns)
+    lines = [
+        f"# 1PCloop transcript — {run_id}",
+        "",
+        "## Mechanical run summary",
+        "",
+        fenced_block(
+            (
+                json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n"
+            ).encode("utf-8")
+        ),
+        "",
+    ]
     for turn in turns:
         process = turn.process
         lines.extend(
@@ -263,6 +413,13 @@ def write_transcript(run_root: Path, run_id: str, turns: List[TurnResult]) -> No
                 f"- Exit code: `{process['exit_code']}`",
                 f"- Success: `{str(process['success']).lower()}`",
                 f"- Duration: `{process['duration_seconds']}` seconds",
+                f"- Thread ID: `{process['thread_id']}`",
+                f"- Input tokens: `{process['input_tokens']}`",
+                f"- Cached input tokens: `{process['cached_input_tokens']}`",
+                f"- Uncached input tokens: `{process['uncached_input_tokens']}`",
+                f"- Cache hit ratio: `{process['cache_hit_ratio']}`",
+                f"- Output tokens: `{process['output_tokens']}`",
+                f"- Reasoning output tokens: `{process['reasoning_output_tokens']}`",
                 f"- Events: `{process['events_path']}`",
                 f"- stderr: `{process['stderr_path']}`",
                 "",
