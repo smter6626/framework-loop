@@ -1,0 +1,75 @@
+{
+  "experiment_id": "p4a-20260905-01",
+  "frozen_at": "2026-09-05T14:16:17.565+00:00",
+  "frozen_context": {
+    "approval_policy": "never",
+    "codex_executable": "/Users/smterpro/.local/share/fnm/node-versions/v24.18.0/installation/lib/node_modules/@openai/codex/bin/codex.js",
+    "codex_version": "codex-cli 0.153.4",
+    "executor_codex_home": "/Users/smterpro/.codex-A",
+    "executor_config": {
+      "config_path": "/Users/smterpro/.codex-A/config.toml",
+      "config_sha256": "ebcd087bb6d87b551b036cb035bd7d631a9cea731ad8dfca88c550e3e2dbb16c",
+      "model": "gpt-6-astra",
+      "model_reasoning_effort": "high"
+    },
+    "executor_prompt_sha256": "35f282083549c4bf8713b41a45a0766e0992a04f1d0c25ffe4aeb4d70f833534",
+    "git_branch": "main",
+    "git_head": "0496fba156083f08e7d1975069330ec131d4ad0e",
+    "git_status_clean": true,
+    "reviewer_codex_home": "/Users/smterpro/.codex-B",
+    "reviewer_config": {
+      "config_path": "/Users/smterpro/.codex-B/config.toml",
+      "config_sha256": "11173f577eb124c2741f18c7bfde61d392756b002e01c92b0ae812eaeba814ef",
+      "model": "gpt-5.6-terra",
+      "model_reasoning_effort": "high"
+    },
+    "reviewer_initial_prompt_sha256": "45bffaf32f38e366c301ead816bb9841c53f41b8b09890c1f49acef9952cfabd",
+    "reviewer_review_prompt_sha256": "c909004ac949929fef4b80335a2b07b66b8e42b3a656bef923ef33c8e8cd6b59",
+    "runtime_sha256": "81f900d47c1ed35569ab65d1a257c625deaf1ede244ddc929e9c187012940f3c",
+    "sandbox": "read-only",
+    "session_modes": {
+      "ephemeral-control": [
+        "fresh-ephemeral",
+        "fresh-ephemeral",
+        "fresh-ephemeral"
+      ],
+      "reviewer-resume-treatment": [
+        "new-persistent",
+        "fresh-ephemeral",
+        "resume"
+      ]
+    },
+    "static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+  },
+  "run_order": [
+    "ephemeral-control",
+    "reviewer-resume-treatment"
+  ],
+  "runs": [
+    {
+      "finished_at": "2026-09-05T14:17:12.769+00:00",
+      "manifest_path": "/private/tmp/1pcloop-p4a-20260905-01/control/manifest.json",
+      "manifest_sha256": "d43ccd6860630d7dc87a2e72bc88353e70999d0e57fac69a725f32a0e4493ba4",
+      "requested_at": "2026-09-05T14:16:17.565+00:00",
+      "run_id": "control",
+      "run_order_index": 1,
+      "runs_root": "/private/tmp/1pcloop-p4a-20260905-01",
+      "session_mode": "ephemeral-control",
+      "started_at": "2026-09-05T14:16:17.565+00:00",
+      "status": "completed"
+    },
+    {
+      "finished_at": "2026-09-05T14:18:40.699+00:00",
+      "manifest_path": "/private/tmp/1pcloop-p4a-20260905-01/treatment/manifest.json",
+      "manifest_sha256": "724a536dc6d05fa9299c11c0f7e7e9d6385bf6a055206c6931ddf43ed7364f67",
+      "requested_at": "2026-09-05T14:17:57.332+00:00",
+      "run_id": "treatment",
+      "run_order_index": 2,
+      "runs_root": "/private/tmp/1pcloop-p4a-20260905-01",
+      "session_mode": "reviewer-resume-treatment",
+      "started_at": "2026-09-05T14:17:57.332+00:00",
+      "status": "completed"
+    }
+  ],
+  "schema_version": 1
+}

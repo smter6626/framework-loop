@@ -1,0 +1,204 @@
+{
+  "control": {
+    "aggregate": {
+      "cache_hit_ratio": 0.717814,
+      "cached_input_tokens": 77824,
+      "duration_seconds": 55.199,
+      "input_tokens": 108418,
+      "output_tokens": 1311,
+      "reasoning_output_tokens": 780,
+      "uncached_input_tokens": 30594
+    },
+    "finished_at": "2026-09-05T14:17:12.769+00:00",
+    "started_at": "2026-09-05T14:16:17.565+00:00",
+    "turns": [
+      {
+        "cache_hit_ratio": 0.715338,
+        "cached_input_tokens": 42240,
+        "duration_seconds": 27.405,
+        "input_tokens": 59049,
+        "output_tokens": 818,
+        "reasoning_output_tokens": 522,
+        "role": "reviewer",
+        "session_mode": "fresh-ephemeral",
+        "turn": 1,
+        "uncached_input_tokens": 16809
+      },
+      {
+        "cache_hit_ratio": 0.733478,
+        "cached_input_tokens": 11520,
+        "duration_seconds": 12.449,
+        "input_tokens": 15706,
+        "output_tokens": 78,
+        "reasoning_output_tokens": 20,
+        "role": "executor",
+        "session_mode": "fresh-ephemeral",
+        "turn": 2,
+        "uncached_input_tokens": 4186
+      },
+      {
+        "cache_hit_ratio": 0.71485,
+        "cached_input_tokens": 24064,
+        "duration_seconds": 15.345,
+        "input_tokens": 33663,
+        "output_tokens": 415,
+        "reasoning_output_tokens": 238,
+        "role": "reviewer",
+        "session_mode": "fresh-ephemeral",
+        "turn": 3,
+        "uncached_input_tokens": 9599
+      }
+    ]
+  },
+  "delta_treatment_minus_control": {
+    "aggregate": {
+      "cached_input_tokens": -768,
+      "duration_seconds": -11.837,
+      "duration_seconds_fraction": -0.214442,
+      "input_tokens": -6375,
+      "output_tokens": -280,
+      "reasoning_output_tokens": -153,
+      "uncached_input_tokens": -5607,
+      "uncached_input_tokens_fraction": -0.183271
+    },
+    "reviewer_turn_3": {
+      "cached_input_tokens": 256,
+      "input_tokens": -7649,
+      "output_tokens": -183,
+      "reasoning_output_tokens": -63,
+      "uncached_input_tokens": -7905,
+      "uncached_input_tokens_fraction": -0.823523
+    }
+  },
+  "experiment_id": "p4a-20260905-01",
+  "frozen_git_head": "0496fba156083f08e7d1975069330ec131d4ad0e",
+  "limitations": [
+    "This is one control-then-treatment pair; server-side prompt-cache warm order is a confound and no reversed-order replicate was run.",
+    "Role prompt prefixes and governance files were frozen, but stochastic Reviewer outputs made the downstream full T2/T3 prompt hashes differ between runs.",
+    "Configured model and reasoning effort were read from selected top-level config.toml fields; the JSONL schema did not independently report observed model configuration.",
+    "Duration includes service, network, inference, and tool-execution variability from one pair.",
+    "Fixed sed ranges did not always cover the complete governance documents; P4-A intentionally did not alter context-read policy.",
+    "A single pair is evidence for this run only and does not decide whether Reviewer resume is the final architecture."
+  ],
+  "read_behavior": {
+    "control": {
+      "executor_turn_2": {
+        "runtime_read": false,
+        "static_read": false,
+        "unique_commands": []
+      },
+      "reviewer_turn_1": {
+        "runtime_read": true,
+        "static_read": true,
+        "unique_commands": [
+          "/bin/zsh -lc \"sed -n '1,240p' 1PCloop/docs/miniloop_static.md && sed -n '1,260p' 1PCloop/docs/miniloop_runtime.md\"",
+          "/bin/zsh -lc \"sed -n '241,520p' 1PCloop/docs/miniloop_static.md && sed -n '261,620p' 1PCloop/docs/miniloop_runtime.md\""
+        ]
+      },
+      "reviewer_turn_3": {
+        "runtime_read": true,
+        "static_read": true,
+        "unique_commands": [
+          "/bin/zsh -lc \"sed -n '1,240p' 1PCloop/docs/miniloop_static.md && sed -n '1,260p' 1PCloop/docs/miniloop_runtime.md\""
+        ]
+      }
+    },
+    "document_line_counts": {
+      "runtime": 541,
+      "static": 534
+    },
+    "observed_fixed_range_limitations": {
+      "control_reviewer_turn_1": "Static lines 521-534 were not read; Runtime was covered through EOF.",
+      "control_reviewer_turn_3": "Only Static 1-240 and Runtime 1-260 were read; Runtime Active Step begins at line 361.",
+      "treatment_reviewer_turn_1": "Static 1-480 and Runtime 1-520 were read; document tails were not read.",
+      "treatment_reviewer_turn_3": "No Static or Runtime command read occurred during the resumed turn."
+    },
+    "treatment": {
+      "executor_turn_2": {
+        "runtime_read": false,
+        "static_read": false,
+        "unique_commands": []
+      },
+      "reviewer_turn_1": {
+        "runtime_read": true,
+        "static_read": true,
+        "unique_commands": [
+          "/bin/zsh -lc \"sed -n '1,240p' 1PCloop/docs/miniloop_static.md && sed -n '1,260p' 1PCloop/docs/miniloop_runtime.md\"",
+          "/bin/zsh -lc \"sed -n '220,480p' 1PCloop/docs/miniloop_static.md && sed -n '260,520p' 1PCloop/docs/miniloop_runtime.md\""
+        ]
+      },
+      "reviewer_turn_3": {
+        "runtime_read": false,
+        "static_read": false,
+        "unique_commands": []
+      }
+    }
+  },
+  "resume_proof": {
+    "created_thread_id": "01a071ee-e9a1-7a40-89f5-098da93d94f7",
+    "observed_event_type": "thread.started",
+    "observed_resume_thread_id": "01a071ee-e9a1-7a40-89f5-098da93d94f7",
+    "resume_command_target": "01a071ee-e9a1-7a40-89f5-098da93d94f7",
+    "resume_relationship_verified": true,
+    "resume_target_thread_id": "01a071ee-e9a1-7a40-89f5-098da93d94f7",
+    "treatment_turn_count": 3,
+    "treatment_turn_3_contains_ephemeral": false,
+    "treatment_turn_3_session_mode": "resume"
+  },
+  "run_order": [
+    "ephemeral-control",
+    "reviewer-resume-treatment"
+  ],
+  "schema_version": 1,
+  "treatment": {
+    "aggregate": {
+      "cache_hit_ratio": 0.755133,
+      "cached_input_tokens": 77056,
+      "duration_seconds": 43.362,
+      "input_tokens": 102043,
+      "output_tokens": 1031,
+      "reasoning_output_tokens": 627,
+      "uncached_input_tokens": 24987
+    },
+    "finished_at": "2026-09-05T14:18:40.699+00:00",
+    "started_at": "2026-09-05T14:17:57.332+00:00",
+    "turns": [
+      {
+        "cache_hit_ratio": 0.680964,
+        "cached_input_tokens": 41216,
+        "duration_seconds": 23.825,
+        "input_tokens": 60526,
+        "output_tokens": 714,
+        "reasoning_output_tokens": 429,
+        "role": "reviewer",
+        "session_mode": "new-persistent",
+        "turn": 1,
+        "uncached_input_tokens": 19310
+      },
+      {
+        "cache_hit_ratio": 0.743082,
+        "cached_input_tokens": 11520,
+        "duration_seconds": 9.088,
+        "input_tokens": 15503,
+        "output_tokens": 85,
+        "reasoning_output_tokens": 23,
+        "role": "executor",
+        "session_mode": "fresh-ephemeral",
+        "turn": 2,
+        "uncached_input_tokens": 3983
+      },
+      {
+        "cache_hit_ratio": 0.934881,
+        "cached_input_tokens": 24320,
+        "duration_seconds": 10.449,
+        "input_tokens": 26014,
+        "output_tokens": 232,
+        "reasoning_output_tokens": 175,
+        "role": "reviewer",
+        "session_mode": "resume",
+        "turn": 3,
+        "uncached_input_tokens": 1694
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+Act as Executor for a bounded text-only transport demonstration. Do not modify the repository, Static, Runtime, or any artifact, and do not claim Step 1 acceptance. Return a brief plain-language execution receipt confirming you performed no mutation, self-checked that constraint, and that this response is limited to the existing Reviewer → Executor → Reviewer text-routing path.

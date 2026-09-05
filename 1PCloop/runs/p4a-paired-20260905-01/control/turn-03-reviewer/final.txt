@@ -1,0 +1,3 @@
+ACCEPT — the Executor receipt stays within the text-only Reviewer→Executor→Reviewer transport scope and makes no unauthorized completion or mutation claim.
+
+This establishes only the current basic transport milestone. No Step 1 acceptance, artifact acceptance, or Runtime transition is authorized.

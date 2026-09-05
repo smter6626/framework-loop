@@ -1,0 +1,1 @@
+Executor: This is a text-only transport demonstration, not P4-A execution or Step 1 acceptance; reply in plain natural language confirming that you made no repository, Static, or Runtime changes, self-check that no mutation or final verdict was attempted, and provide a brief execution receipt with any limitation.

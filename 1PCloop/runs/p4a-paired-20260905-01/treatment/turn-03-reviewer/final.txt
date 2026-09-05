@@ -1,0 +1,1 @@
+Reviewed: the Executor receipt follows the bounded text-only instruction, confirms no mutations, and disclaims P4-A and final acceptance. Accept this run only as a basic text-transport demonstration; it does not complete Step 1 or authorize any Runtime transition.

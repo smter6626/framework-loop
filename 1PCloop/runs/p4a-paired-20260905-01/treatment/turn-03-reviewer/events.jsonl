@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a071ee-e9a1-7a40-89f5-098da93d94f7"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Reviewed: the Executor receipt follows the bounded text-only instruction, confirms no mutations, and disclaims P4-A and final acceptance. Accept this run only as a basic text-transport demonstration; it does not complete Step 1 or authorize any Runtime transition."}}
+{"type":"turn.completed","usage":{"input_tokens":26014,"cached_input_tokens":24320,"cache_write_input_tokens":0,"output_tokens":232,"reasoning_output_tokens":175}}

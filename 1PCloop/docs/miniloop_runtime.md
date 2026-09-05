@@ -356,23 +356,142 @@ P4-A experiment decision:
 - P4-A 不改变 Executor session lifecycle，不进入 workspace-write，不进入 disposable mutation，不实现 automatic Runtime semantic transition；
 - P4-A 完成后只根据真实 evidence 判断 Reviewer resume 是否值得保留，不预设 resume 一定更省。
 
+### 2026-09-05 — P4-A paired experiment execution evidence
+
+Status: `EXPERIMENT COMPLETED — AWAITING REVIEW`
+
+Step: `Step 1 P4-A`
+
+Implementation commit:
+
+- `0496fba156083f08e7d1975069330ec131d4ad0e` — 同一 orchestrator 的 control/treatment session mode、frozen experiment metadata、resume relationship fail-closed 验证与 tests。
+
+Frozen experiment metadata:
+
+```text
+experiment_id = p4a-20260905-01
+git_head = 0496fba156083f08e7d1975069330ec131d4ad0e
+git_branch = main
+git_status_clean = true
+codex_version = codex-cli 0.153.4
+run_order = ephemeral-control -> reviewer-resume-treatment
+control = 2026-09-05T14:16:17.565+00:00 -> 2026-09-05T14:17:12.769+00:00
+treatment = 2026-09-05T14:17:57.332+00:00 -> 2026-09-05T14:18:40.699+00:00
+
+static_sha256 = f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe
+runtime_sha256 = 81f900d47c1ed35569ab65d1a257c625deaf1ede244ddc929e9c187012940f3c
+reviewer_initial_prompt_sha256 = 45bffaf32f38e366c301ead816bb9841c53f41b8b09890c1f49acef9952cfabd
+executor_prompt_sha256 = 35f282083549c4bf8713b41a45a0766e0992a04f1d0c25ffe4aeb4d70f833534
+reviewer_review_prompt_sha256 = c909004ac949929fef4b80335a2b07b66b8e42b3a656bef923ef33c8e8cd6b59
+
+Reviewer CODEX_HOME = /Users/smterpro/.codex-B
+Reviewer config.toml sha256 = 11173f577eb124c2741f18c7bfde61d392756b002e01c92b0ae812eaeba814ef
+Reviewer configured model / reasoning = gpt-5.6-terra / high
+
+Executor CODEX_HOME = /Users/smterpro/.codex-A
+Executor config.toml sha256 = ebcd087bb6d87b551b036cb035bd7d631a9cea731ad8dfca88c550e3e2dbb16c
+Executor configured model / reasoning = gpt-6-astra / high
+
+sandbox = read-only
+approval_policy = never
+```
+
+Model 与 reasoning 值仅来自 experiment-start 时 `config.toml` 的顶层非敏感字段；当前 JSONL 没有独立报告 observed model configuration。Experiment metadata 没有读取或复制 `auth.json`、credential 或完整 profile state。
+
+Measured results:
+
+```text
+Control — ephemeral-control
+  Reviewer T1: input 59049, cached 42240, uncached 16809, cache 0.715338,
+               output 818, reasoning 522, duration 27.405s
+  Executor T2: input 15706, cached 11520, uncached 4186, cache 0.733478,
+               output 78, reasoning 20, duration 12.449s
+  Reviewer T3: input 33663, cached 24064, uncached 9599, cache 0.714850,
+               output 415, reasoning 238, duration 15.345s
+  Aggregate:   input 108418, cached 77824, uncached 30594, cache 0.717814,
+               output 1311, reasoning 780, duration 55.199s
+
+Treatment — reviewer-resume-treatment
+  Reviewer T1: input 60526, cached 41216, uncached 19310, cache 0.680964,
+               output 714, reasoning 429, duration 23.825s
+  Executor T2: input 15503, cached 11520, uncached 3983, cache 0.743082,
+               output 85, reasoning 23, duration 9.088s
+  Reviewer T3: input 26014, cached 24320, uncached 1694, cache 0.934881,
+               output 232, reasoning 175, duration 10.449s
+  Aggregate:   input 102043, cached 77056, uncached 24987, cache 0.755133,
+               output 1031, reasoning 627, duration 43.362s
+
+Delta — Treatment minus Control
+  Reviewer T3 uncached_input_tokens = -7905 (-82.3523%)
+  Aggregate uncached_input_tokens   = -5607 (-18.3271%)
+  Reviewer T3 cached_input_tokens   = +256
+  Reviewer T3 input_tokens          = -7649
+  Aggregate input_tokens            = -6375 (-5.8800%)
+  Aggregate duration_seconds        = -11.837 (-21.4442%)
+```
+
+Resume mechanical proof:
+
+```text
+created_thread_id         = 01a071ee-e9a1-7a40-89f5-098da93d94f7
+resume command target     = 01a071ee-e9a1-7a40-89f5-098da93d94f7
+resume_target_thread_id   = 01a071ee-e9a1-7a40-89f5-098da93d94f7
+observed thread.started   = 01a071ee-e9a1-7a40-89f5-098da93d94f7
+resume_relationship_verified = true
+T3 --ephemeral            = false
+```
+
+Treatment T1 没有使用 `--ephemeral`；Executor T2 仍使用 fresh `--ephemeral`；T3 只有一次显式 resume invocation。没有发生 resume-to-fresh fallback。两组各三个 process 均 exit code `0`，四次 peer transport 均通过 SHA/byte identity 检查。
+
+Observed Static / Runtime read behavior:
+
+- Control Reviewer T1 使用固定 `sed` 范围读取 Static `1-520`、Runtime `1-620`；frozen Static 共 `534` 行，因此遗漏 Static `521-534`；
+- Control Reviewer T3 只读取 Static `1-240` 与 Runtime `1-260`；frozen Runtime 的 Active Step 从第 `361` 行开始，因此该 fresh review turn 没有通过该命令读到当前 Active Step；
+- Treatment Reviewer T1 使用固定范围读取 Static `1-480` 与 Runtime `1-520`，遗漏两份文件尾部；
+- Treatment Reviewer T3 resume 后没有再次执行 Static / Runtime read command；
+- 两组 Executor T2 均未执行 Static / Runtime read command；
+- P4-A 按约束没有修改 role prompt 或 context-read policy；这些 reconstruction correctness 观察只作为后续候选 P4-B evidence。
+
+Experiment limitations / confounders:
+
+- 本次只有一个 `Control -> Treatment` pair，服务端 prompt-cache warm order 仍是 confound；没有自行追加 reversed-order replicate；
+- role prompt prefix 与治理文件已冻结，但两次 Reviewer 的 stochastic output 不同，使后续 T2/T3 的完整动态 prompt hash 不同；
+- duration 包含单次实验的 service、network、inference 与 tool-execution variation；
+- 更高 cache-hit ratio 不被单独解释为更低成本；主要 observation 同时报告 total input 与 uncached input；
+- 固定 `sed` 范围存在实际遗漏，因此本实验不能证明 authoritative reconstruction 已完整或最优；
+- 单个 pair 只构成本次 run evidence，不决定 Reviewer resume 的最终架构地位。
+
+Evidence locator:
+
+- `1PCloop/runs/p4a-paired-20260905-01/experiment.json`；
+- `1PCloop/runs/p4a-paired-20260905-01/comparison.json`；
+- `1PCloop/runs/p4a-paired-20260905-01/control/manifest.json`；
+- `1PCloop/runs/p4a-paired-20260905-01/control/transcript.md`；
+- `1PCloop/runs/p4a-paired-20260905-01/treatment/manifest.json`；
+- `1PCloop/runs/p4a-paired-20260905-01/treatment/transcript.md`；
+- 两组各 turn 的原始 `events.jsonl` 与派生 `process.json`。
+
+Decision boundary:
+
+P4-A 实验执行已完成，现在等待 Reviewer / Human Owner 审阅。该记录不是最终 `ACCEPT`，不自动保留或放弃 Reviewer resume，不启动 P4-B、persistent Executor、workspace mutation 或 automatic Runtime transition。
+
 ---
 
 ## 当前活跃步骤
 
-### Step 1 — P4-A Reviewer-session resume paired experiment
+### Step 1 — P4-A paired experiment completed; awaiting review
 
-状态：`ACTIVE`
+状态：`EXPERIMENT COMPLETED — AWAITING REVIEW`
 
 ### 当前目标
 
-在 P3 instrumentation 基础上实现并执行一个严格配对的 Reviewer session lifecycle 对照实验，测量 `ephemeral control` 与 `Reviewer persistent + resume treatment` 在 token/cache/latency 上的真实差异。
+向 Reviewer / Human Owner 提交 frozen P4-A paired evidence，等待对 Reviewer resume 的 evidence-backed 决策。当前不再执行额外 Codex experiment call，不做 reversed-order replicate，也不进入 P4-B。
 
-本阶段只回答一个问题：
+本次实验研究问题保持为：
 
 > 在其他条件保持一致时，仅把 Reviewer 的第三回合从 fresh ephemeral thread 改为 resume Reviewer 第一回合的持久化 thread，是否能降低 uncached input、重复上下文重建或 latency？
 
-不在本阶段回答 Executor 是否应 persistent，也不进入代码 mutation。
+当前结果显示本次 Treatment 的 Reviewer T3 与 aggregate uncached input 都低于 Control，但受单次顺序、cache warm-order、stochastic downstream prompt 和固定范围 reconstruction 等限制，尚未形成最终架构结论。不在本阶段回答 Executor 是否应 persistent，也不进入代码 mutation。
 
 ### P4-A 实验矩阵
 
@@ -509,9 +628,9 @@ state db returned stale rollout path for thread ...
 
 ### P4 — Role-session resume policy
 
-状态：`ACTIVE — P4-A PAIRED EXPERIMENT`
+状态：`P4-A EXPERIMENT COMPLETED — AWAITING REVIEW`
 
-P4 当前只授权 P4-A：Reviewer session lifecycle paired experiment。
+P4 当前只完成了 P4-A Reviewer session lifecycle paired experiment；没有授权任何后续自动执行。
 
 P4-A 完成后必须先由 Reviewer / Human Owner 审阅结果，再决定是否：
 

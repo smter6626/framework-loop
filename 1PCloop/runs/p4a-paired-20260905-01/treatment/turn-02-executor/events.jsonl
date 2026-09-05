@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"01a071ef-44a0-7ba1-a70e-4c805bab7704"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"**Confirming no changes**"}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"Text-only transport demonstration completed. I made no repository, Static, or Runtime changes. Self-check confirms that no mutation, final verdict, or self-acceptance was attempted. This receipt is limited to the transport demonstration; no P4-A execution or Step 1 acceptance occurred."}}
+{"type":"turn.completed","usage":{"input_tokens":15503,"cached_input_tokens":11520,"cache_write_input_tokens":0,"output_tokens":85,"reasoning_output_tokens":23}}
