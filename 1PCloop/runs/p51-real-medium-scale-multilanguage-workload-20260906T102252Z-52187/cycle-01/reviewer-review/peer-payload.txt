@@ -1,0 +1,16 @@
+Implemented and committed multilingual language selection slice.
+
+Commit: `0d3b9e6 Add multilingual language selection validation`
+
+Changed:
+- `settings.py`
+- `ui_app.py`
+- `testCodes/test_ui_language.py`
+- `testCodes/test_multilingual_language_selection.py`
+
+Validation:
+- Focused unittest coverage: 12 passed.
+- Prescribed full suite: 106 run, 105 passed; 1 unchanged documented Python environment-path failure.
+- Working tree is clean.
+
+Limitation: supplemental legacy backend script reports unavailable `faster_whisper`/whisper-cli; its whisper.cpp command-builder check passed.

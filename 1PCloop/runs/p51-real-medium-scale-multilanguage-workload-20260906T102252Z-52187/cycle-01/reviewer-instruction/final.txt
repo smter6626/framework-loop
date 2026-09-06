@@ -1,0 +1,9 @@
+On `multiLanguage_v1` at HEAD `b5188ccc6aef591398fd8d31e162a29390b120e4`, implement one bounded vertical slice: canonical multilingual original-language selection plus `.en` model compatibility enforcement.
+
+Update `settings.py` so the ordered canonical choices are English/en, Chinese/zh, Japanese/ja, French/fr, Spanish/es, German/de, Korean/ko, and Auto Detect/auto. Use `Auto Detect` as the canonical label while normalizing the legacy aliases `Mixed Chinese/English`, `中英混合`, `mixed`, and `auto` to it. Keep one authoritative label-to-code normalization path and ensure session configuration records the canonical label and code.
+
+Update `ui_app.py` so all eight choices appear with correct English labels and Chinese labels (`英语`, `中文`, `日语`, `法语`, `西班牙语`, `德语`, `韩语`, `自动检测`), while retaining only English and Chinese as application UI locales.
+
+Add centralized validation that recognizes English-only `.en` models from the selected model identity and conventional model filename, and rejects every language except English—including Auto Detect—with a clear error and no fallback or model switching. Multilingual models must remain valid for every canonical choice.
+
+Add discoverable deterministic `unittest` coverage for canonical ordering and codes, legacy normalization, bilingual UI labels/retranslation, session config label/code accuracy, whisper.cpp `-l` propagation for all choices including `auto`, and `.en` versus multilingual-model compatibility. Do not change transcript dedup/tokenization or documentation in this cycle. Run the relevant targeted tests and the full prescribed regression suite, treating the already documented project-local Python environment test failure as pre-existing if unchanged. Create one ordinary descendant commit, leave the branch clean, and report the commit, changed files, test results, and any limitations.

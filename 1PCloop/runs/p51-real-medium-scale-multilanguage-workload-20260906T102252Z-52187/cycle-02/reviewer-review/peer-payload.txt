@@ -1,0 +1,8 @@
+Execution receipt:
+
+- Commit: `b9f61b3 docs: describe multilingual original language choices`
+- Changed only `README.md` and `README.zh-CN.md`: features, quick start, language-selection guidance, and limitations.
+- Documented eight canonical choices/codes, `Auto Detect` legacy aliases, UI locale distinction, and `.en` English-only enforcement.
+- Validation: prescribed suite ran; 105/106 passed. The sole failure is the pre-existing project-local Python environment check (uv-managed Python path).
+- Working tree is clean.
+- Known non-blocking limitation: existing ASCII-centric `TOKEN_RE` does not tokenize pure CJK/Korean overlap for deduplication; not expanded in this task.

@@ -1,0 +1,169 @@
+{
+  "approval_policy": "bypassed",
+  "approvals_and_sandbox_bypassed": true,
+  "authoritative_context": {
+    "authoritative_payload_bytes": 106478,
+    "authoritative_payload_offset": 1170,
+    "authoritative_payload_sha256": "3342c30cf3688ab550b2fd059a9e93ece06d3e83644cf4e9426b578180ea45e7",
+    "current_documents": {
+      "framework_runtime": {
+        "bytes": 69252,
+        "class": "runtime",
+        "lines": 1417,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_runtime.md",
+        "sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82"
+      },
+      "framework_static": {
+        "bytes": 18039,
+        "class": "static",
+        "lines": 534,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_static.md",
+        "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+      },
+      "workload_runtime": {
+        "bytes": 2402,
+        "class": "runtime",
+        "lines": 102,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_runtime.md",
+        "sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547"
+      },
+      "workload_static": {
+        "bytes": 13733,
+        "class": "static",
+        "lines": 518,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_static.md",
+        "sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+      }
+    },
+    "current_hashes": {
+      "framework_runtime_sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+      "framework_static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+      "workload_runtime_sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+      "workload_static_sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+    },
+    "cycle_number": 1,
+    "document_prompt_offsets": {
+      "framework_runtime": 21987,
+      "framework_static": 3857,
+      "workload_runtime": 105151,
+      "workload_static": 91329
+    },
+    "freshness_policy": {
+      "abandoned_thread_id": null,
+      "changed_files": [
+        "framework_static",
+        "framework_runtime",
+        "workload_static",
+        "workload_runtime"
+      ],
+      "injected_files": [
+        "framework_static",
+        "framework_runtime",
+        "workload_static",
+        "workload_runtime"
+      ],
+      "injection_mode": "full-bootstrap",
+      "resume_target_thread_id": null,
+      "session_mode": "new-persistent"
+    },
+    "prompt_bytes": 107648,
+    "prompt_sha256": "3487598f6ab33a9553cdefc2be5f0faa6551796a88e7d05adc3b5dcc99accdf7",
+    "schema_version": 1,
+    "session_known_hashes": null,
+    "session_known_target_head": null,
+    "session_known_thread_id": null,
+    "target": {
+      "branch": "multiLanguage_v1",
+      "clean": true,
+      "head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+      "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+      "status_porcelain": ""
+    },
+    "target_freshness": {
+      "current_target_head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+      "reviewer_known_target_head": null,
+      "target_head_changed": false
+    },
+    "validation": {
+      "failure": null,
+      "performed_before_launch": true,
+      "prompt_bytes_verified": true,
+      "source_bytes_verified": true
+    }
+  },
+  "cache_hit_ratio": 0.846442,
+  "cache_write_input_tokens": 0,
+  "cached_input_tokens": 394752,
+  "codex_home": "/Users/smterpro/.codex-A",
+  "command": [
+    "/Users/smterpro/.local/state/fnm_multishells/27110_1788605595790/bin/codex",
+    "exec",
+    "--json",
+    "--color",
+    "never",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--cd",
+    "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "--output-last-message",
+    "/Users/smterpro/Workspace/framework-loop/1PCloop/runs/20260906T102252Z-52187/cycle-01/reviewer-instruction/final.txt",
+    "-"
+  ],
+  "created_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "duration_seconds": 108.071,
+  "event_parse": {
+    "blank_lines": 0,
+    "irrelevant_json_events": 29,
+    "malformed_json_lines": 0,
+    "thread_started_events": 1,
+    "turn_completed_events": 1,
+    "usage_events": 1,
+    "valid_json_lines": 31
+  },
+  "events_path": "cycle-01/reviewer-instruction/events.jsonl",
+  "exit_code": 0,
+  "failure": null,
+  "final_message_path": "cycle-01/reviewer-instruction/final.txt",
+  "final_message_sha256": "e12fec7f308c7c2407ed6619317b0cf50c32d7e7de2d1e81ca5cfdd771166b8b",
+  "finished_at": "2026-09-06T10:24:40.751+00:00",
+  "input_tokens": 466366,
+  "observed_resume_thread_id": null,
+  "output_tokens": 4363,
+  "prompt_path": "cycle-01/reviewer-instruction/prompt.txt",
+  "prompt_sha256": "3487598f6ab33a9553cdefc2be5f0faa6551796a88e7d05adc3b5dcc99accdf7",
+  "reasoning_output_tokens": 2910,
+  "resume_relationship_verified": null,
+  "resume_target_thread_id": null,
+  "reviewer_state_after": {
+    "cycle_number": 1,
+    "known_framework_runtime_sha": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+    "known_framework_static_sha": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+    "known_workload_runtime_sha": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+    "known_workload_static_sha": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221",
+    "reviewer_known_target_head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+    "reviewer_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc"
+  },
+  "reviewer_target_after": {
+    "branch": "multiLanguage_v1",
+    "clean": true,
+    "head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "status_porcelain": ""
+  },
+  "reviewer_target_before": {
+    "branch": "multiLanguage_v1",
+    "clean": true,
+    "head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "status_porcelain": ""
+  },
+  "reviewer_target_read_only_verified": true,
+  "role": "reviewer",
+  "sandbox": "none",
+  "session_mode": "new-persistent",
+  "started_at": "2026-09-06T10:22:52.678+00:00",
+  "stderr_path": "cycle-01/reviewer-instruction/stderr.txt",
+  "success": true,
+  "thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "transport": null,
+  "uncached_input_tokens": 71614
+}

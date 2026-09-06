@@ -1,0 +1,7 @@
+The workload is ready for Human Owner review.
+
+Commit `b9f61b3` is a clean documentation-only child of accepted commit `0d3b9e6`; the two-commit history is linear with no merges. Both READMEs accurately cover all eight choices and codes, Auto Detect aliases, UI-locale boundaries, and `.en` restrictions.
+
+Independent full-suite validation reproduced 106 tests: 105 passed, with only the documented pre-existing project-local Python-path failure. The branch remains clean at `b9f61b39384001eae07c94d114ae66dcba0873cb`.
+
+Repository inspection supports workload criteria A–L: canonical normalization, bilingual labels, backend `-l` propagation, `.en` rejection, session/config evidence, tests, documentation, and clean descendant history are present. The ASCII-centric `TOKEN_RE` remains a known non-blocking dedup limitation for pure CJK/Korean overlap; it does not block this workload’s required selection, propagation, compatibility, or regression behavior. No further Executor mutation is required, and final acceptance or merge remains a Human Owner decision.

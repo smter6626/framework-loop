@@ -1,0 +1,1 @@
+2026-09-06T10:31:38.062317Z ERROR codex_rollout::list: state db returned stale rollout path for thread 01a07215-21f1-7ba3-8973-7d1c655d5610: /Users/smterpro/.codex/sessions/2026/09/05/rollout-2026-09-05T07-59-42-01a07215-21f1-7ba3-8973-7d1c655d5610.jsonl

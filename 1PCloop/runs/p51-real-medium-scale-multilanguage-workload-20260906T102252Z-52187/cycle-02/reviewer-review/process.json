@@ -1,0 +1,168 @@
+{
+  "approval_policy": "bypassed",
+  "approvals_and_sandbox_bypassed": true,
+  "authoritative_context": {
+    "authoritative_payload_bytes": 3009,
+    "authoritative_payload_offset": 1309,
+    "authoritative_payload_sha256": "8da0331ec5a6466a04581eeb256e679ff90d4cf4453b1ba1822d8fdd4b800e04",
+    "current_documents": {
+      "framework_runtime": {
+        "bytes": 69252,
+        "class": "runtime",
+        "lines": 1417,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_runtime.md",
+        "sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82"
+      },
+      "framework_static": {
+        "bytes": 18039,
+        "class": "static",
+        "lines": 534,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_static.md",
+        "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+      },
+      "workload_runtime": {
+        "bytes": 2402,
+        "class": "runtime",
+        "lines": 102,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_runtime.md",
+        "sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547"
+      },
+      "workload_static": {
+        "bytes": 13733,
+        "class": "static",
+        "lines": 518,
+        "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_static.md",
+        "sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+      }
+    },
+    "current_hashes": {
+      "framework_runtime_sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+      "framework_static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+      "workload_runtime_sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+      "workload_static_sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+    },
+    "cycle_number": 2,
+    "document_prompt_offsets": {},
+    "freshness_policy": {
+      "abandoned_thread_id": null,
+      "changed_files": [],
+      "injected_files": [],
+      "injection_mode": "resume-unchanged",
+      "resume_target_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+      "session_mode": "resume"
+    },
+    "prompt_bytes": 5035,
+    "prompt_sha256": "7b850ecbad92e724ca72e32d621ccacb66b0b0477f12348201645b3c2a3a9119",
+    "schema_version": 1,
+    "session_known_hashes": {
+      "framework_runtime_sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+      "framework_static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+      "workload_runtime_sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+      "workload_static_sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+    },
+    "session_known_target_head": "0d3b9e6c0f57dbd87a214717c07e4de9a4025d75",
+    "session_known_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+    "target": {
+      "branch": "multiLanguage_v1",
+      "clean": true,
+      "head": "b9f61b39384001eae07c94d114ae66dcba0873cb",
+      "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+      "status_porcelain": ""
+    },
+    "target_freshness": {
+      "current_target_head": "b9f61b39384001eae07c94d114ae66dcba0873cb",
+      "reviewer_known_target_head": "0d3b9e6c0f57dbd87a214717c07e4de9a4025d75",
+      "target_head_changed": true
+    },
+    "validation": {
+      "failure": null,
+      "performed_before_launch": true,
+      "prompt_bytes_verified": true,
+      "source_bytes_verified": true
+    }
+  },
+  "cache_hit_ratio": 0.966395,
+  "cache_write_input_tokens": 0,
+  "cached_input_tokens": 404480,
+  "codex_home": "/Users/smterpro/.codex-A",
+  "command": [
+    "/Users/smterpro/.local/state/fnm_multishells/27110_1788605595790/bin/codex",
+    "exec",
+    "--json",
+    "--color",
+    "never",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--cd",
+    "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "--output-last-message",
+    "/Users/smterpro/Workspace/framework-loop/1PCloop/runs/20260906T102252Z-52187/cycle-02/reviewer-review/final.txt",
+    "resume",
+    "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+    "-"
+  ],
+  "created_thread_id": null,
+  "duration_seconds": 50.208,
+  "event_parse": {
+    "blank_lines": 0,
+    "irrelevant_json_events": 14,
+    "malformed_json_lines": 0,
+    "thread_started_events": 1,
+    "turn_completed_events": 1,
+    "usage_events": 1,
+    "valid_json_lines": 16
+  },
+  "events_path": "cycle-02/reviewer-review/events.jsonl",
+  "exit_code": 0,
+  "failure": null,
+  "final_message_path": "cycle-02/reviewer-review/final.txt",
+  "final_message_sha256": "b4d8b6239310fb9eaf18813b51ba7e7fdbc0b596200c8fcbaa531bb46450f5f1",
+  "finished_at": "2026-09-06T10:32:28.171+00:00",
+  "input_tokens": 418545,
+  "observed_resume_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "output_tokens": 1696,
+  "prompt_path": "cycle-02/reviewer-review/prompt.txt",
+  "prompt_sha256": "7b850ecbad92e724ca72e32d621ccacb66b0b0477f12348201645b3c2a3a9119",
+  "reasoning_output_tokens": 622,
+  "resume_relationship_verified": true,
+  "resume_target_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "reviewer_state_after": {
+    "cycle_number": 2,
+    "known_framework_runtime_sha": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+    "known_framework_static_sha": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+    "known_workload_runtime_sha": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+    "known_workload_static_sha": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221",
+    "reviewer_known_target_head": "b9f61b39384001eae07c94d114ae66dcba0873cb",
+    "reviewer_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc"
+  },
+  "reviewer_target_after": {
+    "branch": "multiLanguage_v1",
+    "clean": true,
+    "head": "b9f61b39384001eae07c94d114ae66dcba0873cb",
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "status_porcelain": ""
+  },
+  "reviewer_target_before": {
+    "branch": "multiLanguage_v1",
+    "clean": true,
+    "head": "b9f61b39384001eae07c94d114ae66dcba0873cb",
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "status_porcelain": ""
+  },
+  "reviewer_target_read_only_verified": true,
+  "role": "reviewer",
+  "sandbox": "none",
+  "session_mode": "resume",
+  "started_at": "2026-09-06T10:31:37.962+00:00",
+  "stderr_path": "cycle-02/reviewer-review/stderr.txt",
+  "success": true,
+  "thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "transport": {
+    "bytes": 679,
+    "peer_payload_path": "cycle-02/reviewer-review/peer-payload.txt",
+    "preserved_verbatim": true,
+    "prompt_offset": 4356,
+    "sha256": "511170dc56b8caf13d4b1e312e759e035c18a7e459daa17a94a470f71f56dbe4",
+    "source_final_message": "cycle-02/executor/final.txt"
+  },
+  "uncached_input_tokens": 14065
+}

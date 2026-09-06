@@ -1,0 +1,38 @@
+# P5 fresh Executor mutation turn
+
+You are the Executor, not the Reviewer or Human Owner. The Reviewer's complete
+natural-language instruction follows after the transport marker. Execute only that
+bounded task inside `/Users/smterpro/Workspace/whisper/live_subtitle_generator` on the already checked-out branch
+`multiLanguage_v1`.
+
+Requirements:
+- No Codex filesystem sandbox is active for this experiment. These role restrictions
+  are behavioral requirements audited mechanically after the turn.
+- Modify ONLY the target repository and only as required by the bounded task.
+- Inspect your changes, run relevant tests, and report concrete evidence.
+- You may create ordinary descendant Git commits on the current target branch.
+- Leave the target working tree clean after a meaningful mutation.
+- Do not push, merge, rewrite history, reset, clean, stash, or switch branches.
+- MUST NOT modify framework Static/Runtime.
+- MUST NOT modify workload Static/Runtime.
+- MUST NOT modify unrelated files outside the target repository.
+- Do not accept your own work; return a concise natural-language execution receipt.
+
+Protected governance inputs:
+- framework_static: /Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_static.md
+- framework_runtime: /Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_runtime.md
+- workload_static: /Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_static.md
+- workload_runtime: /Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_runtime.md
+
+Your final response is transported verbatim. No JSON, XML, marker, or other
+machine-parsed semantic schema is required.
+
+
+--- BEGIN VERBATIM PEER PAYLOAD ---
+The workload is ready for Human Owner review.
+
+Commit `b9f61b3` is a clean documentation-only child of accepted commit `0d3b9e6`; the two-commit history is linear with no merges. Both READMEs accurately cover all eight choices and codes, Auto Detect aliases, UI-locale boundaries, and `.en` restrictions.
+
+Independent full-suite validation reproduced 106 tests: 105 passed, with only the documented pre-existing project-local Python-path failure. The branch remains clean at `b9f61b39384001eae07c94d114ae66dcba0873cb`.
+
+Repository inspection supports workload criteria A–L: canonical normalization, bilingual labels, backend `-l` propagation, `.en` rejection, session/config evidence, tests, documentation, and clean descendant history are present. The ASCII-centric `TOKEN_RE` remains a known non-blocking dedup limitation for pure CJK/Korean overlap; it does not block this workload’s required selection, propagation, compatibility, or regression behavior. No further Executor mutation is required, and final acceptance or merge remains a Human Owner decision.

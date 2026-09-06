@@ -1,0 +1,113 @@
+# P5 persistent Reviewer review turn
+
+You are the Reviewer in a multi-cycle Reviewer/Executor mutation loop. You are not
+the Human Owner. The Executor's complete natural-language final response is appended
+verbatim after the deterministic context envelope.
+
+Independently inspect the actual target repository at `/Users/smterpro/Workspace/whisper/live_subtitle_generator` on branch
+`multiLanguage_v1`, its current commit, diff/history, tests, and cited evidence. No
+Codex filesystem sandbox is active for this experiment. Your role is inspection and
+review only. You MUST NOT modify target code or other target files, alter target Git
+state, modify framework Static/Runtime, or modify workload Static/Runtime. These
+behavioral restrictions are audited mechanically after the turn.
+
+Review the prior work and return natural-language review reasoning. If more work is
+needed, include exactly one next bounded instruction. Otherwise, return the readiness
+or Human-blocker handoff you judge appropriate. Python will not classify any of these
+meanings; a following fresh Executor receives the entire final response as an opaque
+payload.
+
+Do not ask the Executor to push, merge, rewrite history, change branches, or modify
+framework/workload governance. No JSON, XML, marker, or machine-parsed verdict is
+required.
+
+
+--- BEGIN P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---
+{
+  "current_documents": {
+    "framework_runtime": {
+      "bytes": 69252,
+      "class": "runtime",
+      "lines": 1417,
+      "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_runtime.md",
+      "sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82"
+    },
+    "framework_static": {
+      "bytes": 18039,
+      "class": "static",
+      "lines": 534,
+      "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/docs/miniloop_static.md",
+      "sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe"
+    },
+    "workload_runtime": {
+      "bytes": 2402,
+      "class": "runtime",
+      "lines": 102,
+      "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_runtime.md",
+      "sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547"
+    },
+    "workload_static": {
+      "bytes": 13733,
+      "class": "static",
+      "lines": 518,
+      "path": "/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/multiLanguage_v1/workload_static.md",
+      "sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+    }
+  },
+  "current_hashes": {
+    "framework_runtime_sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+    "framework_static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+    "workload_runtime_sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+    "workload_static_sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+  },
+  "cycle_number": 1,
+  "freshness_policy": {
+    "abandoned_thread_id": null,
+    "changed_files": [],
+    "injected_files": [],
+    "injection_mode": "resume-unchanged",
+    "resume_target_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+    "session_mode": "resume"
+  },
+  "schema_version": 1,
+  "session_known_hashes": {
+    "framework_runtime_sha256": "c399d6845a95e3ee5289899e6ba2310a880a7616dd1510bb810fa2ab76e3fc82",
+    "framework_static_sha256": "f2fc9b87a11078c4cb5bf8cef1c9de95d297f2ad1e7e1164db8f096d573818fe",
+    "workload_runtime_sha256": "fa9814e14126a554d2f6eec5e2826091125b98ae34f096481d3613c74cd50547",
+    "workload_static_sha256": "23084095c1291129c2810df189c179f177d395ef4ebdec2ec7737dd63d143221"
+  },
+  "session_known_target_head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+  "session_known_thread_id": "01a0763e-0f68-76b2-b1d7-e4be01989dbc",
+  "target": {
+    "branch": "multiLanguage_v1",
+    "clean": true,
+    "head": "0d3b9e6c0f57dbd87a214717c07e4de9a4025d75",
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator",
+    "status_porcelain": ""
+  },
+  "target_freshness": {
+    "current_target_head": "0d3b9e6c0f57dbd87a214717c07e4de9a4025d75",
+    "reviewer_known_target_head": "b5188ccc6aef591398fd8d31e162a29390b120e4",
+    "target_head_changed": true
+  }
+}
+--- END P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---
+
+
+--- BEGIN VERBATIM PEER PAYLOAD ---
+Implemented and committed multilingual language selection slice.
+
+Commit: `0d3b9e6 Add multilingual language selection validation`
+
+Changed:
+- `settings.py`
+- `ui_app.py`
+- `testCodes/test_ui_language.py`
+- `testCodes/test_multilingual_language_selection.py`
+
+Validation:
+- Focused unittest coverage: 12 passed.
+- Prescribed full suite: 106 run, 105 passed; 1 unchanged documented Python environment-path failure.
+- Working tree is clean.
+
+Limitation: supplemental legacy backend script reports unavailable `faster_whisper`/whisper-cli; its whisper.cpp command-builder check passed.
