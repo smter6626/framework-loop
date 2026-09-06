@@ -2,7 +2,7 @@
 
 ## Status
 
-`READY FOR FIRST P5 RUN`
+`HUMAN GATE — REVIEWER ACCEPTED / FINAL PRODUCT ACCEPTANCE PENDING`
 
 Target repository:
 
@@ -12,10 +12,14 @@ Target branch:
 
 `multiLanguage_v1`
 
+Current target HEAD:
+
+`b9f61b39384001eae07c94d114ae66dcba0873cb`
+
 ## Current Human State
 
-Human Owner has authorized preparation and execution of the first real P5
-medium-scale workload after successful preflight.
+The first successful real medium-scale P5 workload run has completed and reached the
+Human gate. Reviewer evidence does not require run #3 at this time.
 
 Reviewer / Executor binding for this workload:
 
@@ -39,30 +43,40 @@ German
 Korean
 ```
 
-No implementation work has yet been accepted for this workload.
+Reviewer has accepted the implementation/documentation slices produced by run #2.
+Final product acceptance and any merge decision remain with the Human Owner.
 
 Repository Git state is authoritative for implementation progress.
 P5 run evidence is authoritative for mechanical Reviewer/Executor transport and
 process evidence.
 
-Do not duplicate repository implementation history into this Runtime.
+Do not treat the semantic Reviewer observations below as Python-derived control
+metadata. They were human-reviewed from opaque Agent final messages.
 
-## Current Blockers
+## Current Blockers / Known Limits
 
-None known before preflight.
+No control-plane or workload correctness blocker is currently identified.
+
+Known non-blocking items:
+
+- the baseline project-local Python environment assertion remains the same pre-existing
+  failure and is outside this workload scope;
+- `TOKEN_RE` remains ASCII-centric for pure CJK/Korean overlap in transcript dedup;
+  Reviewer classified this as non-blocking for this workload boundary;
+- optional manual UI smoke remains appropriate before merge.
 
 ## Human Gates
 
-The loop may mutate `multiLanguage_v1`.
+No run #3 is currently required by Reviewer evidence.
 
-It may not:
+The workflow may not automatically:
 
-- merge to `main`;
-- push unless separately authorized;
+- merge `multiLanguage_v1` to `main`;
+- push target changes unless separately authorized;
 - expand the workload beyond the Static contract;
-- modify workload or framework governance.
+- modify workload or framework governance as part of Executor work.
 
-Final workload acceptance remains with the Human Owner.
+Final workload acceptance and merge remain with the Human Owner.
 
 ## Baseline Validation
 
@@ -101,6 +115,28 @@ All other baseline tests passed.
 Human Owner has not authorized unrelated repair of this environment-contract issue
 as part of multiLanguage_v1.
 
+## 2026-09-06 — First real mutation attempt failed closed and was recovered
+
+Run:
+
+`20260906T083312Z-48975`
+
+Observed control-plane failure:
+
+- Reviewer completed the first bounded instruction;
+- Executor modified source/tests and ran validation;
+- the then-active Codex `workspace-write` sandbox blocked `.git/index.lock`, so the
+  Executor could not create the required Git commit;
+- target HEAD remained at baseline while the working tree became dirty;
+- P5 correctly failed closed instead of accepting the Executor's natural-language
+  completion report;
+- Human Owner saved recovery evidence externally and restored the target to clean
+  baseline `b5188ccc6aef591398fd8d31e162a29390b120e4` before retry.
+
+This failed attempt produced no accepted implementation commit for this workload.
+The control-plane repair and disposable real-commit smoke are recorded in framework
+Runtime; they are not redefined here.
+
 ## 2026-09-06 — Real mutation run #2 reached Human Gate
 
 Status: `REVIEWER ACCEPTED — HUMAN MERGE/FINAL PRODUCT ACCEPTANCE PENDING`
@@ -136,7 +172,8 @@ Cycle progression:
 - Cycle 1: `b5188ccc... -> 0d3b9e6c...`, `head_changed=true`
 - Cycle 2: `0d3b9e6c... -> b9f61b39...`, `head_changed=true`
 - Cycle 3: `b9f61b39... -> b9f61b39...`, `head_changed=false`
-- the unchanged-HEAD Executor payload still reached Reviewer review before the orchestrator stopped at the Human gate
+- the unchanged-HEAD Executor payload still reached Reviewer review before the
+  orchestrator stopped at the Human gate
 
 Reviewer semantic observation (human-reviewed from opaque final messages; not parsed by Python):
 
@@ -198,7 +235,7 @@ Interpretation boundary:
 
 These token/cache values are observations from one real workload run, not a controlled benchmark or causal performance result. Reviewer persistence/resume correlates with very high cache-hit ratios in later Reviewer turns, but this run alone does not isolate the effect of session persistence from prompt shape, repository state, service-side cache state, or task complexity.
 
-Current Human Gate:
+## Current Human Gate
 
 - no run #3 is required by current Reviewer evidence
 - product merge/final acceptance remains a Human Owner decision
