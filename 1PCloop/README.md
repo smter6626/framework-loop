@@ -59,7 +59,21 @@ Orchestrator 只为每次调用设置角色、`CODEX_HOME`、sandbox、turn/run 
 
 每个 `process.json` 还会从原始 `events.jsonl` 机械派生 `thread_id`、input/cached/uncached/output/reasoning token 和 cache hit ratio。缺失或类型不符合当前 machine-readable event schema 的 usage 字段记录为 `null`，不会被当成 `0`；原始 JSONL 保持不变。
 
-当前两个 session mode 的三个 turn 均显式使用 `read-only` sandbox，并且不会自动修改 Runtime。后续允许 Executor mutation 的阶段需要单独扩展 capability boundary。
+上述 `run_text_loop.py` 的两个 session mode 均显式使用 `read-only` sandbox，并且不会自动修改 Runtime。P5/P5.1 的 mutation runner 已进入允许 Executor 修改目标仓库的实验阶段，其隔离策略与文本路由实验不同。
+
+## P5/P5.1 的隔离定位
+
+当前 mutation loop 的隔离方式是 Human Owner 有意选择的实验设计，不是遗漏 sandbox 配置：
+
+- Reviewer 和 Executor 的 Codex CLI turn 均使用 `--dangerously-bypass-approvals-and-sandbox`。原因是 Executor 必须在目标仓库中修改文件、创建 `.git/index.lock` 并亲自提交 evidence；实测 `workspace-write` 会阻断这一闭环。由宿主 Python 代替 Executor 提交也会破坏“Executor 产出可审计 commit”的角色边界。
+- Reviewer 通过 role prompt 被限制为只检查 evidence，禁止修改目标仓库、Git 状态和治理文件。
+- Executor 只被授权修改指定目标分支的任务范围，运行测试，生成普通 descendant commit，并留下 clean worktree；不得 push、merge、reset、clean、stash、switch、改写历史、修改治理文件或扩大任务范围。
+- Python orchestrator 在关键边界机械检查目标 branch、HEAD、cleanliness、commit ancestry、merge commit、治理文件 hash、Reviewer turn 前后的目标仓库不变性、instruction freshness 和 thread relationship；不满足条件时 fail closed。
+- Static、Runtime、Reviewer 与 Executor 的 conversation state 仍然分离；Executor 只接收当前 bounded instruction 和必要的 peer payload，而不继承 Reviewer 的完整上下文。
+
+该方案提供的是“角色能力约定 + turn 后机械审计”，不是操作系统级安全隔离。同一 macOS 用户下运行的 Codex 仍具有广泛文件系统能力；审计能发现已覆盖的越权结果，但不能保证在所有情况下阻止恶意进程在审计前造成影响。因此它适合作为当前 Reviewer–Executor orchestration、上下文隔离和 evidence boundary 的研究原型，不应被描述为 production security boundary。
+
+若后续目标转为抵抗恶意或失控 Agent，需要另行引入更强的能力隔离，例如 Reviewer 专用只读 worktree、受约束的文件/Git capability proxy、独立用户或容器。那是下一层安全研究，不改变当前隔离方式属于有意设计这一事实。
 
 运行 transport self-check：
 
