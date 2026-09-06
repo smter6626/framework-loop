@@ -6,7 +6,7 @@
 
 Target repository:
 
-`/实际路径/live_subtitle_generator`
+`/Users/smterpro/Workspace/whisper/live_subtitle_generator`
 
 Target branch:
 
