@@ -612,7 +612,9 @@ def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
     thread_id: Optional[str] = None
     usage: Dict[str, Optional[Any]] = {field: None for field in USAGE_FIELDS}
     counts = {
+        "ambiguous_usage_events": 0,
         "blank_lines": 0,
+        "invalid_cached_input_relationships": 0,
         "irrelevant_json_events": 0,
         "malformed_json_lines": 0,
         "thread_started_events": 0,
@@ -620,6 +622,7 @@ def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
         "usage_events": 0,
         "valid_json_lines": 0,
     }
+    usage_candidates: List[Dict[str, Optional[Any]]] = []
 
     for raw_line in events_jsonl.splitlines():
         if not raw_line.strip():
@@ -648,7 +651,7 @@ def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
             candidate_usage = event.get("usage")
             if isinstance(candidate_usage, dict):
                 counts["usage_events"] += 1
-                usage = {
+                usage_candidates.append({
                     field: (
                         candidate_usage[field]
                         if type(candidate_usage.get(field)) is int
@@ -656,18 +659,33 @@ def extract_event_metadata(events_jsonl: bytes) -> Dict[str, Any]:
                         else None
                     )
                     for field in USAGE_FIELDS
-                }
+                })
             continue
 
         counts["irrelevant_json_events"] += 1
 
+    if len(usage_candidates) == 1:
+        usage = usage_candidates[0]
+    elif len(usage_candidates) > 1:
+        # Event order does not establish which completion record is authoritative.
+        # Telemetry must be unavailable rather than silently selecting one record.
+        counts["ambiguous_usage_events"] = len(usage_candidates) - 1
     input_tokens = usage["input_tokens"]
     cached_input_tokens = usage["cached_input_tokens"]
     if input_tokens is not None and cached_input_tokens is not None:
-        uncached_input_tokens: Optional[int] = input_tokens - cached_input_tokens
-        cache_hit_ratio: Optional[float] = (
-            round(cached_input_tokens / input_tokens, 6) if input_tokens > 0 else None
-        )
+        if cached_input_tokens > input_tokens:
+            # Do not emit impossible negative uncached tokens.  Preserve unrelated
+            # output metrics, but mark cache-derived telemetry unavailable.
+            counts["invalid_cached_input_relationships"] = 1
+            input_tokens = None
+            cached_input_tokens = None
+            uncached_input_tokens = None
+            cache_hit_ratio = None
+        else:
+            uncached_input_tokens = input_tokens - cached_input_tokens
+            cache_hit_ratio = (
+                round(cached_input_tokens / input_tokens, 6) if input_tokens > 0 else None
+            )
     else:
         uncached_input_tokens = None
         cache_hit_ratio = None

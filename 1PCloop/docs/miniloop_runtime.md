@@ -1033,3 +1033,42 @@ Framework interpretation:
   separately by P6-B capability-gated authoritative verdict/Runtime transition;
 - crash/restart reconstruction and a durable curated-evidence policy remain pending
   control-plane work.
+
+## 2026-09-06 — P5 non-blocking cleanup completed
+
+Status: `CLOSED — EVIDENCE RECORDED`
+
+The three implementation-adjacent non-blocking items recorded during P3/P5 are no
+longer open cleanup work:
+
+1. **Event-metadata robustness.** `run_text_loop.py` now treats more than one
+   `turn.completed` usage record as ambiguous instead of silently selecting the last;
+   it also marks cache-derived metrics unavailable when
+   `cached_input_tokens > input_tokens`, so no negative uncached-token value is
+   emitted. Unrelated valid output metrics remain available. The shared P5 runner
+   uses this helper. New regression coverage plus the existing text/mutation suites
+   passed `25 / 25`.
+2. **Project-local Python environment.** The target's formal
+   `bootstrap_python_env.sh --recreate` path recreated the ignored `.venv` against
+   the already-frozen project `.tools/python` location. This resolves the former
+   pre-existing assertion caused by an old virtual environment pointing at user-level
+   uv Python; no tracked dependency contract changed.
+3. **CJK/Korean exact transcript overlap.** Target commit
+   `088f1071280e656f85b5abb2bbce1fc06bc9925c` publishes character-level comparison
+   tokens for continuous Japanese/Chinese/Korean text, preserving the established
+   ASCII word/contraction path. Japanese/Korean exact-boundary regression tests and
+   the target's full suite passed `108 / 108`. This is deliberately not a claim of
+   fuzzy semantic deduplication, manual Korean transcription, or multilingual
+   WER/CER.
+
+The remaining Spanish/German/Korean/Auto Detect manual-smoke gap is an explicitly
+accepted Human Gate coverage boundary, not an unacknowledged blocker. Historical
+references to stale Codex rollout paths, prior profile-internal locations, and raw
+run-log growth remain archived context rather than active work: the current execution
+path does not depend on them, and raw P5.1 evidence plus the lossless Runtime archive
+are already committed.
+
+No further P5 non-blocking cleanup is pending. P6 crash/restart reconstruction,
+capability-gated authoritative Runtime transition, rejection/repair evidence, and
+curated-evidence policy remain intentionally scoped next-phase control-plane work;
+they must not be mislabeled as small maintenance fixes.

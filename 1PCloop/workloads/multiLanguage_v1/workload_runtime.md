@@ -2,7 +2,7 @@
 
 ## Status
 
-`COMPLETED — HUMAN ACCEPTED / TARGET INTEGRATION PENDING`
+`COMPLETED — HUMAN ACCEPTED / TARGET MAIN INTEGRATION PENDING`
 
 Target repository:
 
@@ -14,7 +14,7 @@ Target branch:
 
 Current target HEAD:
 
-`b9f61b39384001eae07c94d114ae66dcba0873cb`
+`088f1071280e656f85b5abb2bbce1fc06bc9925c`
 
 ## Current Human State
 
@@ -58,34 +58,43 @@ process evidence.
 Do not treat the semantic Reviewer observations below as Python-derived control
 metadata. They were human-reviewed from opaque Agent final messages.
 
-## Current Blockers / Known Limits
+## Current Operational Status / Accepted Coverage Limits
 
 No control-plane or workload correctness blocker is currently identified.
 
-Known non-blocking items:
+Resolved after the workload phase, with independent local regression evidence:
 
-- the baseline project-local Python environment assertion remains the same pre-existing
-  failure and is outside this workload scope;
-- `TOKEN_RE` remains ASCII-centric for pure CJK/Korean overlap in transcript dedup;
-  Reviewer classified this as non-blocking for this workload boundary;
+- the project-local Python environment contract was restored with
+  `./scripts/bootstrap_python_env.sh --recreate`; it now uses the pinned,
+  project-local managed Python and its five environment-contract tests pass;
+- exact CJK/Korean transcript-boundary overlap is now tokenized character-by-character
+  while existing ASCII word/contraction behavior remains unchanged. Target commit
+  `088f1071280e656f85b5abb2bbce1fc06bc9925c` adds Japanese/Korean regression tests;
+  the full suite passed `108 / 108` after the change.
+
+Accepted, intentionally retained coverage limits:
+
 - manual live transcription was completed for Japanese and French, but Spanish,
   German, Korean and Auto Detect were not manually exercised because of time limits;
 - `.en` rejection and UI-locale preservation were not reported as part of the Human
   manual smoke; their current evidence remains automated tests and Reviewer inspection.
 
-## Remaining Human-controlled Integration Actions
+The CJK change covers exact boundary overlap only. Fuzzy semantic overlap remains
+deliberately conservative and is not presented as language-quality or WER/CER evidence.
+
+## Remaining Human-controlled Integration Action
 
 The workload Human acceptance gate is resolved. No run #3 is required by current
 Reviewer or Human evidence.
 
-The workflow may not automatically:
+The target branch is now published as `origin/multiLanguage_v1` at
+`088f1071280e656f85b5abb2bbce1fc06bc9925c`. The workflow may not automatically:
 
 - merge `multiLanguage_v1` to `main`;
-- push target changes unless separately authorized;
 - expand the workload beyond the Static contract;
 - modify workload or framework governance as part of Executor work.
 
-Target push and merge remain Human-controlled repository integration decisions.
+The remaining target-`main` merge is a Human-controlled repository integration decision.
 
 ## Baseline Validation
 

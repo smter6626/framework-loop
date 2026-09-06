@@ -197,6 +197,31 @@ class TextLoopTests(unittest.TestCase):
         self.assertEqual(metadata["uncached_input_tokens"], 60)
         self.assertEqual(metadata["cache_hit_ratio"], 0.25)
 
+    def test_ambiguous_usage_events_are_unavailable_not_last_event_wins(self):
+        events = b'\n'.join(
+            [
+                b'{"type":"turn.completed","usage":{"input_tokens":80,"cached_input_tokens":20}}',
+                b'{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":25}}',
+            ]
+        )
+        metadata = MODULE.extract_event_metadata(events)
+        self.assertIsNone(metadata["input_tokens"])
+        self.assertIsNone(metadata["cached_input_tokens"])
+        self.assertIsNone(metadata["uncached_input_tokens"])
+        self.assertIsNone(metadata["cache_hit_ratio"])
+        self.assertEqual(metadata["event_parse"]["usage_events"], 2)
+        self.assertEqual(metadata["event_parse"]["ambiguous_usage_events"], 1)
+
+    def test_impossible_cache_relationship_is_unavailable_not_negative(self):
+        events = b'{"type":"turn.completed","usage":{"input_tokens":80,"cached_input_tokens":100,"output_tokens":12}}'
+        metadata = MODULE.extract_event_metadata(events)
+        self.assertIsNone(metadata["input_tokens"])
+        self.assertIsNone(metadata["cached_input_tokens"])
+        self.assertIsNone(metadata["uncached_input_tokens"])
+        self.assertIsNone(metadata["cache_hit_ratio"])
+        self.assertEqual(metadata["output_tokens"], 12)
+        self.assertEqual(metadata["event_parse"]["invalid_cached_input_relationships"], 1)
+
     def test_missing_usage_fields_are_unavailable_not_zero(self):
         events = b'{"type":"turn.completed"}'
         metadata = MODULE.extract_event_metadata(events)
