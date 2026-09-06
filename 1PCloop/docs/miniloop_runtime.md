@@ -1326,3 +1326,26 @@ P0–P5 现在构成第一版可用于真实 external-repository medium-scale wo
 下一候选工作是准备并由 Human Owner 审阅 `live_subtitle_generator / multiLanguage_v1` 的 workload Static/Runtime、target branch 与 preflight，然后启动第一次真实中规模 mutation loop。
 
 本 P5 acceptance 本身不创建 `multiLanguage_v1` branch，不创建 workload Static/Runtime，不启动真实 workload，不自动 merge target changes，不启用 persistent Executor，也不启用 automatic semantic Runtime transition。
+
+---
+
+## P5.1 — Current real-mutation execution-policy repair
+
+### 2026-09-06 — Codex filesystem sandbox disabled for the current experiment
+
+Status: `IMPLEMENTED AND DETERMINISTICALLY VALIDATED — REAL WORKLOAD NOT RE-RUN`
+
+First real mutation run:
+
+```text
+run_id = 20260906T083312Z-48975
+target baseline = b5188ccc6aef591398fd8d31e162a29390b120e4
+```
+
+该 run 中 Reviewer 正常完成首轮 instruction；Executor 完成 source/test 修改及测试，但 Codex `workspace-write` sandbox 阻止创建 `.git/index.lock`，因此无法创建 Git commit。目标 HEAD 保持不变且 working tree 变脏，P5 按既有 invariant 正确进入 `FAILED_CLOSED`。Human Owner 随后已将目标仓库恢复至 clean baseline `b5188ccc6aef591398fd8d31e162a29390b120e4`。
+
+P5.1 当前决定：在本次 real-mutation experiment 中，Reviewer 与 Executor 的 Codex filesystem sandbox 均禁用。角色隔离暂由 prompt 明确定义；Reviewer 仅 inspection/review，不得修改 target 或其 Git state，Executor 仅可在 bounded task 范围内修改 target 并创建 ordinary descendant commit。两者均不得修改 framework/workload governance 或无关外部文件。
+
+现有确定性 post-turn 审计继续生效，包括 target branch/HEAD/cleanliness、Reviewer target immutability、ordinary descendant history、merge prohibition、governance hashes、instruction freshness、thread relationship 与 fail-closed behavior。Python 仍仅执行机械路由与验证，不解析 Agent natural-language semantics。
+
+该 execution policy 是当前实验的临时选择，**不是 permanent architecture invariant**。本 repair 完成后尚未重新运行 `multiLanguage_v1` real mutation workload。

@@ -35,6 +35,8 @@ DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
 FRESH_EPHEMERAL = "fresh-ephemeral"
 NEW_PERSISTENT = "new-persistent"
 RESUME = "resume"
+NO_CODEX_SANDBOX = "none"
+BYPASS_APPROVALS_AND_SANDBOX_FLAG = "--dangerously-bypass-approvals-and-sandbox"
 
 FRAMEWORK_STATIC = "framework_static"
 FRAMEWORK_RUNTIME = "framework_runtime"
@@ -598,9 +600,14 @@ the Human Owner. The deterministic context envelope below contains complete byte
 for framework Static, framework Runtime, workload Static, and workload Runtime.
 
 Independently inspect the target repository at `{target_repo}` on branch
-`{target_branch}`. Do not modify it. Your task is inspection, planning, review,
-repair planning, and production of exactly one bounded natural-language instruction
-for the next Executor. The Executor will be fresh and workspace-write capable.
+`{target_branch}`. No Codex filesystem sandbox is active for this experiment. Your
+role is inspection/review only. You MUST NOT modify target code or other target
+files, alter target Git state, modify framework Static/Runtime, or modify workload
+Static/Runtime. These behavioral restrictions are audited mechanically after the
+turn.
+
+Perform inspection, planning, review, repair planning, and production of exactly one
+bounded natural-language instruction for the next fresh Executor.
 
 Do not ask the Executor to push, merge, rewrite history, change branches, or modify
 framework/workload governance. Do not rely on Python interpreting your wording.
@@ -617,12 +624,17 @@ the Human Owner. The Executor's complete natural-language final response is appe
 verbatim after the deterministic context envelope.
 
 Independently inspect the actual target repository at `{target_repo}` on branch
-`{target_branch}`, its current commit, diff/history, tests, and cited evidence. Do
-not modify it. Review the prior work and return natural-language review reasoning.
-If more work is needed, include exactly one next bounded instruction. Otherwise,
-return the readiness or Human-blocker handoff you judge appropriate. Python will not
-classify any of these meanings; a following fresh Executor receives the entire final
-response as an opaque payload.
+`{target_branch}`, its current commit, diff/history, tests, and cited evidence. No
+Codex filesystem sandbox is active for this experiment. Your role is inspection and
+review only. You MUST NOT modify target code or other target files, alter target Git
+state, modify framework Static/Runtime, or modify workload Static/Runtime. These
+behavioral restrictions are audited mechanically after the turn.
+
+Review the prior work and return natural-language review reasoning. If more work is
+needed, include exactly one next bounded instruction. Otherwise, return the readiness
+or Human-blocker handoff you judge appropriate. Python will not classify any of these
+meanings; a following fresh Executor receives the entire final response as an opaque
+payload.
 
 Do not ask the Executor to push, merge, rewrite history, change branches, or modify
 framework/workload governance. No JSON, XML, marker, or machine-parsed verdict is
@@ -635,13 +647,18 @@ def reviewer_refresh_prompt(target_repo: Path, target_branch: str) -> bytes:
 
 Authoritative governance and/or the target repository HEAD changed after your prior
 bounded instruction and before the next Executor launch. Apply the deterministic
-freshness envelope below, inspect `{target_repo}` on `{target_branch}` read-only,
+freshness envelope below, inspect `{target_repo}` on `{target_branch}` without
+modifying it,
 and replace the stale instruction with exactly one current bounded natural-language
 instruction based on the current target HEAD.
 
-Do not modify the target or governance. Do not ask the Executor to push, merge,
-rewrite history, change branches, or modify framework/workload governance. Python
-routes your complete final response opaquely and does not interpret its semantics.
+No Codex filesystem sandbox is active for this experiment. Your role is inspection
+and review only. You MUST NOT modify target code or other target files, alter target
+Git state, modify framework Static/Runtime, or modify workload Static/Runtime. These
+behavioral restrictions are audited mechanically after the turn. Do not ask the
+Executor to push, merge, rewrite history, change branches, or modify governance.
+Python routes your complete final response opaquely and does not interpret its
+semantics.
 """.encode("utf-8")
 
 
@@ -659,12 +676,16 @@ bounded task inside `{target_repo}` on the already checked-out branch
 `{target_branch}`.
 
 Requirements:
-- Modify only the target repository and only as required by the bounded task.
+- No Codex filesystem sandbox is active for this experiment. These role restrictions
+  are behavioral requirements audited mechanically after the turn.
+- Modify ONLY the target repository and only as required by the bounded task.
 - Inspect your changes, run relevant tests, and report concrete evidence.
-- If you make code/artifact changes, create a Git commit on the current target branch.
-- Leave the target working tree clean.
+- You may create ordinary descendant Git commits on the current target branch.
+- Leave the target working tree clean after a meaningful mutation.
 - Do not push, merge, rewrite history, reset, clean, stash, or switch branches.
-- Do not modify any framework or workload governance input listed below.
+- MUST NOT modify framework Static/Runtime.
+- MUST NOT modify workload Static/Runtime.
+- MUST NOT modify unrelated files outside the target repository.
 - Do not accept your own work; return a concise natural-language execution receipt.
 
 Protected governance inputs:
@@ -681,7 +702,6 @@ def build_codex_command(
     workspace: Path,
     final_path: Path,
     session_mode: str,
-    sandbox: str,
     resume_target_thread_id: Optional[str],
 ) -> List[str]:
     if session_mode not in (FRESH_EPHEMERAL, NEW_PERSISTENT, RESUME):
@@ -690,9 +710,6 @@ def build_codex_command(
         raise ValueError("resume requires an explicit Reviewer thread id")
     if session_mode != RESUME and resume_target_thread_id is not None:
         raise ValueError("resume target is only valid for resume mode")
-    if sandbox not in ("read-only", "workspace-write"):
-        raise ValueError(f"unsupported sandbox: {sandbox}")
-
     command = [codex_bin, "exec"]
     if session_mode == FRESH_EPHEMERAL:
         command.append("--ephemeral")
@@ -701,10 +718,7 @@ def build_codex_command(
             "--json",
             "--color",
             "never",
-            "-c",
-            'approval_policy="never"',
-            "--sandbox",
-            sandbox,
+            BYPASS_APPROVALS_AND_SANDBOX_FLAG,
             "--cd",
             str(workspace),
             "--output-last-message",
@@ -733,7 +747,6 @@ def run_codex_turn(
     role: str,
     prompt: bytes,
     session_mode: str,
-    sandbox: str,
     resume_target_thread_id: Optional[str] = None,
     authoritative: Optional[AuthoritativePrompt] = None,
     peer_payload: Optional[bytes] = None,
@@ -807,7 +820,6 @@ def run_codex_turn(
         workspace=workspace,
         final_path=final_path,
         session_mode=session_mode,
-        sandbox=sandbox,
         resume_target_thread_id=resume_target_thread_id,
     )
     environment = os.environ.copy()
@@ -877,6 +889,8 @@ def run_codex_turn(
 
     process = {
         "authoritative_context": authoritative_evidence,
+        "approval_policy": "bypassed",
+        "approvals_and_sandbox_bypassed": True,
         "cache_hit_ratio": event_metadata["cache_hit_ratio"],
         "cache_write_input_tokens": event_metadata["cache_write_input_tokens"],
         "cached_input_tokens": event_metadata["cached_input_tokens"],
@@ -902,7 +916,7 @@ def run_codex_turn(
         "resume_relationship_verified": resume_verified,
         "resume_target_thread_id": resume_target_thread_id,
         "role": role,
-        "sandbox": sandbox,
+        "sandbox": NO_CODEX_SANDBOX,
         "session_mode": session_mode,
         "started_at": started_at,
         "stderr_path": relative_evidence_path(stderr_path, run_root),
@@ -950,7 +964,6 @@ def invoke_reviewer(
         role="reviewer",
         prompt=authoritative.prompt,
         session_mode=policy.session_mode,
-        sandbox="read-only",
         resume_target_thread_id=policy.resume_target_thread_id,
         authoritative=authoritative,
         peer_payload=peer_payload,
@@ -1233,16 +1246,18 @@ def orchestrate(
         WORKLOAD_RUNTIME: args.workload_runtime.resolve(),
     }
     run_configuration = {
-        "approval_policy": "never",
+        "approval_policy": "bypassed",
+        "approvals_and_sandbox_bypassed": True,
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "executor_home": str(args.executor_home.resolve()),
-        "executor_sandbox": "workspace-write",
+        "executor_sandbox": NO_CODEX_SANDBOX,
         "executor_session_mode": FRESH_EPHEMERAL,
+        "execution_policy": "prompt-defined-roles-with-post-turn-mechanical-audit",
         "framework_git_head": git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"]),
         "max_cycles": args.max_cycles,
         "reviewer_home": str(args.reviewer_home.resolve()),
         "reviewer_session_mode": "persistent-with-explicit-resume",
-        "reviewer_sandbox": "read-only",
+        "reviewer_sandbox": NO_CODEX_SANDBOX,
         "runs_root": str(args.runs_root.resolve()),
         "timeout_seconds": args.timeout_seconds,
     }
@@ -1388,7 +1403,6 @@ def orchestrate(
                 role="executor",
                 prompt=executor_full_prompt,
                 session_mode=FRESH_EPHEMERAL,
-                sandbox="workspace-write",
                 peer_payload=instruction.final_message,
                 peer_payload_offset=executor_peer_offset,
                 peer_source=relative_evidence_path(
@@ -1534,6 +1548,12 @@ def preflight_report(
 ) -> Dict[str, Any]:
     return {
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
+        "execution_policy": {
+            "approval_policy": "bypassed",
+            "approvals_and_sandbox_bypassed": True,
+            "role_separation": "prompt-defined-with-post-turn-mechanical-audit",
+            "sandbox": NO_CODEX_SANDBOX,
+        },
         "executor_home": str(args.executor_home.resolve()),
         "governance": governance.metadata(),
         "max_cycles": args.max_cycles,
