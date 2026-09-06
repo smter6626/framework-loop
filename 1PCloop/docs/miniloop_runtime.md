@@ -1349,3 +1349,69 @@ P5.1 当前决定：在本次 real-mutation experiment 中，Reviewer 与 Execut
 现有确定性 post-turn 审计继续生效，包括 target branch/HEAD/cleanliness、Reviewer target immutability、ordinary descendant history、merge prohibition、governance hashes、instruction freshness、thread relationship 与 fail-closed behavior。Python 仍仅执行机械路由与验证，不解析 Agent natural-language semantics。
 
 该 execution policy 是当前实验的临时选择，**不是 permanent architecture invariant**。本 repair 完成后尚未重新运行 `multiLanguage_v1` real mutation workload。
+
+### 2026-09-06 — P5.1 real mutation smoke accepted
+
+Status: `ACCEPTED — REAL MUTATION PATH VERIFIED`
+
+Disposable smoke root:
+
+`/Users/smterpro/Documents/deletable/p51-real-mutation-smoke-20260906`
+
+Run:
+
+`20260906T092213Z-51515`
+
+Purpose:
+
+Verify that the P5.1 no-filesystem-sandbox execution policy closes the real
+`.git/index.lock` blocker observed in the first `multiLanguage_v1` attempt.
+
+Observed real Codex sequence:
+
+Reviewer new persistent
+→ Executor fresh ephemeral
+→ Reviewer explicit resume
+→ Executor fresh ephemeral no-op
+→ Reviewer explicit resume
+→ `STOPPED_FOR_HUMAN_REVIEW`
+
+Cycle 1:
+
+- before: `e35162dc38a8aa891a02333c56e1d8829d45a66f`
+- after: `d8d535452dc11c132749782b9e9a4dccd9431b2a`
+- `head_changed = true`
+
+The Executor successfully:
+
+- created `P51_SMOKE.txt`;
+- wrote the exact required bytes `P5.1 real mutation smoke PASS\n`;
+- created ordinary descendant commit `d8d535452dc11c132749782b9e9a4dccd9431b2a`;
+- changed no existing tracked file;
+- left the target working tree clean.
+
+The Reviewer independently inspected the actual target commit, parent, file bytes,
+tree contents and cleanliness and required no repair.
+
+Cycle 2:
+
+- before: `d8d535452dc11c132749782b9e9a4dccd9431b2a`
+- after: `d8d535452dc11c132749782b9e9a4dccd9431b2a`
+- `head_changed = false`
+
+The Executor correctly performed no mutation. The Reviewer still received and
+reviewed the Executor payload before the orchestrator mechanically stopped:
+
+- status: `STOPPED_FOR_HUMAN_REVIEW`
+- reason: `target_head_unchanged`
+
+This real-service smoke verifies that disabling the Codex filesystem sandbox for
+the current experiment permits the Executor to complete the required
+workspace-mutation + Git-commit path while existing post-turn mechanical auditing
+remains effective.
+
+The earlier `.git/index.lock` blocker is therefore closed for the current P5.1
+execution policy.
+
+This acceptance does not make no-sandbox execution a permanent architecture
+invariant.
