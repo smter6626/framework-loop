@@ -2,7 +2,7 @@
 
 ## Status
 
-`HUMAN GATE — REVIEWER ACCEPTED / FINAL PRODUCT ACCEPTANCE PENDING`
+`COMPLETED — HUMAN ACCEPTED / TARGET INTEGRATION PENDING`
 
 Target repository:
 
@@ -18,8 +18,9 @@ Current target HEAD:
 
 ## Current Human State
 
-The first successful real medium-scale P5 workload run has completed and reached the
-Human gate. Reviewer evidence does not require run #3 at this time.
+The first successful real medium-scale P5 workload run completed, reached the Human
+gate, and has now been accepted by the Human Owner for this workload phase. Reviewer
+and Human evidence do not require run #3.
 
 Reviewer / Executor binding for this workload:
 
@@ -43,8 +44,12 @@ German
 Korean
 ```
 
-Reviewer has accepted the implementation/documentation slices produced by run #2.
-Final product acceptance and any merge decision remain with the Human Owner.
+Reviewer accepted the implementation/documentation slices produced by run #2. Human
+Owner subsequently completed a bounded manual transcription smoke, accepted the
+remaining explicitly recorded coverage limits, and closed this workload phase.
+
+Target branch publication and merge remain separate integration actions; neither is
+implied by workload acceptance.
 
 Repository Git state is authoritative for implementation progress.
 P5 run evidence is authoritative for mechanical Reviewer/Executor transport and
@@ -63,11 +68,15 @@ Known non-blocking items:
   failure and is outside this workload scope;
 - `TOKEN_RE` remains ASCII-centric for pure CJK/Korean overlap in transcript dedup;
   Reviewer classified this as non-blocking for this workload boundary;
-- optional manual UI smoke remains appropriate before merge.
+- manual live transcription was completed for Japanese and French, but Spanish,
+  German, Korean and Auto Detect were not manually exercised because of time limits;
+- `.en` rejection and UI-locale preservation were not reported as part of the Human
+  manual smoke; their current evidence remains automated tests and Reviewer inspection.
 
-## Human Gates
+## Remaining Human-controlled Integration Actions
 
-No run #3 is currently required by Reviewer evidence.
+The workload Human acceptance gate is resolved. No run #3 is required by current
+Reviewer or Human evidence.
 
 The workflow may not automatically:
 
@@ -76,7 +85,7 @@ The workflow may not automatically:
 - expand the workload beyond the Static contract;
 - modify workload or framework governance as part of Executor work.
 
-Final workload acceptance and merge remain with the Human Owner.
+Target push and merge remain Human-controlled repository integration decisions.
 
 ## Baseline Validation
 
@@ -235,8 +244,35 @@ Interpretation boundary:
 
 These token/cache values are observations from one real workload run, not a controlled benchmark or causal performance result. Reviewer persistence/resume correlates with very high cache-hit ratios in later Reviewer turns, but this run alone does not isolate the effect of session persistence from prompt shape, repository state, service-side cache state, or task complexity.
 
-## Current Human Gate
+## 2026-09-06 — Human Gate manual smoke and phase acceptance
 
-- no run #3 is required by current Reviewer evidence
-- product merge/final acceptance remains a Human Owner decision
-- optional manual UI smoke remains appropriate before merge
+Status: `HUMAN ACCEPTED — WORKLOAD PHASE CLOSED`
+
+Human-observed evidence:
+
+- Japanese live audio was successfully transcribed through Whisper;
+- French live audio was successfully transcribed through Whisper;
+- observed Japanese/French transcription quality was subjectively comparable to the
+  existing Chinese/English experience;
+- the earlier source-run blocker, `whisper-cli not found`, was operationally closed
+  before these successful transcriptions.
+
+Manual-coverage boundary:
+
+- Spanish, German, Korean and Auto Detect were not manually exercised because of
+  available testing time;
+- no controlled multilingual corpus was used, so this is not WER/CER evidence;
+- `.en` rejection behavior and UI-locale/code preservation were not reported as
+  manually exercised in this Human Gate;
+- those unexercised paths remain supported by deterministic tests, common canonical
+  mapping/propagation code and independent Reviewer inspection, but are not described
+  as Human-tested.
+
+Human verdict:
+
+Human Owner accepts the workload with those limits explicitly recorded and closes
+the `multiLanguage_v1` implementation/validation phase. No run #3 or additional
+language smoke is required for this phase unless later evidence invalidates the
+current conclusion.
+
+This verdict does not push the target branch and does not merge it into `main`.

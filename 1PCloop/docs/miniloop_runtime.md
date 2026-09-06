@@ -18,6 +18,7 @@ P4-B = ACCEPTED
 P5   = ACCEPTED
 P5.1 real Git mutation smoke = ACCEPTED
 P5.1 real medium-scale workload control-plane path = VERIFIED
+P5.1 medium-scale workload Human Gate = ACCEPTED / PHASE CLOSED
 
 Deterministic authoritative-context reconstruction
 = ACCEPTED CURRENT CONTROL-PLANE MECHANISM
@@ -30,11 +31,12 @@ Reviewer persistent + explicit resume
 = NOT A PERMANENT ARCHITECTURE INVARIANT
 ```
 
-Latest real workload run `20260906T102252Z-52187` stopped mechanically at
+Real workload run `20260906T102252Z-52187` stopped mechanically at
 `STOPPED_FOR_HUMAN_REVIEW / target_head_unchanged` after the final no-op Executor
-payload reached Reviewer review. `multiLanguage_v1` is at its Human gate; current
-evidence does not require run #3. Final product acceptance, target push and merge
-remain Human Owner decisions.
+payload reached Reviewer review. Human Owner subsequently verified Japanese and
+French live transcription, accepted the explicitly recorded residual manual-coverage
+limits, and closed the `multiLanguage_v1` workload phase. No run #3 is required.
+Target push and merge remain separate Human-controlled integration actions.
 
 Overall 1PCloop remains `ACTIVE` under the Static Completion Definition. The
 accepted milestones above do not by themselves claim that every final framework
@@ -989,3 +991,45 @@ Effective interpretation:
   it is not a hard filesystem capability boundary;
 - final target merge and product acceptance remain outside Python and belong to
   the Human Owner.
+
+### 2026-09-06 — P5.1 Human Gate accepted and stage closed
+
+Status: `HUMAN ACCEPTED — MEDIUM-SCALE WORKLOAD PHASE CLOSED`
+
+Human Gate result:
+
+- Japanese live audio was successfully transcribed through Whisper;
+- French live audio was successfully transcribed through Whisper;
+- observed Japanese/French quality was subjectively comparable to the existing
+  Chinese/English experience;
+- the source-run `whisper-cli not found` environment blocker was operationally
+  closed before successful transcription;
+- Spanish, German, Korean and Auto Detect were not manually exercised because of
+  available testing time;
+- `.en` rejection and UI-locale/code preservation were not reported as manually
+  exercised in this Human Gate;
+- those unexercised paths retain deterministic-test, shared implementation-path and
+  Reviewer-inspection evidence, but are not classified as Human-tested.
+
+Human Owner accepts those explicit residual limits. This closes the current
+medium-scale workload phase without run #3. It does not claim multilingual WER/CER,
+push the target branch, or merge the target into `main`.
+
+Stage summary and next-phase analysis:
+
+`1PCloop/docs/p51_medium_scale_stage_summary.md`
+
+Framework interpretation:
+
+- research relevance is materially stronger because evidence now spans a real
+  sandbox failure, fail-closed recovery, policy repair, deterministic validation,
+  disposable Git smoke, real external-repository mutation, independent review,
+  mechanical Human Gate and live transcription;
+- this remains a research-ready prototype signal rather than a research conclusion:
+  there is one real medium-scale workload, no replicate, no comparative self-review
+  arm, no real loop rejection/repair event and only partial language smoke;
+- overall 1PCloop remains `ACTIVE` under the Static Completion Definition;
+- recommended next work is P6-A controlled `REJECT -> REPAIR -> re-review`, followed
+  separately by P6-B capability-gated authoritative verdict/Runtime transition;
+- crash/restart reconstruction and a durable curated-evidence policy remain pending
+  control-plane work.
