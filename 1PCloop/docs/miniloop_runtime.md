@@ -1038,3 +1038,155 @@ Deterministic authoritative-context reconstruction
 ```
 
 下一候选阶段可以进入 mutation-capable / medium-scale loop 设计与验证，但本次 review **不自动启动** persistent Executor、workspace mutation、automatic Runtime semantic transition 或 `multiLanguage_v1` workload。下一阶段仍需 Human Owner 明确授权。
+
+---
+
+## Observed Research Questions — Non-Blocking Research Notes
+
+Status: `OBSERVATION ONLY — DOES NOT AFFECT ACTIVE IMPLEMENTATION`
+
+本节记录在 1PCloop 当前实现、P4-A / P4-B 实验与 review 过程中自然暴露出的 research-question signals。  
+这些内容只是研究方向观察，不属于当前 authoritative Active Step，不修改 Static，不改变已有 Acceptance Criteria，不授权新的 implementation / experiment，也不影响当前工程主线的执行顺序。
+
+### RQ1 — Persistent session memory 与 authoritative external state 应如何分工？
+
+**RQ 内容：**  
+在 long-horizon Agent workflow 中，哪些信息可以由 persistent session 作为 working memory 保留，哪些信息必须由外部 authoritative state 承担？如何同时获得 session continuity / efficiency，又保证 correctness 不依赖不可验证或不可重建的 conversation state？
+
+**解释：**  
+P4-A 已实际比较 fresh Reviewer 与 persistent Reviewer + explicit resume，并观察到 Reviewer T3 uncached input 和 latency 明显下降。与此同时，当前 architecture 明确要求 Static + Runtime + repository/evidence 才是 authoritative memory，persistent session 只能作为可丢失的 performance working memory。
+
+**建议等级：VERY HIGH**
+
+### RQ2 — Agent “读取了状态”是否等价于“正确重建了 authoritative state”？
+
+**RQ 内容：**  
+如何保证 Agent reconstruction 得到的是完整、当前、可验证的 authoritative context，而不仅仅是机械上执行过一次 read command？
+
+**解释：**  
+P4-A 中已经观察到 Reviewer 使用固定 `sed` 范围读取治理文件，但实际遗漏了 Static / Runtime 后部的当前内容，说明 `read happened` 并不足以证明 `current authoritative context reconstructed`。P4-B 随后引入完整 byte injection、hash、length、line count、prompt offset 与 launch-before verification，对该 failure mode 做了专门控制。
+
+**建议等级：VERY HIGH**
+
+### RQ3 — 外部 authoritative state 改变后，应采用什么 refresh / invalidation / rollover policy？
+
+**RQ 内容：**  
+当 persistent Agent session 已持有旧治理状态，而外部 authoritative state 发生变化时，什么变化只需要增量 refresh，什么变化必须使旧 context 失效并触发完整 rebootstrap？
+
+**解释：**  
+P4-B 当前已形成初步 policy：unchanged governance 可复用 session；Runtime changed 时 refresh 当前 Runtime；Static changed 时 rollover 并完整重新注入 Static + Runtime。该机制已经具备明确的 state-validity / invalidation semantics，但不同 policy 的 correctness–cost trade-off 尚未系统比较。
+
+**建议等级：VERY HIGH**
+
+### RQ4 — Independent Reviewer 是否比 self-review 或 shared-context review 更能降低 false acceptance？
+
+**RQ 内容：**  
+Reviewer 与 Executor 的角色独立程度，会如何影响错误接受、漏检、repair quality 与最终任务可靠性？
+
+**解释：**  
+当前 Static 明确禁止 Executor 对自身工作进行最终 ACCEPT，并要求 Reviewer 直接检查实际 evidence，而不能仅相信 Executor 的自然语言 PASS。该设计已经形成可测试假设，但目前尚未通过 controlled comparison 验证不同 review independence level 对 false acceptance 的影响。
+
+**建议等级：VERY HIGH**
+
+### RQ5 — execution success、test pass、review verdict 与 formal acceptance 是否应被显式区分？
+
+**RQ 内容：**  
+在 Agent workflow 中，process exit success、test success、Executor self-report、Reviewer verdict 和 authoritative Runtime transition 是否应该属于不同层级的 completion / acceptance semantics？
+
+**解释：**  
+当前 1PCloop 已多次明确区分 process completion、transport correctness、semantic review 与 authoritative transition，并禁止 Python 通过搜索 `ACCEPT` / `REJECT` 自由文本直接推进 Runtime。说明系统已经隐式实现多层 acceptance semantics，但其对 silent failure / false acceptance 的实际价值仍可进一步实验化。
+
+**建议等级：HIGH**
+
+### RQ6 — Independent REJECT → REPAIR loop 相比 one-shot execution 能提高多少可靠性？
+
+**RQ 内容：**  
+由独立 Reviewer 驱动的 REJECT → bounded repair → new evidence → re-review 闭环，相比 one-shot execution 或 Executor self-repair，是否能系统性提高最终正确率？
+
+**解释：**  
+REJECT → REPAIR 已经是当前 Static Acceptance Criteria 的核心目标之一，但尚未成为中等规模真实 workload 上的 comparative experiment。该路径天然具备 success rate、repair count、false acceptance、token / latency cost 等可测指标。
+
+**建议等级：MEDIUM-HIGH**
+
+### RQ7 — Agent-to-Agent semantic payload 应使用 opaque natural language，还是强制 structured protocol？
+
+**RQ 内容：**  
+多 Agent 协作中，是否应该依赖 prompt-only JSON / XML / schema 进行 semantic communication，还是将自然语言作为 opaque semantic payload，并把 deterministic control metadata 独立放在 orchestration layer？
+
+**解释：**  
+当前 1PCloop 明确采用 “LLM 理解 LLM，Python 路由 LLM” 的边界，并已机械验证 peer payload byte preservation，同时禁止 Python 从自由文本中推断 authoritative state transition。该设计目前主要是 architecture choice，尚缺少与 structured-output alternatives 的系统 failure comparison。
+
+**建议等级：MEDIUM**
+
+### RQ8 — Reviewer 与 Executor 是否应采用不同的 session persistence policy？
+
+**RQ 内容：**  
+不同 Agent role 是否应该具有不同的 memory / session lifecycle，而不是统一采用 fresh 或 persistent session？
+
+**解释：**  
+P4-A 当前只让 Reviewer 使用 persistent/resume，而 Executor 继续保持 fresh ephemeral，这已经隐含 role-specific memory hypothesis。Reviewer 需要保持治理与 review continuity，而 Executor 更依赖 bounded current-task context；两种角色是否应采用不同 persistence policy 可以直接做 factorial comparison。
+
+**建议等级：MEDIUM-HIGH**
+
+### RQ9 — raw run history 与 curated authoritative evidence 应如何划界？
+
+**RQ 内容：**  
+长期 Agent workflow 是否应该让未来 Agent 访问全部 raw run history，还是需要把 raw logs 与 curated / accepted evidence 显式分离？
+
+**解释：**  
+当前 Runtime 已观察到 `1PCloop/runs/` 长期增长可能带来 context pollution、token burden 与 stale evidence exposure，因此已经提出 raw local logs 与 curated evidence 的边界问题。该问题可进一步研究不同 evidence-retention policy 对 retrieval correctness、stale-evidence reuse 与运行成本的影响。
+
+**建议等级：MEDIUM-HIGH**
+
+### RQ10 — 什么情况下 Agent 应 fail closed，而不是自行继续或恢复？
+
+**RQ 内容：**  
+面对 stale state、missing evidence、resume mismatch、治理状态冲突等 control-plane uncertainty 时，什么时候应该 fail closed、什么时候允许 automatic recovery、什么时候必须升级到 Human Gate？
+
+**解释：**  
+当前 P4-B 已对 governance missing、source/prompt mismatch、resume relationship mismatch 等情况采用 fail-closed behavior，并禁止 silent fallback。现有规则主要来自 reliability design judgment，尚未系统研究 conservative failure policy、automatic recovery 与 human escalation 之间的 trade-off。
+
+**建议等级：MEDIUM-HIGH**
+
+### Research-note boundary
+
+以上 RQ 均为当前实现和实验过程中观察到的研究信号，不表示：
+
+- 已证明对应 research hypothesis；
+- 已确认 literature novelty；
+- 已形成可投稿 research contribution；
+- 当前 1PCloop 工程主线需要为了这些 RQ 改变执行顺序；
+- Human Owner 已授权额外 research experiment。
+
+后续只有在 Human Owner 明确决定把某个 RQ 提升为 research track 时，才单独定义 hypothesis、baseline、independent variable、dependent metrics、controlled experiment、replication 与 literature validation。
+
+---
+
+### 2026-09-05 — ChatGPT GitHub connector branch-recovery reproduction
+
+Status: `OBSERVATION ONLY — SUPPORT DIAGNOSTIC / NON-BLOCKING`
+
+Surface / environment:
+
+- ChatGPT Web，standard chat；
+- macOS + Google Chrome；
+- 同一 GitHub connection；测试过程中没有重新 OAuth、没有 reconnect GitHub、没有切换 Agent / Deep Research 等 mode；
+- timezone: `America/Phoenix (MST, UTC-07:00)`。
+
+Observed sequence:
+
+- Parent conversation，约 `2026-09-05 18:26:33–18:26:41 MST`：GitHub tool discovery/schema exposure 仍可见，但实际调用 `fetch_file` 读取 `smter6626/framework-loop` 的 `1PCloop/docs/miniloop_runtime.md` 时失败，返回：`The GitHub tool has been disabled. Do not send any more messages to GitHub.`；
+- Human Owner 随后从该 affected conversation 创建新的 branch conversation；
+- Branch conversation，`2026-09-05 18:29:08 MST`：在没有重新授权或重新连接 GitHub 的情况下，实际 `fetch_file` 对同一 repository / same Runtime file 成功，并取得当前 blob SHA `8afdc1ebbe1ebeaa74308411579a3330c0f42294`；
+- branch recovery 因此复现了当前支持工单中描述的核心现象：affected conversation 中 GitHub execution unavailable，而 fresh branch 立即恢复 GitHub execution capability。
+
+Support-ticket context:
+
+- OpenAI Support 已将问题升级至 support specialist / technical review；
+- Support 已请求的补充字段包括：exact timestamp + timezone、affected conversation URL / recovered branch URL、screen recording、browser/environment，以及 failed reproduction 的 HAR；
+- 本 Runtime 仅记录当前可机械/会话内确认的信息；conversation / branch URL 无法由当前 GitHub tool 调用取得，需要 Human Owner 在回复 Support 时从浏览器地址栏提供；
+- 本次未抓取 screen recording 或 HAR。
+
+Interpretation boundary:
+
+该 observation 支持“问题至少具有 conversation/branch-scoped state component”的判断，但不证明具体 root cause，也不证明所有用户、所有 connector 或所有 ChatGPT surface 都受影响。该 support diagnostic 不属于 1PCloop Active Step，不改变 framework acceptance、P4-A/P4-B 结论或 medium-scale workload 执行顺序。
