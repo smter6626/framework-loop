@@ -1415,3 +1415,115 @@ execution policy.
 
 This acceptance does not make no-sandbox execution a permanent architecture
 invariant.
+
+### 2026-09-06 — P5.1 real medium-scale workload completed
+
+Status: `REAL WORKLOAD CONTROL-PLANE PATH VERIFIED`
+
+Real workload run:
+
+`20260906T102252Z-52187`
+
+Target:
+
+- repository: `live_subtitle_generator`
+- branch: `multiLanguage_v1`
+- baseline HEAD: `b5188ccc6aef591398fd8d31e162a29390b120e4`
+- final HEAD: `b9f61b39384001eae07c94d114ae66dcba0873cb`
+- final working tree: clean
+
+Control-plane result:
+
+- `3` cycles;
+- `7 / 7` Codex turns successful;
+- Cycle 1 and Cycle 2 each created one ordinary descendant target commit;
+- Cycle 3 was a clean Executor no-op;
+- Reviewer was created once as a persistent thread and explicitly resumed for all
+  three review turns;
+- observed Reviewer resume relationships were mechanically verified;
+- the unchanged-HEAD Executor payload still reached the Reviewer review turn;
+- final status: `STOPPED_FOR_HUMAN_REVIEW`;
+- final reason: `target_head_unchanged`.
+
+Observed sequence:
+
+```text
+Reviewer new persistent
+-> Executor fresh ephemeral / mutation commit
+-> Reviewer explicit resume / independent review
+-> Executor fresh ephemeral / mutation commit
+-> Reviewer explicit resume / independent review
+-> Executor fresh ephemeral / no-op
+-> Reviewer explicit resume / final review
+-> mechanical Human gate
+```
+
+Usage/cache observation:
+
+```text
+Reviewer aggregate:
+  turns      = 4
+  input      = 1586733
+  cached     = 1481216
+  uncached   = 105517
+  cache hit  = 0.933500
+  output     = 10101
+  reasoning  = 6026
+  duration   = 261.272s
+
+Executor aggregate:
+  turns      = 3
+  input      = 1365588
+  cached     = 1232896
+  uncached   = 132692
+  cache hit  = 0.902832
+  output     = 14925
+  reasoning  = 5110
+  duration   = 365.804s
+
+Total:
+  input      = 2952321
+  cached     = 2714112
+  uncached   = 238209
+  cache hit  = 0.919315
+  output     = 25026
+  reasoning  = 11136
+  duration   = 627.076s
+```
+
+Later Reviewer resume turns observed cache-hit ratios of `0.957524`, `0.966395`,
+and `0.987021`.
+
+These are single-run observations only. They do not establish a causal benchmark
+for persistent Reviewer sessions because prompt shape, target state, service-side
+cache state, and task complexity were not independently controlled here.
+
+Semantic-boundary observation:
+
+Human review of the opaque Reviewer final messages found `0` rejection events and
+`0` repair-request events in this run. Cycle 1 accepted the implementation slice
+and issued one bounded documentation task; Cycle 2 judged the workload ready for
+Human review; Cycle 3 reaffirmed the no-op handoff.
+
+These are Human semantic observations, not Python-derived control-plane fields.
+Python did not classify `ACCEPT`, `REJECT`, `READY`, or equivalent wording. It
+stopped only after the mechanical unchanged-HEAD condition, after the no-op
+Executor payload had still been routed to Reviewer review.
+
+Target regression was repeatedly reported/reproduced as `106` tests with `105`
+passes and the same single pre-existing project-local Python-path assertion
+failure. Reviewer also audited the existing ASCII-centric `TOKEN_RE` behavior and
+classified it as non-blocking for this workload boundary.
+
+Effective interpretation:
+
+- the `.git/index.lock` blocker exposed by run `20260906T083312Z-48975` is closed
+  for the current P5.1 execution policy;
+- P5.1 is now supported by deterministic validation, a disposable real-Git-mutation
+  smoke, and one real medium-scale external-repository workload;
+- disabling the Codex filesystem sandbox remains a temporary implementation choice,
+  not a permanent architecture invariant;
+- current role separation is prompt-defined and mechanically audited after turns;
+  it is not a hard filesystem capability boundary;
+- final target merge and product acceptance remain outside Python and belong to
+  the Human Owner.
