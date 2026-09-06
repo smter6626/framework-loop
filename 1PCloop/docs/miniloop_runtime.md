@@ -1190,3 +1190,139 @@ Support-ticket context:
 Interpretation boundary:
 
 该 observation 支持“问题至少具有 conversation/branch-scoped state component”的判断，但不证明具体 root cause，也不证明所有用户、所有 connector 或所有 ChatGPT surface 都受影响。该 support diagnostic 不属于 1PCloop Active Step，不改变 framework acceptance、P4-A/P4-B 结论或 medium-scale workload 执行顺序。
+
+---
+
+## Reviewer Decision — P5
+
+### 2026-09-06 — Multi-cycle mutation orchestration accepted
+
+Status: `ACCEPTED — FIRST MULTI-CYCLE MUTATION CONTROL PLANE`
+
+Step: `Step 1 P5`
+
+Implementation commit:
+
+- `16c3f3311b3f0d2b04341a0078fdd95b402be63c` — `Add P5 multi-cycle mutation orchestrator`；
+- path: `1PCloop/scripts/run_mutation_loop.py`；
+- reviewed implementation SHA-256: `359221984c12f081d572ea3ba4aa9dd60b16f383ff1b1481df867aed896bbd19`；
+- Git blob SHA: `615e63873a724bbc4e704a43c4db0367df663b04`。
+
+Review history:
+
+- first single-file review: `REPAIR REQUIRED`；
+- required repairs were limited to target-HEAD instruction freshness and ensuring an unchanged-HEAD Executor still reaches the Reviewer review turn before the Human gate；
+- repaired single-file implementation passed external code review；
+- subsequent validation found no correctness bug requiring production-code repair。
+
+Accepted behavior:
+
+- Reviewer state persists across mutation cycles with explicit resume；
+- Executor remains fresh ephemeral for every cycle and uses target `workspace-write`；
+- Reviewer uses target `read-only` and its before/after target state is mechanically checked；
+- framework Static/Runtime plus workload Static/Runtime are mechanically snapshotted with hashes/bytes/lines；
+- fresh Reviewer receives the full four-document bootstrap；
+- unchanged governance resumes the same Reviewer without repeating full governance bytes；
+- Runtime-only governance changes refresh the changed Runtime document(s) on the same Reviewer thread；
+- Static-class changes abandon the stale Reviewer thread and perform full rebootstrap on a new persistent Reviewer thread；
+- loop-scoped Reviewer state tracks the target HEAD associated with the latest successful Reviewer instruction/review；
+- target-HEAD drift invalidates a stale instruction and triggers Reviewer refresh before Executor launch；
+- target branch, cleanliness, HEAD, ancestry/history, merge commits, governance changes and launch-time target state are mechanically checked；
+- Executor unchanged HEAD is not interpreted as semantic completion: the Executor payload still reaches Reviewer review, after which the loop stops mechanically at `STOPPED_FOR_HUMAN_REVIEW / target_head_unchanged`；
+- Python continues to route Agent natural-language payloads opaquely and does not classify `ACCEPT` / `REJECT` / `READY` / `BLOCKED` semantics。
+
+Validation evidence:
+
+Validation-only artifacts were intentionally kept outside the repository at:
+
+```text
+/Users/smterpro/Documents/deletable/p5-validation-20260906-01/
+```
+
+This directory is disposable local evidence, not permanent repository provenance.
+
+Deterministic harness:
+
+```text
+6 / 6 PASS
+```
+
+Coverage included preflight failures, four-document freshness behavior, Reviewer thread/hash/known-target-HEAD state, target `A -> B` stale-instruction refresh, `B -> C` launch-race fail-close, descendant/dirty/branch/rewrite/merge/governance invariants, no-op Reviewer-review ordering, opaque byte/SHA/offset preservation, and natural-language non-parsing.
+
+Real Codex no-op smoke:
+
+```text
+Reviewer new persistent
+-> Executor fresh ephemeral / workspace-write
+-> Reviewer explicit resume
+-> STOPPED_FOR_HUMAN_REVIEW
+reason = target_head_unchanged
+```
+
+Reviewer thread relationship:
+
+```text
+created  = 01a07591-2dc3-7b52-a5a4-0cb87ac8936c
+target   = 01a07591-2dc3-7b52-a5a4-0cb87ac8936c
+observed = 01a07591-2dc3-7b52-a5a4-0cb87ac8936c
+verified = true
+```
+
+Disposable target repository:
+
+```text
+branch       = p5-validation
+initial HEAD = 2268166e745f66525e2c549ee803b68c31e74303
+final HEAD   = 2268166e745f66525e2c549ee803b68c31e74303
+clean before = true
+clean after  = true
+```
+
+Both Reviewer turns recorded `reviewer_target_read_only_verified=true`. The real smoke also verified that Codex `--cd` pointed to the disposable target while `--output-last-message`, JSONL, stderr, process and peer-payload evidence were successfully written outside the target repository.
+
+Single-run usage observation:
+
+```text
+Reviewer initial: input 105626, cached 80128, uncached 25498, output 569, reasoning 258, duration 20.419s
+Executor:         input  30717, cached 25728, uncached  4989, output 341, reasoning 117, duration 14.925s
+Reviewer review:  input 112509, cached107776, uncached  4733, output 701, reasoning 253, duration 21.789s
+Total:            input 248852, cached213632, uncached 35220, output1611, reasoning 628, duration 57.133s
+```
+
+These values are validation observations only, not a P4/P5 causal benchmark or performance claim.
+
+Known non-blocking boundaries:
+
+1. Workload Runtime is still a read-only authoritative input during a P5 v1 run. P5 does not yet persist Reviewer semantic decisions as a per-cycle workload-runtime checkpoint or promise crash/restart reconstruction of those semantic decisions.
+2. P5 does not hold an exclusive lock on the target repository. It instead uses repeated branch / clean / HEAD checks and fail-closed validation to detect external mutation.
+3. The target-HEAD refresh path was validated deterministically but was not exercised against the live Codex service because the production runner intentionally has no test hook for injecting a safe external commit between Reviewer instruction and Executor launch.
+
+These limitations do not block the first real medium-scale workload.
+
+### Effective-state supersession
+
+本节 supersede 上文只到 P4-B 的 current-state 记录；历史 evidence 与 provenance 保留不变。
+
+当前有效状态：
+
+```text
+P4-A = ACCEPTED
+P4-B = ACCEPTED
+P5   = ACCEPTED
+
+Deterministic authoritative-context reconstruction
+= ACCEPTED CURRENT CONTROL-PLANE MECHANISM
+
+Multi-cycle mutation orchestration
+= ACCEPTED CURRENT CONTROL-PLANE MECHANISM
+
+Reviewer persistent + explicit resume
+= PREFERRED IMPLEMENTATION CANDIDATE
+= NOT A PERMANENT ARCHITECTURE INVARIANT
+```
+
+P0–P5 现在构成第一版可用于真实 external-repository medium-scale workload 的 1PCloop control plane。
+
+下一候选工作是准备并由 Human Owner 审阅 `live_subtitle_generator / multiLanguage_v1` 的 workload Static/Runtime、target branch 与 preflight，然后启动第一次真实中规模 mutation loop。
+
+本 P5 acceptance 本身不创建 `multiLanguage_v1` branch，不创建 workload Static/Runtime，不启动真实 workload，不自动 merge target changes，不启用 persistent Executor，也不启用 automatic semantic Runtime transition。
