@@ -4,6 +4,17 @@
 
 在一台 Apple Silicon Mac 上实现并验证一个最小可运行的 Reviewer–Executor 自动闭环（1PCloop）。
 
+除完成工程闭环验证外，本项目的最终目标还包括形成一个具备进一步研究基础的
+research prototype（研究雏形）。项目应把真实实现、失败模式、修复过程、角色隔离、
+context management、evidence-backed acceptance 与 Human Gate 的运行证据，逐步提炼为
+可检验的 research question、明确的 hypothesis 候选和可复现的对照实验方向。
+
+运行过程中已经观察到、但尚未被证明的潜在 Research Questions 记录在 Runtime。具体
+RQ 可以随新 evidence 增补、修正、合并或降级，因此单个 RQ 不是永久 Static contract；
+但保留从工程 evidence 形成研究问题、并支持后续 controlled experiment 的能力，是本项目
+的稳定目标。记录 RQ 不表示相应 hypothesis 已成立，也不表示已经证明 literature novelty、
+形成可发表 contribution 或授权立即开展额外实验。
+
 当前 active implementation 不再以“单个本地 Ollama/Qwen 模型实例 + 两个逻辑 session”为运行前提，而是使用同一台 M4 Max 上已经独立配置好的两个 ChatGPT/Codex identity：
 
 ```text
