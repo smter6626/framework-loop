@@ -1,13 +1,16 @@
 import argparse
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,7 +26,9 @@ SPEC.loader.exec_module(MODULE)
 FAKE_CODEX = r'''#!/usr/bin/env python3
 import json
 import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 args = sys.argv[1:]
@@ -35,6 +40,18 @@ is_reviewer = home.name == "reviewer-home"
 is_executor = home.name == "executor-home"
 is_resume = "resume" in args
 
+call_log = os.environ.get("P5_TEST_CALL_LOG")
+if call_log:
+    label = "reviewer-resume" if is_reviewer and is_resume else (
+        "reviewer-new" if is_reviewer else "executor"
+    )
+    with Path(call_log).open("a", encoding="utf-8") as handle:
+        handle.write(label + "\n")
+
+if scenario == "slow":
+    print(json.dumps({"type": "turn.started"}), flush=True)
+    time.sleep(0.2)
+
 if is_reviewer and scenario == "reviewer-dirty":
     (Path.cwd() / "reviewer-unexpected.txt").write_text("unexpected\n", encoding="utf-8")
 if is_executor and scenario == "executor-dirty":
@@ -42,6 +59,10 @@ if is_executor and scenario == "executor-dirty":
 if is_executor and scenario == "governance-change":
     governance_path = Path(os.environ["P5_TEST_GOVERNANCE_PATH"])
     governance_path.write_bytes(governance_path.read_bytes() + b"changed\n")
+if is_executor and scenario == "executor-commit":
+    (Path.cwd() / "executor-change.txt").write_text("changed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "executor-change.txt"], check=True)
+    subprocess.run(["git", "commit", "-qm", "executor fixture change"], check=True)
 
 if is_executor:
     final = b"Executor opaque receipt: ACCEPT REJECT READY BLOCKED are just bytes.\n"
@@ -69,6 +90,10 @@ print(json.dumps({
     }
 }))
 '''
+
+
+class SimulatedCrash(BaseException):
+    pass
 
 
 class MutationLoopTests(unittest.TestCase):
@@ -111,11 +136,15 @@ class MutationLoopTests(unittest.TestCase):
             framework_static=governance_paths[MODULE.FRAMEWORK_STATIC],
             max_cycles=1,
             reviewer_home=reviewer_home,
+            resume=False,
             run_id=run_id,
             runs_root=root / "runs",
+            state_root=root / ".local" / "state",
             target_branch="p5-test",
             target_repo=target,
             timeout_seconds=10,
+            progress_interval_seconds=0.05,
+            workload_id="fixture-workload",
             workload_runtime=governance_paths[MODULE.WORKLOAD_RUNTIME],
             workload_static=governance_paths[MODULE.WORKLOAD_STATIC],
         )
@@ -294,6 +323,271 @@ class MutationLoopTests(unittest.TestCase):
             self.assertEqual(policy.resume_target_thread_id, "reviewer-thread-id")
             self.assertEqual(policy.injection_mode, "resume-unchanged")
             self.assertEqual(policy.injected_files, ())
+
+    def test_checkpoint_atomically_overwrites_one_current_file(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            path = root / "state" / "checkpoint.json"
+            store = MODULE.CheckpointStore(path)
+
+            store.write(MODULE.PREFLIGHT_PASSED, {"run_id": "first"})
+            store.write(MODULE.INSTRUCTION_READY, {"run_id": "second"})
+
+            checkpoint = store.load()
+            self.assertEqual(checkpoint["state"], MODULE.INSTRUCTION_READY)
+            self.assertEqual(checkpoint["run_id"], "second")
+            self.assertEqual([item.name for item in path.parent.iterdir()], [
+                "checkpoint.json"
+            ])
+
+    def test_nonterminal_checkpoint_requires_explicit_resume(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            args, target, governance, _ = self.make_fixture(root)
+            crashed = False
+
+            def crash_at_instruction(
+                state: str, _checkpoint: object
+            ) -> None:
+                nonlocal crashed
+                if state == MODULE.INSTRUCTION_READY and not crashed:
+                    crashed = True
+                    raise SimulatedCrash()
+
+            with self.assertRaises(SimulatedCrash):
+                MODULE.orchestrate(
+                    args=args,
+                    target_initial=target,
+                    governance_initial=governance,
+                    checkpoint_observer=crash_at_instruction,
+                )
+
+            current_target, current_governance = MODULE.validate_preflight(args)
+            with self.assertRaisesRegex(
+                MODULE.InvariantViolation, "incomplete checkpoint exists"
+            ):
+                MODULE.orchestrate(
+                    args=args,
+                    target_initial=current_target,
+                    governance_initial=current_governance,
+                )
+
+            args.resume = True
+            exit_code, run_root = MODULE.orchestrate(
+                args=args,
+                target_initial=current_target,
+                governance_initial=current_governance,
+            )
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads(
+                (run_root / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["status"], "STOPPED_FOR_HUMAN_REVIEW")
+            checkpoint = MODULE.CheckpointStore(
+                MODULE.checkpoint_path_for_args(args)
+            ).load()
+            self.assertEqual(checkpoint["state"], MODULE.HUMAN_GATE)
+
+    def test_restart_after_executor_commit_does_not_run_executor_twice(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            args, target, governance, _ = self.make_fixture(root)
+            call_log = root / "calls.log"
+            crashed = False
+
+            def crash_after_commit(state: str, _checkpoint: object) -> None:
+                nonlocal crashed
+                if state == MODULE.EXECUTOR_COMMITTED and not crashed:
+                    crashed = True
+                    raise SimulatedCrash()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "P5_TEST_SCENARIO": "executor-commit",
+                    "P5_TEST_CALL_LOG": str(call_log),
+                },
+                clear=False,
+            ):
+                with self.assertRaises(SimulatedCrash):
+                    MODULE.orchestrate(
+                        args=args,
+                        target_initial=target,
+                        governance_initial=governance,
+                        checkpoint_observer=crash_after_commit,
+                    )
+                head_after_crash = MODULE.git_text(args.target_repo, ["rev-parse", "HEAD"])
+                self.assertNotEqual(head_after_crash, target.head)
+
+                args.resume = True
+                current_target, current_governance = MODULE.validate_preflight(args)
+                exit_code, run_root = MODULE.orchestrate(
+                    args=args,
+                    target_initial=current_target,
+                    governance_initial=current_governance,
+                )
+
+            self.assertEqual(exit_code, 0)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(calls.count("executor"), 1)
+            manifest = json.loads(
+                (run_root / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                [turn["role"] for turn in manifest["turns"]],
+                ["reviewer", "executor", "reviewer"],
+            )
+            self.assertEqual(manifest["reason"], "max_cycles_reached")
+
+    def test_restart_before_executor_launch_runs_it_once(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            args, target, governance, _ = self.make_fixture(root)
+            call_log = root / "calls.log"
+            crashed = False
+
+            def crash_before_executor(state: str, _checkpoint: object) -> None:
+                nonlocal crashed
+                if state == MODULE.EXECUTOR_RUNNING and not crashed:
+                    crashed = True
+                    raise SimulatedCrash()
+
+            with patch.dict(
+                os.environ, {"P5_TEST_CALL_LOG": str(call_log)}, clear=False
+            ):
+                with self.assertRaises(SimulatedCrash):
+                    MODULE.orchestrate(
+                        args=args,
+                        target_initial=target,
+                        governance_initial=governance,
+                        checkpoint_observer=crash_before_executor,
+                    )
+                self.assertNotIn(
+                    "executor", call_log.read_text(encoding="utf-8").splitlines()
+                )
+
+                args.resume = True
+                current_target, current_governance = MODULE.validate_preflight(args)
+                exit_code, _ = MODULE.orchestrate(
+                    args=args,
+                    target_initial=current_target,
+                    governance_initial=current_governance,
+                )
+
+            self.assertEqual(exit_code, 0)
+            calls = call_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(calls.count("executor"), 1)
+
+    def test_restart_at_review_boundaries_does_not_duplicate_reviewer(self):
+        for crash_state in (MODULE.REVIEW_PENDING, MODULE.REVIEW_COMPLETED):
+            with self.subTest(crash_state=crash_state), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                args, target, governance, _ = self.make_fixture(root)
+                call_log = root / "calls.log"
+                crashed = False
+
+                def crash_at_boundary(state: str, _checkpoint: object) -> None:
+                    nonlocal crashed
+                    if state == crash_state and not crashed:
+                        crashed = True
+                        raise SimulatedCrash()
+
+                with patch.dict(
+                    os.environ, {"P5_TEST_CALL_LOG": str(call_log)}, clear=False
+                ):
+                    with self.assertRaises(SimulatedCrash):
+                        MODULE.orchestrate(
+                            args=args,
+                            target_initial=target,
+                            governance_initial=governance,
+                            checkpoint_observer=crash_at_boundary,
+                        )
+                    calls_before = call_log.read_text(encoding="utf-8").splitlines()
+                    args.resume = True
+                    current_target, current_governance = MODULE.validate_preflight(args)
+                    exit_code, _ = MODULE.orchestrate(
+                        args=args,
+                        target_initial=current_target,
+                        governance_initial=current_governance,
+                    )
+
+                self.assertEqual(exit_code, 0)
+                calls_after = call_log.read_text(encoding="utf-8").splitlines()
+                if crash_state == MODULE.REVIEW_PENDING:
+                    self.assertEqual(len(calls_after), len(calls_before) + 1)
+                else:
+                    self.assertEqual(calls_after, calls_before)
+                self.assertEqual(
+                    sum(call.startswith("reviewer") for call in calls_after), 2
+                )
+
+    def test_ambiguous_commit_after_running_checkpoint_stops_for_human(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            args, target, governance, _ = self.make_fixture(root)
+            crashed = False
+
+            def crash_before_executor(state: str, _checkpoint: object) -> None:
+                nonlocal crashed
+                if state == MODULE.EXECUTOR_RUNNING and not crashed:
+                    crashed = True
+                    raise SimulatedCrash()
+
+            with self.assertRaises(SimulatedCrash):
+                MODULE.orchestrate(
+                    args=args,
+                    target_initial=target,
+                    governance_initial=governance,
+                    checkpoint_observer=crash_before_executor,
+                )
+
+            (args.target_repo / "ambiguous.txt").write_text(
+                "external\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "add", "ambiguous.txt"], cwd=args.target_repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "ambiguous concurrent commit"],
+                cwd=args.target_repo,
+                check=True,
+            )
+
+            args.resume = True
+            current_target, current_governance = MODULE.validate_preflight(args)
+            exit_code, run_root = MODULE.orchestrate(
+                args=args,
+                target_initial=current_target,
+                governance_initial=current_governance,
+            )
+            manifest = json.loads(
+                (run_root / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(manifest["status"], "STOPPED_FOR_HUMAN_REVIEW")
+            self.assertEqual(
+                manifest["reason"], "executor_outcome_ambiguous_after_restart"
+            )
+
+    def test_streaming_turn_emits_heartbeat_before_completion(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            args, target, governance, _ = self.make_fixture(root)
+            output = io.StringIO()
+            with patch.dict(
+                os.environ, {"P5_TEST_SCENARIO": "slow"}, clear=False
+            ), redirect_stdout(output):
+                exit_code, _ = MODULE.orchestrate(
+                    args=args,
+                    target_initial=target,
+                    governance_initial=governance,
+                )
+
+            self.assertEqual(exit_code, 0)
+            progress = output.getvalue()
+            self.assertIn("process_started", progress)
+            self.assertIn("running elapsed=", progress)
+            self.assertIn("process_finished", progress)
+            self.assertIn("checkpoint state=HUMAN_GATE", progress)
+            self.assertIn("target_head=", progress)
 
 
 if __name__ == "__main__":

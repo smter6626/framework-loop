@@ -75,6 +75,28 @@ Orchestrator 只为每次调用设置角色、`CODEX_HOME`、sandbox、turn/run 
 
 若后续目标转为抵抗恶意或失控 Agent，需要另行引入更强的能力隔离，例如 Reviewer 专用只读 worktree、受约束的文件/Git capability proxy、独立用户或容器。那是下一层安全研究，不改变当前隔离方式属于有意设计这一事实。
 
+## P6.1 checkpoint 与终端进度
+
+`run_mutation_loop.py` 会为每个 workload key 维护一份可覆盖的本地 checkpoint：
+
+```text
+1PCloop/.local/state/<workload-id>/checkpoint.json
+```
+
+`1PCloop/.local/` 被 Git 忽略。默认 workload ID 是 `--workload-static` 所在目录名，也可以用 `--workload-id` 显式指定。checkpoint 在每个控制面边界原子替换，不保存逐版本历史。terminal checkpoint 可以由下一次新 run 覆盖；未完成 checkpoint 不会被静默覆盖。
+
+恢复未完成 run 时，使用与原 run 相同的 target、governance、角色配置和 cycle 上限，并增加：
+
+```bash
+python3 1PCloop/scripts/run_mutation_loop.py \
+  <原有参数> \
+  --resume
+```
+
+恢复前会重新核对配置、治理 hash、target branch/HEAD 和工作树。已完成并记录的 Executor commit 或 Reviewer turn 不会重跑；无法机械归因的中途 target mutation 会停止到 Human Gate。checkpoint 中的 Reviewer thread 不可安全复用时，Reviewer 可以从 repository-backed governance 和已保存的 peer evidence 重新 bootstrap。
+
+Codex 子进程输出现在边运行边写入原始 evidence，同时终端显示 turn 开始/结束、可公开的工具事件和定时 heartbeat。默认 heartbeat 间隔为 15 秒，可用 `--progress-interval-seconds` 调整。Ctrl-C 等可处理的父进程中断会先终止当前 Codex 子进程，避免它成为继续修改仓库的后台 Agent。
+
 运行 transport self-check：
 
 ```bash

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run a fail-closed, multi-cycle Reviewer/Executor mutation loop.
+"""Run a fail-closed, recoverable Reviewer/Executor mutation loop.
 
-This is the first P5 orchestrator.  It deliberately treats Agent final messages as
-opaque byte payloads: Python routes them and verifies mechanical state, but never
-interprets readiness, acceptance, rejection, repair, or blocker semantics.
+P6.1 adds an overwrite-only local checkpoint and live terminal progress to the P5
+orchestrator. Agent final messages remain opaque byte payloads until the separately
+scoped P6.2 structured-verdict work.
 """
 
 from __future__ import annotations
@@ -16,17 +16,19 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 
 SCRIPT_PATH = Path(__file__).resolve()
 FRAMEWORK_ROOT = SCRIPT_PATH.parents[2]
 ACTIVE_ROOT = FRAMEWORK_ROOT / "1PCloop"
 DEFAULT_RUNS_ROOT = ACTIVE_ROOT / "runs"
+DEFAULT_STATE_ROOT = ACTIVE_ROOT / ".local" / "state"
 DEFAULT_FRAMEWORK_STATIC = ACTIVE_ROOT / "docs/miniloop_static.md"
 DEFAULT_FRAMEWORK_RUNTIME = ACTIVE_ROOT / "docs/miniloop_runtime.md"
 DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
@@ -54,6 +56,23 @@ RUNTIME_DOCUMENTS = (FRAMEWORK_RUNTIME, WORKLOAD_RUNTIME)
 CONTEXT_BEGIN = b"\n\n--- BEGIN P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---\n"
 CONTEXT_END = b"--- END P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---\n"
 
+PREFLIGHT_PASSED = "PREFLIGHT_PASSED"
+REVIEWER_INSTRUCTION_RUNNING = "REVIEWER_INSTRUCTION_RUNNING"
+INSTRUCTION_READY = "INSTRUCTION_READY"
+EXECUTOR_RUNNING = "EXECUTOR_RUNNING"
+EXECUTOR_COMMITTED = "EXECUTOR_COMMITTED"
+REVIEW_PENDING = "REVIEW_PENDING"
+REVIEW_COMPLETED = "REVIEW_COMPLETED"
+RUNTIME_TRANSITION_PENDING = "RUNTIME_TRANSITION_PENDING"
+RUNTIME_TRANSITION_COMMITTED = "RUNTIME_TRANSITION_COMMITTED"
+HUMAN_GATE = "HUMAN_GATE"
+FAILED_CLOSED = "FAILED_CLOSED"
+TERMINAL_CHECKPOINT_STATES = {
+    RUNTIME_TRANSITION_COMMITTED,
+    HUMAN_GATE,
+    FAILED_CLOSED,
+}
+
 
 def load_p4_helpers() -> ModuleType:
     """Load the accepted P3/P4 transport helpers without changing their API."""
@@ -72,6 +91,73 @@ P4 = load_p4_helpers()
 
 class InvariantViolation(RuntimeError):
     """A mechanical invariant failed and the loop must not continue."""
+
+
+def emit_progress(message: str) -> None:
+    """Emit a concise, immediately visible control-plane progress line."""
+    print(f"[{P4.utc_now()}] {message}", flush=True)
+
+
+def atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    """Atomically replace one JSON file without creating checkpoint history."""
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+    data = (
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    try:
+        with temporary.open("wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+        except OSError:
+            directory_fd = None
+        if directory_fd is not None:
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+@dataclass
+class CheckpointStore:
+    path: Path
+    observer: Optional[Callable[[str, Mapping[str, Any]], None]] = None
+
+    def exists(self) -> bool:
+        return self.path.is_file()
+
+    def load(self) -> Dict[str, Any]:
+        if not self.path.is_file():
+            raise InvariantViolation(f"checkpoint does not exist: {self.path}")
+        try:
+            value = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise InvariantViolation(f"checkpoint is unreadable: {exc}") from exc
+        if not isinstance(value, dict) or value.get("schema_version") != 1:
+            raise InvariantViolation("checkpoint schema is unsupported")
+        state = value.get("state")
+        if not isinstance(state, str):
+            raise InvariantViolation("checkpoint state is missing")
+        return value
+
+    def write(self, state: str, payload: Mapping[str, Any]) -> Dict[str, Any]:
+        value = dict(payload)
+        value["schema_version"] = 1
+        value["state"] = state
+        value["updated_at"] = P4.utc_now()
+        atomic_write_json(self.path, value)
+        emit_progress(f"checkpoint state={state} path={self.path}")
+        if self.observer is not None:
+            self.observer(state, value)
+        return value
 
 
 @dataclass(frozen=True)
@@ -204,6 +290,67 @@ class TurnResult:
     @property
     def success(self) -> bool:
         return bool(self.process.get("success"))
+
+
+def reviewer_state_record(state: ReviewerState) -> Dict[str, Any]:
+    return {
+        "cycle_number": state.cycle_number,
+        "known_hashes": copy.deepcopy(state.known_hashes),
+        "known_target_head": state.known_target_head,
+        "reviewer_thread_id": state.reviewer_thread_id,
+    }
+
+
+def reviewer_state_from_record(value: Mapping[str, Any]) -> ReviewerState:
+    known_hashes = value.get("known_hashes")
+    if known_hashes is not None and not isinstance(known_hashes, dict):
+        raise InvariantViolation("checkpoint Reviewer hashes are invalid")
+    cycle_number = value.get("cycle_number")
+    if type(cycle_number) is not int or cycle_number < 0:
+        raise InvariantViolation("checkpoint Reviewer cycle is invalid")
+    return ReviewerState(
+        reviewer_thread_id=value.get("reviewer_thread_id"),
+        known_hashes=copy.deepcopy(known_hashes),
+        cycle_number=cycle_number,
+        known_target_head=value.get("known_target_head"),
+    )
+
+
+def turn_reference(turn: TurnResult, run_root: Path) -> Dict[str, str]:
+    final_path = turn.turn_dir / "final.txt"
+    process_path = turn.turn_dir / "process.json"
+    return {
+        "final_path": relative_evidence_path(final_path, run_root),
+        "final_sha256": P4.sha256_bytes(turn.final_message),
+        "process_path": relative_evidence_path(process_path, run_root),
+    }
+
+
+def load_turn_reference(reference: Mapping[str, Any], run_root: Path) -> TurnResult:
+    final_relative = reference.get("final_path")
+    process_relative = reference.get("process_path")
+    expected_sha = reference.get("final_sha256")
+    if not all(isinstance(value, str) for value in (final_relative, process_relative, expected_sha)):
+        raise InvariantViolation("checkpoint turn reference is incomplete")
+    final_path = (run_root / final_relative).resolve()
+    process_path = (run_root / process_relative).resolve()
+    try:
+        final_path.relative_to(run_root.resolve())
+        process_path.relative_to(run_root.resolve())
+    except ValueError as exc:
+        raise InvariantViolation("checkpoint turn reference escapes the run root") from exc
+    if not final_path.is_file() or not process_path.is_file():
+        raise InvariantViolation("checkpoint turn artifact is missing")
+    final_message = final_path.read_bytes()
+    if P4.sha256_bytes(final_message) != expected_sha:
+        raise InvariantViolation("checkpoint turn final-message hash mismatch")
+    try:
+        process = json.loads(process_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InvariantViolation(f"checkpoint turn process is unreadable: {exc}") from exc
+    if not isinstance(process, dict) or not process.get("success"):
+        raise InvariantViolation("checkpoint turn process is not successful")
+    return TurnResult(final_path.parent, final_message, process)
 
 
 def git_bytes(repo: Path, args: Sequence[str], *, check: bool = True) -> bytes:
@@ -736,6 +883,155 @@ def relative_evidence_path(path: Path, run_root: Path) -> str:
     return path.resolve().relative_to(run_root.resolve()).as_posix()
 
 
+def describe_progress_event(line: bytes) -> Optional[str]:
+    try:
+        event = json.loads(line)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(event, dict):
+        return None
+    event_type = event.get("type")
+    if event_type in {"thread.started", "turn.started", "turn.completed", "error"}:
+        return f"codex_event={event_type}"
+    if event_type in {"item.started", "item.completed"}:
+        item = event.get("item")
+        if isinstance(item, dict):
+            item_type = item.get("type")
+            if item_type in {"command_execution", "mcp_tool_call", "web_search"}:
+                return f"codex_event={event_type} item={item_type}"
+    return None
+
+
+def stream_subprocess(
+    *,
+    command: Sequence[str],
+    workspace: Path,
+    environment: Mapping[str, str],
+    prompt: bytes,
+    events_path: Path,
+    stderr_path: Path,
+    timeout_seconds: int,
+    progress_interval_seconds: float,
+    progress_label: str,
+) -> Tuple[Optional[int], bytes, bytes, Optional[str]]:
+    """Run Codex while teeing raw output and emitting bounded live progress."""
+    process: Optional[subprocess.Popen[bytes]] = None
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    failure: Optional[str] = None
+    try:
+        process = subprocess.Popen(
+            list(command),
+            cwd=str(workspace),
+            env=dict(environment),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        events_path.write_bytes(b"")
+        stderr_path.write_bytes(b"")
+        return None, b"", b"", f"unable to launch Codex: {exc}"
+
+    emit_progress(f"{progress_label} process_started pid={process.pid}")
+
+    def pump(
+        pipe: Any,
+        path: Path,
+        destination: bytearray,
+        *,
+        report_events: bool,
+    ) -> None:
+        with path.open("wb") as handle:
+            while True:
+                chunk = pipe.readline()
+                if not chunk:
+                    break
+                destination.extend(chunk)
+                handle.write(chunk)
+                handle.flush()
+                if report_events:
+                    description = describe_progress_event(chunk)
+                    if description is not None:
+                        emit_progress(f"{progress_label} {description}")
+
+    stdout_thread = threading.Thread(
+        target=pump,
+        args=(process.stdout, events_path, stdout_buffer),
+        kwargs={"report_events": True},
+        daemon=True,
+    )
+    stderr_thread = threading.Thread(
+        target=pump,
+        args=(process.stderr, stderr_path, stderr_buffer),
+        kwargs={"report_events": False},
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    try:
+        assert process.stdin is not None
+        process.stdin.write(prompt)
+        process.stdin.close()
+    except (BrokenPipeError, OSError) as exc:
+        failure = f"unable to send prompt to Codex: {exc}"
+
+    started = time.monotonic()
+    heartbeat_interval = max(progress_interval_seconds, 0.05)
+    next_heartbeat = started + heartbeat_interval
+    timed_out = False
+    try:
+        while process.poll() is None:
+            now = time.monotonic()
+            if now - started >= timeout_seconds:
+                timed_out = True
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                break
+            if now >= next_heartbeat:
+                emit_progress(
+                    f"{progress_label} running elapsed={round(now - started, 1)}s"
+                )
+                next_heartbeat = now + heartbeat_interval
+            time.sleep(min(0.1, heartbeat_interval))
+    except BaseException:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        stdout_thread.join(timeout=5)
+        stderr_thread.join(timeout=5)
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+        emit_progress(f"{progress_label} process_interrupted")
+        raise
+
+    exit_code = process.wait()
+    stdout_thread.join(timeout=5)
+    stderr_thread.join(timeout=5)
+    if process.stdout is not None:
+        process.stdout.close()
+    if process.stderr is not None:
+        process.stderr.close()
+    if stdout_thread.is_alive() or stderr_thread.is_alive():
+        failure = failure or "Codex output stream did not close cleanly"
+    if timed_out:
+        failure = f"timeout after {timeout_seconds} seconds"
+    emit_progress(
+        f"{progress_label} process_finished exit_code={exit_code} "
+        f"elapsed={round(time.monotonic() - started, 1)}s"
+    )
+    return exit_code, bytes(stdout_buffer), bytes(stderr_buffer), failure
+
+
 def run_codex_turn(
     *,
     run_root: Path,
@@ -752,6 +1048,8 @@ def run_codex_turn(
     peer_payload: Optional[bytes] = None,
     peer_payload_offset: Optional[int] = None,
     peer_source: Optional[str] = None,
+    progress_interval_seconds: float = 15.0,
+    progress_label: Optional[str] = None,
 ) -> TurnResult:
     turn_dir.mkdir(parents=True, exist_ok=False)
     prompt_path = turn_dir / "prompt.txt"
@@ -836,33 +1134,34 @@ def run_codex_turn(
     )
 
     if validation_failure is None:
-        try:
-            completed = subprocess.run(
-                command,
-                cwd=str(workspace),
-                env=environment,
-                input=prompt,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=timeout_seconds,
-                check=False,
-            )
-            exit_code = completed.returncode
-            stdout = completed.stdout
-            stderr = completed.stderr
-        except subprocess.TimeoutExpired as exc:
-            failure = f"timeout after {timeout_seconds} seconds"
-            stdout = exc.stdout or b""
-            stderr = exc.stderr or b""
-        except OSError as exc:
-            failure = f"unable to launch Codex: {exc}"
+        exit_code, stdout, stderr, process_failure = stream_subprocess(
+            command=command,
+            workspace=workspace,
+            environment=environment,
+            prompt=prompt,
+            events_path=events_path,
+            stderr_path=stderr_path,
+            timeout_seconds=timeout_seconds,
+            progress_interval_seconds=progress_interval_seconds,
+            progress_label=(
+                progress_label or f"role={role} turn={turn_dir.name}"
+            ),
+        )
+        if process_failure is not None:
+            failure = process_failure
 
     duration = round(time.monotonic() - started_monotonic, 3)
-    events_path.write_bytes(stdout)
-    stderr_path.write_bytes(stderr)
+    if validation_failure is not None:
+        events_path.write_bytes(stdout)
+        stderr_path.write_bytes(stderr)
     event_metadata = P4.extract_event_metadata(events_path.read_bytes())
     final_message = final_path.read_bytes() if final_path.is_file() else b""
-    success = exit_code == 0 and bool(final_message) and validation_failure is None
+    success = (
+        exit_code == 0
+        and bool(final_message)
+        and validation_failure is None
+        and failure is None
+    )
     if not success and failure is None:
         failure = "Codex exited unsuccessfully or did not write a final message"
 
@@ -943,6 +1242,7 @@ def invoke_reviewer(
     codex_bin: str,
     reviewer_home: Path,
     timeout_seconds: int,
+    progress_interval_seconds: float = 15.0,
 ) -> TurnResult:
     policy = choose_freshness_policy(governance, state)
     authoritative = build_authoritative_prompt(
@@ -969,6 +1269,11 @@ def invoke_reviewer(
         peer_payload=peer_payload,
         peer_payload_offset=authoritative.peer_payload_offset,
         peer_source=peer_source,
+        progress_interval_seconds=progress_interval_seconds,
+        progress_label=(
+            f"run={run_root.name} cycle={cycle_number} role=reviewer "
+            f"state=running target_head={target.head} turn={turn_dir.name}"
+        ),
     )
     reviewer_invariant_failure: Optional[str] = None
     target_after: Optional[TargetState] = None
@@ -1100,9 +1405,109 @@ def write_manifest(
     P4.write_json(run_root / "manifest.json", manifest)
 
 
+def workload_id_for_args(args: argparse.Namespace) -> str:
+    requested = getattr(args, "workload_id", None)
+    candidate = requested or args.workload_static.resolve().parent.name
+    return P4.validate_run_id(candidate)
+
+
+def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
+    state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
+    return state_root.resolve() / workload_id_for_args(args) / "checkpoint.json"
+
+
+def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
+    state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
+    return {
+        "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
+        "executor_home": str(args.executor_home.resolve()),
+        "framework_runtime": str(args.framework_runtime.resolve()),
+        "framework_static": str(args.framework_static.resolve()),
+        "max_cycles": args.max_cycles,
+        "reviewer_home": str(args.reviewer_home.resolve()),
+        "runs_root": str(args.runs_root.resolve()),
+        "state_root": str(state_root.resolve()),
+        "target_branch": args.target_branch,
+        "target_repo": str(args.target_repo.resolve()),
+        "timeout_seconds": args.timeout_seconds,
+        "workload_id": workload_id_for_args(args),
+        "workload_runtime": str(args.workload_runtime.resolve()),
+        "workload_static": str(args.workload_static.resolve()),
+    }
+
+
+def target_state_from_metadata(value: Mapping[str, Any]) -> TargetState:
+    required = ("repo", "branch", "head", "clean", "status_porcelain")
+    if any(name not in value for name in required):
+        raise InvariantViolation("checkpoint target metadata is incomplete")
+    if not isinstance(value["repo"], str) or not isinstance(value["branch"], str):
+        raise InvariantViolation("checkpoint target path/branch is invalid")
+    if not isinstance(value["head"], str) or type(value["clean"]) is not bool:
+        raise InvariantViolation("checkpoint target HEAD/cleanliness is invalid")
+    if not isinstance(value["status_porcelain"], str):
+        raise InvariantViolation("checkpoint target porcelain is invalid")
+    return TargetState(
+        repo=Path(value["repo"]),
+        branch=value["branch"],
+        head=value["head"],
+        clean=value["clean"],
+        porcelain=value["status_porcelain"],
+    )
+
+
+def next_turn_attempt(base: Path) -> Path:
+    if not base.exists():
+        return base
+    attempt = 2
+    while True:
+        candidate = base.with_name(f"{base.name}-attempt-{attempt:02d}")
+        if not candidate.exists():
+            return candidate
+        attempt += 1
+
+
+def completed_turn_from_dir(turn_dir: Path, run_root: Path) -> Optional[TurnResult]:
+    final_path = turn_dir / "final.txt"
+    process_path = turn_dir / "process.json"
+    if not final_path.is_file() or not process_path.is_file():
+        return None
+    try:
+        process = json.loads(process_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(process, dict) or not process.get("success"):
+        return None
+    final_message = final_path.read_bytes()
+    expected = process.get("final_message_sha256")
+    if not final_message or expected != P4.sha256_bytes(final_message):
+        return None
+    try:
+        relative_evidence_path(final_path, run_root)
+    except ValueError:
+        return None
+    return TurnResult(turn_dir, final_message, process)
+
+
+def recover_reviewer_state_from_turn(turn: TurnResult) -> ReviewerState:
+    context = turn.process.get("authoritative_context")
+    state_after = turn.process.get("reviewer_state_after")
+    if not isinstance(context, dict) or not isinstance(state_after, dict):
+        raise InvariantViolation("completed Reviewer artifact lacks recovery metadata")
+    known_hashes = context.get("current_hashes")
+    if not isinstance(known_hashes, dict):
+        raise InvariantViolation("completed Reviewer artifact lacks governance hashes")
+    return ReviewerState(
+        reviewer_thread_id=state_after.get("reviewer_thread_id"),
+        known_hashes=copy.deepcopy(known_hashes),
+        cycle_number=state_after.get("cycle_number"),
+        known_target_head=state_after.get("reviewer_known_target_head"),
+    )
+
+
 def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, GovernanceSnapshot]:
     target_repo = args.target_repo.resolve()
     runs_root = args.runs_root.resolve()
+    state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT).resolve()
     if paths_overlap(target_repo, FRAMEWORK_ROOT):
         raise InvariantViolation(
             "target repository and framework repository must be independent, non-overlapping trees"
@@ -1111,6 +1516,11 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
         raise InvariantViolation(
             "runs root must be outside the target repository to preserve target cleanliness"
         )
+    if paths_overlap(target_repo, state_root):
+        raise InvariantViolation(
+            "checkpoint state root must be outside the target repository"
+        )
+    workload_id_for_args(args)
     if not args.target_branch.strip():
         raise InvariantViolation("target branch must not be empty")
     target = capture_target_state(
@@ -1185,6 +1595,7 @@ def ensure_instruction_fresh(
     codex_bin: str,
     reviewer_home: Path,
     timeout_seconds: int,
+    progress_interval_seconds: float = 15.0,
 ) -> Tuple[
     TurnResult,
     GovernanceSnapshot,
@@ -1214,6 +1625,7 @@ def ensure_instruction_fresh(
         codex_bin=codex_bin,
         reviewer_home=reviewer_home,
         timeout_seconds=timeout_seconds,
+        progress_interval_seconds=progress_interval_seconds,
     )
     freshness["refresh_performed"] = refresh.success
     freshness["replacement_instruction_path"] = (
@@ -1229,318 +1641,605 @@ def orchestrate(
     args: argparse.Namespace,
     target_initial: TargetState,
     governance_initial: GovernanceSnapshot,
+    checkpoint_observer: Optional[
+        Callable[[str, Mapping[str, Any]], None]
+    ] = None,
 ) -> Tuple[int, Path]:
-    run_id = P4.validate_run_id(args.run_id)
-    run_root = args.runs_root.resolve() / run_id
-    run_root.mkdir(parents=True, exist_ok=False)
-    started_at = P4.utc_now()
-    cycles: List[Dict[str, Any]] = []
-    processes: List[Dict[str, Any]] = []
-    reviewer_state = ReviewerState(None, None, 0)
-    status = "RUNNING"
-    reason: Optional[str] = None
+    checkpoint_store = CheckpointStore(checkpoint_path_for_args(args))
+    resume_requested = bool(getattr(args, "resume", False))
+    configuration = checkpoint_configuration(args)
+    progress_interval = float(getattr(args, "progress_interval_seconds", 15.0))
     governance_paths = {
         FRAMEWORK_STATIC: args.framework_static.resolve(),
         FRAMEWORK_RUNTIME: args.framework_runtime.resolve(),
         WORKLOAD_STATIC: args.workload_static.resolve(),
         WORKLOAD_RUNTIME: args.workload_runtime.resolve(),
     }
-    run_configuration = {
-        "approval_policy": "bypassed",
-        "approvals_and_sandbox_bypassed": True,
-        "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
-        "executor_home": str(args.executor_home.resolve()),
-        "executor_sandbox": NO_CODEX_SANDBOX,
-        "executor_session_mode": FRESH_EPHEMERAL,
-        "execution_policy": "prompt-defined-roles-with-post-turn-mechanical-audit",
-        "framework_git_head": git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"]),
-        "max_cycles": args.max_cycles,
-        "reviewer_home": str(args.reviewer_home.resolve()),
-        "reviewer_session_mode": "persistent-with-explicit-resume",
-        "reviewer_sandbox": NO_CODEX_SANDBOX,
-        "runs_root": str(args.runs_root.resolve()),
-        "timeout_seconds": args.timeout_seconds,
-    }
-    write_manifest(
-        run_root=run_root,
-        run_id=run_id,
-        started_at=started_at,
-        status=status,
-        reason=reason,
-        target_initial=target_initial,
-        governance_initial=governance_initial,
-        reviewer_state=reviewer_state,
-        cycles=cycles,
-        processes=processes,
-        run_configuration=run_configuration,
+    if resume_requested:
+        checkpoint = checkpoint_store.load()
+        if checkpoint["state"] in TERMINAL_CHECKPOINT_STATES:
+            raise InvariantViolation("terminal checkpoint has no incomplete work to resume")
+        if checkpoint.get("configuration") != configuration:
+            raise InvariantViolation("resume configuration does not match checkpoint")
+        run_id = P4.validate_run_id(checkpoint.get("run_id"))
+        run_root = Path(checkpoint.get("run_root", "")).resolve()
+        if run_root != args.runs_root.resolve() / run_id or not run_root.is_dir():
+            raise InvariantViolation("checkpoint run root is missing or inconsistent")
+        started_at = checkpoint.get("started_at")
+        if not isinstance(started_at, str):
+            raise InvariantViolation("checkpoint start time is invalid")
+        target_initial = target_state_from_metadata(checkpoint.get("target_initial", {}))
+        if checkpoint.get("governance_initial_hashes") != governance_initial.hashes():
+            raise InvariantViolation("governance changed since the checkpointed run began")
+        cycles = checkpoint.get("cycles")
+        processes = checkpoint.get("processes")
+        if not isinstance(cycles, list) or not isinstance(processes, list):
+            raise InvariantViolation("checkpoint cycle/process state is invalid")
+        reviewer_state = reviewer_state_from_record(
+            checkpoint.get("reviewer_state", {})
+        )
+        run_configuration = checkpoint.get("run_configuration")
+        if not isinstance(run_configuration, dict):
+            raise InvariantViolation("checkpoint run configuration is invalid")
+        state = checkpoint["state"]
+        cycle_number = checkpoint.get("cycle_number", 1)
+        if type(cycle_number) is not int or cycle_number < 1:
+            raise InvariantViolation("checkpoint cycle number is invalid")
+        instruction_reference = checkpoint.get("instruction_reference")
+        executor_reference = checkpoint.get("executor_reference")
+        active_turn_relative = checkpoint.get("active_turn_relative")
+        target_before_metadata = checkpoint.get("target_before")
+        target_after_metadata = checkpoint.get("target_after")
+        summary_progress = checkpoint.get("summary_progress", [])
+        runtime_transition_applied = bool(
+            checkpoint.get("runtime_transition_applied", False)
+        )
+        framework_evidence_committed = bool(
+            checkpoint.get("framework_evidence_committed", False)
+        )
+        framework_evidence_pushed = bool(
+            checkpoint.get("framework_evidence_pushed", False)
+        )
+        if not isinstance(summary_progress, list):
+            raise InvariantViolation("checkpoint summary progress is invalid")
+        emit_progress(
+            f"run={run_id} resume state={state} cycle={cycle_number} "
+            f"target_head={target_initial.head}"
+        )
+    else:
+        if checkpoint_store.exists():
+            previous = checkpoint_store.load()
+            if previous["state"] not in TERMINAL_CHECKPOINT_STATES:
+                raise InvariantViolation(
+                    "an incomplete checkpoint exists; use --resume or explicitly remove "
+                    "the local checkpoint after Human review"
+                )
+        run_id = P4.validate_run_id(args.run_id)
+        run_root = args.runs_root.resolve() / run_id
+        run_root.mkdir(parents=True, exist_ok=False)
+        started_at = P4.utc_now()
+        cycles = []
+        processes = []
+        reviewer_state = ReviewerState(None, None, 0)
+        state = PREFLIGHT_PASSED
+        cycle_number = 1
+        instruction_reference = None
+        executor_reference = None
+        active_turn_relative = None
+        target_before_metadata = None
+        target_after_metadata = None
+        summary_progress: List[str] = []
+        runtime_transition_applied = False
+        framework_evidence_committed = False
+        framework_evidence_pushed = False
+        run_configuration = {
+            "approval_policy": "bypassed",
+            "approvals_and_sandbox_bypassed": True,
+            "checkpoint_path": str(checkpoint_store.path.resolve()),
+            "codex_bin": configuration["codex_bin"],
+            "executor_home": str(args.executor_home.resolve()),
+            "executor_sandbox": NO_CODEX_SANDBOX,
+            "executor_session_mode": FRESH_EPHEMERAL,
+            "execution_policy": "prompt-defined-roles-with-post-turn-mechanical-audit",
+            "framework_git_head": git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"]),
+            "max_cycles": args.max_cycles,
+            "reviewer_home": str(args.reviewer_home.resolve()),
+            "reviewer_session_mode": "persistent-with-explicit-resume",
+            "reviewer_sandbox": NO_CODEX_SANDBOX,
+            "runs_root": str(args.runs_root.resolve()),
+            "timeout_seconds": args.timeout_seconds,
+            "workload_id": workload_id_for_args(args),
+        }
+
+    def persist(
+        checkpoint_state: str,
+        *,
+        manifest_status: str = "RUNNING",
+        manifest_reason: Optional[str] = None,
+    ) -> None:
+        nonlocal state
+        prior_state = state
+        state = checkpoint_state
+        payload = {
+            "active_turn_relative": active_turn_relative,
+            "configuration": configuration,
+            "cycle_number": cycle_number,
+            "cycles": cycles,
+            "executor_reference": executor_reference,
+            "governance_initial_hashes": governance_initial.hashes(),
+            "framework_evidence_committed": framework_evidence_committed,
+            "framework_evidence_pushed": framework_evidence_pushed,
+            "instruction_reference": instruction_reference,
+            "last_state_transition": {
+                "from": prior_state,
+                "to": checkpoint_state,
+            },
+            "manifest_reason": manifest_reason,
+            "manifest_status": manifest_status,
+            "processes": processes,
+            "reviewer_state": reviewer_state_record(reviewer_state),
+            "runtime_transition_applied": runtime_transition_applied,
+            "run_configuration": run_configuration,
+            "run_id": run_id,
+            "run_root": str(run_root),
+            "started_at": started_at,
+            "summary_progress": summary_progress,
+            "target_after": target_after_metadata,
+            "target_before": target_before_metadata,
+            "target_initial": target_initial.metadata(),
+        }
+        written = checkpoint_store.write(checkpoint_state, payload)
+        write_manifest(
+            run_root=run_root,
+            run_id=run_id,
+            started_at=started_at,
+            status=manifest_status,
+            reason=manifest_reason,
+            target_initial=target_initial,
+            governance_initial=governance_initial,
+            reviewer_state=reviewer_state,
+            cycles=cycles,
+            processes=processes,
+            run_configuration=run_configuration,
+        )
+        if checkpoint_observer is not None:
+            checkpoint_observer(checkpoint_state, written)
+
+    def active_turn_path(default: Path) -> Path:
+        if isinstance(active_turn_relative, str):
+            candidate = (run_root / active_turn_relative).resolve()
+            try:
+                candidate.relative_to(run_root.resolve())
+            except ValueError as exc:
+                raise InvariantViolation("checkpoint active turn escapes run root") from exc
+            return candidate
+        return default
+
+    def cycle_for(number: int, instruction: TurnResult) -> Dict[str, Any]:
+        for existing in cycles:
+            if existing.get("cycle_number") == number:
+                return existing
+        created: Dict[str, Any] = {
+            "cycle_number": number,
+            "executor": None,
+            "governance_before_executor": None,
+            "reviewer_instruction_source": relative_evidence_path(
+                instruction.turn_dir / "final.txt", run_root
+            ),
+            "reviewer_instruction_process": instruction.process,
+            "instruction_freshness": None,
+            "reviewer_pre_executor_refresh": None,
+            "reviewer_review": None,
+            "reviewer_state_before": copy.deepcopy(reviewer_state.metadata()),
+            "target_triggered_instruction_refresh": False,
+            "target_after": None,
+            "target_before": None,
+        }
+        cycles.append(created)
+        return created
+
+    if not resume_requested:
+        persist(PREFLIGHT_PASSED)
+
+    instruction: Optional[TurnResult] = (
+        load_turn_reference(instruction_reference, run_root)
+        if isinstance(instruction_reference, dict)
+        else None
+    )
+    executor: Optional[TurnResult] = (
+        load_turn_reference(executor_reference, run_root)
+        if isinstance(executor_reference, dict)
+        else None
     )
 
     try:
-        cycle_one_dir = run_root / "cycle-01"
-        cycle_one_dir.mkdir()
-        initial_reviewer = invoke_reviewer(
-            run_root=run_root,
-            turn_dir=cycle_one_dir / "reviewer-instruction",
-            target=target_initial,
-            governance=governance_initial,
-            state=reviewer_state,
-            cycle_number=1,
-            role_prompt=reviewer_initial_prompt(
-                target_initial.repo, target_initial.branch
-            ),
-            peer_payload=None,
-            peer_source=None,
-            codex_bin=args.codex_bin,
-            reviewer_home=args.reviewer_home.resolve(),
-            timeout_seconds=args.timeout_seconds,
-        )
-        processes.append(initial_reviewer.process)
-        if not initial_reviewer.success:
-            raise InvariantViolation(
-                f"initial Reviewer process failed: {initial_reviewer.process['failure']}"
-            )
-        instruction = initial_reviewer
-
-        for cycle_number in range(1, args.max_cycles + 1):
+        while True:
             cycle_dir = run_root / f"cycle-{cycle_number:02d}"
-            cycle_dir.mkdir(exist_ok=(cycle_number == 1))
-            cycle: Dict[str, Any] = {
-                "cycle_number": cycle_number,
-                "executor": None,
-                "governance_before_executor": None,
-                "reviewer_instruction_source": relative_evidence_path(
-                    instruction.turn_dir / "final.txt", run_root
-                ),
-                "reviewer_instruction_process": instruction.process,
-                "instruction_freshness": None,
-                "reviewer_pre_executor_refresh": None,
-                "reviewer_review": None,
-                "reviewer_state_before": copy.deepcopy(reviewer_state.metadata()),
-                "target_triggered_instruction_refresh": False,
-                "target_after": None,
-                "target_before": None,
-            }
-            cycles.append(cycle)
+            cycle_dir.mkdir(exist_ok=True)
 
-            target_for_freshness = capture_target_state(
-                target_initial.repo, target_initial.branch, require_clean=True
-            )
-            instruction, governance_before, refresh, instruction_freshness = (
-                ensure_instruction_fresh(
-                    run_root=run_root,
-                    cycle_dir=cycle_dir,
-                    target=target_for_freshness,
-                    governance_paths=governance_paths,
-                    state=reviewer_state,
-                    current_instruction=instruction,
-                    cycle_number=cycle_number,
-                    codex_bin=args.codex_bin,
-                    reviewer_home=args.reviewer_home.resolve(),
-                    timeout_seconds=args.timeout_seconds,
-                )
-            )
-            cycle["instruction_freshness"] = instruction_freshness
-            cycle["target_triggered_instruction_refresh"] = bool(
-                instruction_freshness["target_head_changed"]
-            )
-            if refresh is not None:
-                processes.append(refresh.process)
-                cycle["reviewer_pre_executor_refresh"] = refresh.process
-                cycle["reviewer_instruction_source"] = relative_evidence_path(
-                    refresh.turn_dir / "final.txt", run_root
-                )
-                cycle["reviewer_instruction_process"] = refresh.process
-                if not refresh.success:
-                    raise InvariantViolation(
-                        f"Reviewer freshness process failed: {refresh.process['failure']}"
+            if state in {PREFLIGHT_PASSED, REVIEWER_INSTRUCTION_RUNNING}:
+                base = cycle_dir / "reviewer-instruction"
+                turn_dir = active_turn_path(base)
+                recovered = completed_turn_from_dir(turn_dir, run_root)
+                if recovered is not None:
+                    try:
+                        reviewer_state = recover_reviewer_state_from_turn(recovered)
+                    except InvariantViolation:
+                        recovered = None
+                if recovered is None:
+                    if turn_dir.exists():
+                        reviewer_state = ReviewerState(None, None, 0)
+                        turn_dir = next_turn_attempt(base)
+                    active_turn_relative = relative_evidence_path(turn_dir, run_root)
+                    persist(REVIEWER_INSTRUCTION_RUNNING)
+                    emit_progress(
+                        f"run={run_id} cycle={cycle_number} role=reviewer "
+                        f"state=instruction_running target_head={target_initial.head}"
                     )
-            validate_snapshot_sources(governance_before)
-            if reviewer_state.known_hashes != governance_before.hashes():
-                raise InvariantViolation(
-                    "Reviewer known hashes do not match governance immediately before Executor"
-                )
-            target_before = capture_target_state(
-                target_initial.repo, target_initial.branch, require_clean=True
-            )
-            if reviewer_state.known_target_head != target_before.head:
-                raise InvariantViolation(
-                    "current target HEAD does not match Reviewer-known target HEAD "
-                    "immediately before Executor"
-                )
-            cycle["governance_before_executor"] = governance_before.metadata()
-            cycle["reviewer_state_before"] = copy.deepcopy(reviewer_state.metadata())
-            cycle["target_before"] = target_before.metadata()
+                    recovered = invoke_reviewer(
+                        run_root=run_root,
+                        turn_dir=turn_dir,
+                        target=capture_target_state(
+                            target_initial.repo,
+                            target_initial.branch,
+                            require_clean=True,
+                        ),
+                        governance=capture_governance(governance_paths),
+                        state=reviewer_state,
+                        cycle_number=cycle_number,
+                        role_prompt=reviewer_initial_prompt(
+                            target_initial.repo, target_initial.branch
+                        ),
+                        peer_payload=None,
+                        peer_source=None,
+                        codex_bin=args.codex_bin,
+                        reviewer_home=args.reviewer_home.resolve(),
+                        timeout_seconds=args.timeout_seconds,
+                        progress_interval_seconds=progress_interval,
+                    )
+                if not recovered.success:
+                    raise InvariantViolation(
+                        f"initial Reviewer process failed: {recovered.process['failure']}"
+                    )
+                instruction = recovered
+                processes.append(instruction.process)
+                instruction_reference = turn_reference(instruction, run_root)
+                active_turn_relative = None
+                persist(INSTRUCTION_READY)
+                continue
 
-            executor_prefix = executor_prompt(
-                target_before.repo, target_before.branch, governance_before
-            )
-            executor_full_prompt, executor_peer_offset = make_peer_prompt(
-                executor_prefix, instruction.final_message
-            )
-            launch_target = capture_target_state(
-                target_initial.repo, target_initial.branch, require_clean=True
-            )
-            cycle["target_launch_check"] = launch_target.metadata()
-            if launch_target.head != reviewer_state.known_target_head:
-                raise InvariantViolation(
-                    "target HEAD changed after instruction freshness check and before "
-                    "Executor launch"
+            if state == INSTRUCTION_READY:
+                if instruction is None:
+                    raise InvariantViolation("instruction checkpoint reference is missing")
+                cycle = cycle_for(cycle_number, instruction)
+                target_for_freshness = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
                 )
-            if launch_target.head != target_before.head:
-                raise InvariantViolation(
-                    "target HEAD changed while the Executor launch prompt was prepared"
+                instruction, governance_before, refresh, freshness = (
+                    ensure_instruction_fresh(
+                        run_root=run_root,
+                        cycle_dir=cycle_dir,
+                        target=target_for_freshness,
+                        governance_paths=governance_paths,
+                        state=reviewer_state,
+                        current_instruction=instruction,
+                        cycle_number=cycle_number,
+                        codex_bin=args.codex_bin,
+                        reviewer_home=args.reviewer_home.resolve(),
+                        timeout_seconds=args.timeout_seconds,
+                        progress_interval_seconds=progress_interval,
+                    )
                 )
-            validate_snapshot_sources(governance_before)
-            target_before = launch_target
-            cycle["target_before"] = target_before.metadata()
-            executor = run_codex_turn(
-                run_root=run_root,
-                turn_dir=cycle_dir / "executor",
-                codex_bin=args.codex_bin,
-                codex_home=args.executor_home.resolve(),
-                workspace=target_before.repo,
-                timeout_seconds=args.timeout_seconds,
-                role="executor",
-                prompt=executor_full_prompt,
-                session_mode=FRESH_EPHEMERAL,
-                peer_payload=instruction.final_message,
-                peer_payload_offset=executor_peer_offset,
-                peer_source=relative_evidence_path(
-                    instruction.turn_dir / "final.txt", run_root
-                ),
-            )
-            processes.append(executor.process)
-            cycle["executor"] = executor.process
-            target_after = capture_target_state(
-                target_initial.repo,
-                target_initial.branch,
-                require_clean=False,
-                enforce_branch=False,
-            )
-            cycle["target_after"] = target_after.metadata()
-            governance_after = capture_governance(governance_paths)
-            governance_changes = compare_governance(
-                governance_before, governance_after
-            )
-            cycle["governance_after_executor"] = governance_after.metadata()
-            cycle["governance_changes_during_executor"] = governance_changes
-            if governance_changes:
-                raise InvariantViolation(
-                    "protected governance changed during Executor cycle: "
-                    + ", ".join(governance_changes)
+                instruction_reference = turn_reference(instruction, run_root)
+                cycle["instruction_freshness"] = freshness
+                cycle["target_triggered_instruction_refresh"] = bool(
+                    freshness["target_head_changed"]
                 )
-            if target_after.branch != target_before.branch:
-                raise InvariantViolation("target branch changed during Executor cycle")
-            if not target_after.clean:
-                raise InvariantViolation(
-                    "Executor left the target repository working tree dirty"
+                if refresh is not None:
+                    processes.append(refresh.process)
+                    cycle["reviewer_pre_executor_refresh"] = refresh.process
+                    cycle["reviewer_instruction_source"] = relative_evidence_path(
+                        refresh.turn_dir / "final.txt", run_root
+                    )
+                    cycle["reviewer_instruction_process"] = refresh.process
+                    if not refresh.success:
+                        raise InvariantViolation(
+                            f"Reviewer freshness process failed: {refresh.process['failure']}"
+                        )
+                validate_snapshot_sources(governance_before)
+                if reviewer_state.known_hashes != governance_before.hashes():
+                    raise InvariantViolation(
+                        "Reviewer known hashes do not match governance immediately before Executor"
+                    )
+                target_before = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
                 )
-            if not executor.success:
-                raise InvariantViolation(
-                    f"Executor process failed: {executor.process['failure']}"
+                if reviewer_state.known_target_head != target_before.head:
+                    raise InvariantViolation(
+                        "current target HEAD does not match Reviewer-known target HEAD "
+                        "immediately before Executor"
+                    )
+                cycle["governance_before_executor"] = governance_before.metadata()
+                cycle["reviewer_state_before"] = copy.deepcopy(reviewer_state.metadata())
+                cycle["target_before"] = target_before.metadata()
+                launch_target = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
                 )
-            if target_after.head != target_before.head and not is_ancestor(
-                target_before.repo, target_before.head, target_after.head
-            ):
-                raise InvariantViolation(
-                    "target history did not advance by a non-rewriting descendant commit"
+                cycle["target_launch_check"] = launch_target.metadata()
+                if launch_target.head != reviewer_state.known_target_head:
+                    raise InvariantViolation(
+                        "target HEAD changed after instruction freshness check and before "
+                        "Executor launch"
+                    )
+                validate_snapshot_sources(governance_before)
+                target_before_metadata = launch_target.metadata()
+                target_after_metadata = None
+                executor_reference = None
+                active_turn_relative = relative_evidence_path(
+                    next_turn_attempt(cycle_dir / "executor"), run_root
                 )
-            history = new_history_evidence(
-                target_before.repo,
-                target_before.head,
-                target_after.head,
-                governance_after,
-            )
-            cycle["target_history"] = history
-            if history["merge_commits"]:
-                raise InvariantViolation("Executor introduced a merge commit")
-            if history["protected_governance_touches"]:
-                raise InvariantViolation(
-                    "Executor commit history touched protected governance inputs"
-                )
-            cycle["head_changed"] = target_after.head != target_before.head
+                persist(EXECUTOR_RUNNING)
+                continue
 
-            current_governance = capture_governance(governance_paths)
-            reviewer = invoke_reviewer(
-                run_root=run_root,
-                turn_dir=cycle_dir / "reviewer-review",
-                target=target_after,
-                governance=current_governance,
-                state=reviewer_state,
-                cycle_number=cycle_number,
-                role_prompt=reviewer_review_prompt(
-                    target_after.repo, target_after.branch
-                ),
-                peer_payload=executor.final_message,
-                peer_source=relative_evidence_path(
-                    executor.turn_dir / "final.txt", run_root
-                ),
-                codex_bin=args.codex_bin,
-                reviewer_home=args.reviewer_home.resolve(),
-                timeout_seconds=args.timeout_seconds,
-            )
-            processes.append(reviewer.process)
-            cycle["reviewer_review"] = reviewer.process
-            cycle["reviewer_state_after"] = reviewer_state.metadata()
-            if not reviewer.success:
-                raise InvariantViolation(
-                    f"Reviewer review process failed: {reviewer.process['failure']}"
+            if state == EXECUTOR_RUNNING:
+                if instruction is None or not isinstance(target_before_metadata, dict):
+                    raise InvariantViolation("Executor checkpoint context is incomplete")
+                cycle = cycle_for(cycle_number, instruction)
+                target_before = target_state_from_metadata(target_before_metadata)
+                turn_dir = active_turn_path(cycle_dir / "executor")
+                recovered = completed_turn_from_dir(turn_dir, run_root)
+                current_target = capture_target_state(
+                    target_initial.repo,
+                    target_initial.branch,
+                    require_clean=False,
+                    enforce_branch=False,
                 )
-            instruction = reviewer
-
-            if target_after.head == target_before.head:
-                status = "STOPPED_FOR_HUMAN_REVIEW"
-                reason = "target_head_unchanged"
-                write_manifest(
-                    run_root=run_root,
-                    run_id=run_id,
-                    started_at=started_at,
-                    status=status,
-                    reason=reason,
-                    target_initial=target_initial,
-                    governance_initial=governance_initial,
-                    reviewer_state=reviewer_state,
-                    cycles=cycles,
-                    processes=processes,
-                    run_configuration=run_configuration,
+                if recovered is None:
+                    if current_target.branch != target_before.branch or not current_target.clean:
+                        raise InvariantViolation(
+                            "Executor running-state recovery found an unexpected branch or dirty tree"
+                        )
+                    if current_target.head != target_before.head:
+                        active_turn_relative = None
+                        target_after_metadata = current_target.metadata()
+                        persist(
+                            HUMAN_GATE,
+                            manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                            manifest_reason="executor_outcome_ambiguous_after_restart",
+                        )
+                        return 0, run_root
+                    if turn_dir.exists():
+                        turn_dir = next_turn_attempt(cycle_dir / "executor")
+                        active_turn_relative = relative_evidence_path(turn_dir, run_root)
+                        persist(EXECUTOR_RUNNING)
+                    governance_before = capture_governance(governance_paths)
+                    if reviewer_state.known_hashes != governance_before.hashes():
+                        raise InvariantViolation(
+                            "governance does not match the checkpointed Executor instruction"
+                        )
+                    executor_prefix = executor_prompt(
+                        target_before.repo, target_before.branch, governance_before
+                    )
+                    executor_full_prompt, executor_peer_offset = make_peer_prompt(
+                        executor_prefix, instruction.final_message
+                    )
+                    emit_progress(
+                        f"run={run_id} cycle={cycle_number} role=executor "
+                        f"state=running target_head={target_before.head}"
+                    )
+                    recovered = run_codex_turn(
+                        run_root=run_root,
+                        turn_dir=turn_dir,
+                        codex_bin=args.codex_bin,
+                        codex_home=args.executor_home.resolve(),
+                        workspace=target_before.repo,
+                        timeout_seconds=args.timeout_seconds,
+                        role="executor",
+                        prompt=executor_full_prompt,
+                        session_mode=FRESH_EPHEMERAL,
+                        peer_payload=instruction.final_message,
+                        peer_payload_offset=executor_peer_offset,
+                        peer_source=relative_evidence_path(
+                            instruction.turn_dir / "final.txt", run_root
+                        ),
+                        progress_interval_seconds=progress_interval,
+                        progress_label=(
+                            f"run={run_id} cycle={cycle_number} role=executor "
+                            f"state=running target_head={target_before.head} "
+                            f"turn={turn_dir.name}"
+                        ),
+                    )
+                executor = recovered
+                target_after = capture_target_state(
+                    target_initial.repo,
+                    target_initial.branch,
+                    require_clean=False,
+                    enforce_branch=False,
                 )
-                return 0, run_root
+                governance_after = capture_governance(governance_paths)
+                governance_changes = [
+                    name
+                    for name in DOCUMENT_ORDER
+                    if reviewer_state.known_hashes is None
+                    or reviewer_state.known_hashes.get(f"{name}_sha256")
+                    != governance_after.hashes()[f"{name}_sha256"]
+                ]
+                cycle["governance_after_executor"] = governance_after.metadata()
+                cycle["governance_changes_during_executor"] = governance_changes
+                if reviewer_state.known_hashes != governance_after.hashes():
+                    raise InvariantViolation("protected governance changed during Executor cycle")
+                if target_after.branch != target_before.branch:
+                    raise InvariantViolation("target branch changed during Executor cycle")
+                if not target_after.clean:
+                    raise InvariantViolation(
+                        "Executor left the target repository working tree dirty"
+                    )
+                if not executor.success:
+                    raise InvariantViolation(
+                        f"Executor process failed: {executor.process['failure']}"
+                    )
+                if target_after.head != target_before.head and not is_ancestor(
+                    target_before.repo, target_before.head, target_after.head
+                ):
+                    raise InvariantViolation(
+                        "target history did not advance by a non-rewriting descendant commit"
+                    )
+                history = new_history_evidence(
+                    target_before.repo,
+                    target_before.head,
+                    target_after.head,
+                    governance_after,
+                )
+                cycle["target_history"] = history
+                if history["merge_commits"]:
+                    raise InvariantViolation("Executor introduced a merge commit")
+                if history["protected_governance_touches"]:
+                    raise InvariantViolation(
+                        "Executor commit history touched protected governance inputs"
+                    )
+                cycle["head_changed"] = target_after.head != target_before.head
+                cycle["executor"] = executor.process
+                cycle["target_after"] = target_after.metadata()
+                processes.append(executor.process)
+                executor_reference = turn_reference(executor, run_root)
+                target_after_metadata = target_after.metadata()
+                active_turn_relative = None
+                persist(EXECUTOR_COMMITTED)
+                continue
 
-            write_manifest(
-                run_root=run_root,
-                run_id=run_id,
-                started_at=started_at,
-                status="RUNNING",
-                reason=None,
-                target_initial=target_initial,
-                governance_initial=governance_initial,
-                reviewer_state=reviewer_state,
-                cycles=cycles,
-                processes=processes,
-                run_configuration=run_configuration,
-            )
-            if cycle_number == args.max_cycles:
-                status = "STOPPED_FOR_HUMAN_REVIEW"
-                reason = "max_cycles_reached"
-                break
+            if state == EXECUTOR_COMMITTED:
+                if executor is None or not isinstance(target_after_metadata, dict):
+                    raise InvariantViolation("committed Executor checkpoint is incomplete")
+                expected = target_state_from_metadata(target_after_metadata)
+                observed = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
+                )
+                if observed.head != expected.head or observed.branch != expected.branch:
+                    raise InvariantViolation(
+                        "target state changed after the checkpointed Executor commit"
+                    )
+                if reviewer_state.known_hashes != capture_governance(
+                    governance_paths
+                ).hashes():
+                    raise InvariantViolation(
+                        "governance changed after the checkpointed Executor commit"
+                    )
+                active_turn_relative = relative_evidence_path(
+                    next_turn_attempt(cycle_dir / "reviewer-review"), run_root
+                )
+                persist(REVIEW_PENDING)
+                continue
+
+            if state == REVIEW_PENDING:
+                if (
+                    instruction is None
+                    or executor is None
+                    or not isinstance(target_after_metadata, dict)
+                ):
+                    raise InvariantViolation("Reviewer checkpoint context is incomplete")
+                cycle = cycle_for(cycle_number, instruction)
+                target_after = target_state_from_metadata(target_after_metadata)
+                turn_dir = active_turn_path(cycle_dir / "reviewer-review")
+                recovered = completed_turn_from_dir(turn_dir, run_root)
+                if recovered is not None:
+                    try:
+                        reviewer_state = recover_reviewer_state_from_turn(recovered)
+                    except InvariantViolation:
+                        recovered = None
+                if recovered is None:
+                    if turn_dir.exists():
+                        reviewer_state = ReviewerState(None, None, 0)
+                        turn_dir = next_turn_attempt(cycle_dir / "reviewer-review")
+                        active_turn_relative = relative_evidence_path(turn_dir, run_root)
+                        persist(REVIEW_PENDING)
+                    current_target = capture_target_state(
+                        target_initial.repo, target_initial.branch, require_clean=True
+                    )
+                    if current_target.head != target_after.head:
+                        raise InvariantViolation(
+                            "target changed before checkpointed Reviewer review"
+                        )
+                    emit_progress(
+                        f"run={run_id} cycle={cycle_number} role=reviewer "
+                        f"state=review_pending target_head={target_after.head}"
+                    )
+                    recovered = invoke_reviewer(
+                        run_root=run_root,
+                        turn_dir=turn_dir,
+                        target=target_after,
+                        governance=capture_governance(governance_paths),
+                        state=reviewer_state,
+                        cycle_number=cycle_number,
+                        role_prompt=reviewer_review_prompt(
+                            target_after.repo, target_after.branch
+                        ),
+                        peer_payload=executor.final_message,
+                        peer_source=relative_evidence_path(
+                            executor.turn_dir / "final.txt", run_root
+                        ),
+                        codex_bin=args.codex_bin,
+                        reviewer_home=args.reviewer_home.resolve(),
+                        timeout_seconds=args.timeout_seconds,
+                        progress_interval_seconds=progress_interval,
+                    )
+                if not recovered.success:
+                    raise InvariantViolation(
+                        f"Reviewer review process failed: {recovered.process['failure']}"
+                    )
+                instruction = recovered
+                processes.append(instruction.process)
+                cycle["reviewer_review"] = instruction.process
+                cycle["reviewer_state_after"] = reviewer_state.metadata()
+                instruction_reference = turn_reference(instruction, run_root)
+                active_turn_relative = None
+                persist(REVIEW_COMPLETED)
+                continue
+
+            if state == REVIEW_COMPLETED:
+                if not isinstance(target_before_metadata, dict) or not isinstance(
+                    target_after_metadata, dict
+                ):
+                    raise InvariantViolation("review completion target state is incomplete")
+                before = target_state_from_metadata(target_before_metadata)
+                after = target_state_from_metadata(target_after_metadata)
+                if after.head == before.head:
+                    persist(
+                        HUMAN_GATE,
+                        manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                        manifest_reason="target_head_unchanged",
+                    )
+                    return 0, run_root
+                if cycle_number == args.max_cycles:
+                    persist(
+                        HUMAN_GATE,
+                        manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                        manifest_reason="max_cycles_reached",
+                    )
+                    return 0, run_root
+                cycle_number += 1
+                executor = None
+                executor_reference = None
+                target_before_metadata = None
+                target_after_metadata = None
+                active_turn_relative = None
+                persist(INSTRUCTION_READY)
+                continue
+
+            raise InvariantViolation(f"unsupported checkpoint state: {state}")
     except (OSError, RuntimeError, ValueError) as exc:
-        status = "FAILED_CLOSED"
         reason = str(exc)
-
-    write_manifest(
-        run_root=run_root,
-        run_id=run_id,
-        started_at=started_at,
-        status=status,
-        reason=reason,
-        target_initial=target_initial,
-        governance_initial=governance_initial,
-        reviewer_state=reviewer_state,
-        cycles=cycles,
-        processes=processes,
-        run_configuration=run_configuration,
-    )
-    return (1 if status == "FAILED_CLOSED" else 0), run_root
+        active_turn_relative = None
+        try:
+            persist(
+                FAILED_CLOSED,
+                manifest_status="FAILED_CLOSED",
+                manifest_reason=reason,
+            )
+        except (OSError, RuntimeError, ValueError) as checkpoint_exc:
+            emit_progress(
+                f"run={run_id} state=FAILED_CLOSED checkpoint_error={checkpoint_exc}"
+            )
+        return 1, run_root
 
 
 def preflight_report(
@@ -1587,6 +2286,22 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--run-id", default=P4.default_run_id())
     parser.add_argument("--runs-root", type=Path, default=DEFAULT_RUNS_ROOT)
+    parser.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
+    parser.add_argument(
+        "--workload-id",
+        help="stable checkpoint key; defaults to the workload Static parent directory",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="resume the single non-terminal checkpoint for this workload key",
+    )
+    parser.add_argument(
+        "--progress-interval-seconds",
+        type=float,
+        default=15.0,
+        help="terminal heartbeat interval while a Codex turn is running",
+    )
     parser.add_argument(
         "--preflight-only",
         action="store_true",
@@ -1601,6 +2316,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         raise SystemExit("--max-cycles must be positive")
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be positive")
+    if args.progress_interval_seconds <= 0:
+        raise SystemExit("--progress-interval-seconds must be positive")
     try:
         P4.validate_run_id(args.run_id)
         target, governance = validate_preflight(args)
