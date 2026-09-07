@@ -31,7 +31,7 @@ Reviewer persistent + explicit resume
 = NOT A PERMANENT ARCHITECTURE INVARIANT
 
 P6 control-plane hardening
-= HUMAN AUTHORIZED / ACTIVE
+= ACTIVE / P6.1 DETERMINISTICALLY ACCEPTED / P6.2 NEXT
 
 P7 controlled REJECT -> REPAIR fault injection
 = DEFERRED UNTIL P6 ACCEPTANCE
@@ -1081,7 +1081,7 @@ they must not be mislabeled as small maintenance fixes.
 
 ## 2026-09-06 — P6 Human-authorized control-plane hardening plan
 
-Status: `ACTIVE — HUMAN AUTHORIZED; IMPLEMENTATION NOT STARTED`
+Status: `ACTIVE — P6.1 IMPLEMENTED; P6.2 IS THE NEXT ACTIVE STEP`
 
 This section is the authoritative P6 plan. It supersedes the earlier proposed
 sequencing that placed controlled `REJECT -> REPAIR -> re-review` before Runtime
@@ -1125,9 +1125,23 @@ request a transition only through the validated control-plane output described b
 Python remains prohibited from searching free text for `ACCEPT`, `REJECT`, readiness,
 or any equivalent semantic marker.
 
+Human-mandated execution protocol for every remaining P6.x subphase:
+
+1. reason about the intended change logic before editing;
+2. inspect the affected behavior, files and dependencies and read the necessary
+   sources first;
+3. use that observed context to revise the initial change logic when needed;
+4. implement only the resulting bounded subphase;
+5. run proportionate focused and regression tests;
+6. update this Runtime after testing with the implementation result, evidence
+   locator, observed limitations, and a concise description of test logic rather
+   than copying complete test source.
+
+This protocol governs P6.2 and later P6.x work unless the Human Owner changes it.
+
 ### P6.1 — Overwrite-only local checkpoint and visible execution progress
 
-Status: `AUTHORITATIVE ACTIVE STEP`
+Status: `IMPLEMENTED AND DETERMINISTICALLY ACCEPTED`
 
 Implement one current local checkpoint per workload/run key under a Git-ignored path,
 with a default layout equivalent to:
@@ -1203,9 +1217,108 @@ boundaries, successful reconstruction of the exact next action, proof that Execu
 commits and Runtime transitions are not duplicated, and captured evidence that
 progress is visible and flushed while a turn is still running.
 
+Implementation result:
+
+- implementation commit: `b2afc37113250dc5180879a053a3b9c99f8dfb1d`;
+- `run_mutation_loop.py` now maintains one schema-versioned checkpoint at
+  `1PCloop/.local/state/<workload-id>/checkpoint.json` by default;
+- checkpoint writes use a same-directory temporary file, file flush/fsync,
+  `os.replace`, and directory fsync where available, so advancing a state replaces
+  the prior checkpoint rather than creating checkpoint history;
+- `.gitignore` excludes `1PCloop/.local/`; an accidentally generated development
+  checkpoint was removed after validation, so no P6.1 checkpoint artifact was
+  committed;
+- a non-terminal checkpoint blocks a new run unless `--resume` is explicit; a
+  terminal checkpoint may be replaced by a later run;
+- the checkpoint records configuration identity, run/cycle, state transition,
+  Reviewer thread and known hashes/HEAD, complete cycle/process recovery metadata,
+  instruction/receipt references and hashes, target before/after state, plus reserved
+  summary/Runtime-transition/commit/push flags for later P6 phases;
+- resume revalidates the exact configuration, run root, target branch/HEAD/worktree
+  and governance hashes, then continues from the next incomplete state;
+- completed Reviewer/Executor artifacts are reloaded only after their final-message
+  hashes and successful process records validate;
+- an Executor commit checkpointed before a crash is reviewed after restart without
+  launching the Executor again;
+- a crash before Executor launch permits one safe retry only when target HEAD and the
+  clean worktree still equal the checkpointed preimage;
+- an unrecorded target commit observed from `EXECUTOR_RUNNING` is not attributed to
+  the Executor and stops at `HUMAN_GATE / executor_outcome_ambiguous_after_restart`;
+- an incomplete/uncertain Reviewer attempt can be replaced by a fresh fully
+  bootstrapped Reviewer because Reviewer is read-only and conversation state is not
+  authoritative;
+- Codex execution now uses a streaming subprocess path: raw stdout/stderr are written
+  while the process runs, selected public event types and a periodic heartbeat are
+  printed with timestamp/run/cycle/role/state/elapsed/target-HEAD context, and output
+  pipes are closed deterministically;
+- handled parent interruptions terminate the active Codex child before propagating
+  the interruption, preserving the sequential non-background-Agent lifecycle;
+- new CLI controls are `--state-root`, `--workload-id`, `--resume`, and
+  `--progress-interval-seconds`; README documents the operator path.
+
+P6.1 test logic/evidence summary:
+
+1. **Atomic overwrite test.** Write two different checkpoint states to one path,
+   reload the file, verify only the second state remains, and verify the checkpoint
+   directory contains no versioned/temp history file.
+2. **Explicit-resume gate.** Inject a deterministic process-level stop immediately
+   after `INSTRUCTION_READY`; verify a new non-resume run is rejected, then resume
+   the existing run and reach the expected Human Gate.
+3. **Pre-Executor idempotence.** Stop immediately after the durable
+   `EXECUTOR_RUNNING` state but before launch; verify zero Executor calls before the
+   stop and exactly one Executor call across the resumed run.
+4. **Post-commit idempotence.** Use a fake Executor that creates a real ordinary Git
+   descendant commit, stop immediately after `EXECUTOR_COMMITTED`, resume, and verify
+   that the target commit is retained, the Executor call count remains exactly one,
+   and Reviewer review completes.
+5. **Review-boundary idempotence.** Independently stop at `REVIEW_PENDING` and
+   `REVIEW_COMPLETED`; verify resume invokes the missing review exactly once in the
+   former case and invokes no additional Reviewer in the latter case.
+6. **Ambiguous mutation safety.** Stop before Executor launch, insert an otherwise
+   valid external descendant commit, then resume; verify no Executor is launched and
+   the run stops for Human review instead of claiming or overwriting the commit.
+7. **Live-progress test.** Run a deliberately slow fake Codex event stream with a
+   short heartbeat interval and capture stdout; verify process-start, in-flight
+   heartbeat, process-finish, target HEAD and terminal checkpoint are visible.
+8. **Existing invariant regression.** Re-run Reviewer-read-only, Executor-clean-tree,
+   governance-protection, opaque-payload transport, thread-resume and target-history
+   tests to ensure checkpoint/restart behavior did not weaken the P5 boundary.
+9. **Resource lifecycle check.** Run the complete suite with Python
+   `ResourceWarning` promoted to an error, verifying the streaming implementation
+   leaves no unclosed stdout/stderr pipe warning.
+10. **Real-target read-only preflight.** Run P6.1 CLI preflight against
+    `live_subtitle_generator` branch `multiLanguage_v1` at
+    `088f1071280e656f85b5abb2bbce1fc06bc9925c`; verify the target is clean, all four
+    governance inputs are readable/hashed, both profiles resolve, and no run or
+    checkpoint is created.
+
+Observed result:
+
+```text
+python3 -m unittest discover -s 1PCloop/tests -v
+32 tests run / 32 passed
+ResourceWarning strict run / passed
+real target --preflight-only / passed
+```
+
+Interpretation boundary:
+
+- deterministic crash tests raise immediately after durable checkpoint boundaries;
+  they do not yet constitute a real `kill -9` experiment during a live Codex service
+  turn;
+- if a crash occurs during an Executor turn after an unrecorded commit, P6.1 chooses
+  Human Gate rather than unsafe automatic replay;
+- P6.1 does not parse verdict JSON, mutate Runtime, generate tracked evidence
+  summaries, or change future raw-run retention; those remain P6.2/P6.3 scope;
+- Runtime-transition states and associated idempotence flags exist as reserved
+  checkpoint fields, but no authoritative Runtime write is enabled by P6.1.
+
+P6.1 satisfies its deterministic acceptance boundary. The authoritative Active Step
+therefore advances to P6.2.
+
 ### P6.2 — Runtime-enforced JSON verdict and authoritative Runtime transition
 
-Status: `QUEUED AFTER P6.1`
+Status: `AUTHORITATIVE ACTIVE STEP`
 
 Use the Codex CLI runtime-enforced `--output-schema` mechanism. Prompt-only requests
 to emit JSON are insufficient. P6 turn schemas must preserve a complete Agent-to-Agent
