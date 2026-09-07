@@ -102,3 +102,175 @@ Codex 子进程输出现在边运行边写入原始 evidence，同时终端显�
 ```bash
 python3 -m unittest discover -s 1PCloop/tests -v
 ```
+
+## P6.2 structured verdict 与单次 Runtime transition
+
+P6 mutation runner 的每个 turn 都通过 Codex CLI `--output-schema` 请求 runtime-enforced
+JSON，并用同一份 JSON Schema 在本地再次验证。先在运行 runner 的 Python 环境安装依赖：
+
+```bash
+python3 -m venv 1PCloop/.local/venv
+1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
+```
+
+三份 schema 分别是 `schemas/reviewer_instruction.schema.json`、
+`schemas/executor_receipt.schema.json` 和 `schemas/reviewer_verdict.schema.json`。
+所有对象禁止额外字段；所有 turn 都保留完整 `peer_message` 和至多 2000 字符的
+`evidence_summary`。只有 Reviewer review schema 包含 `verdict`。Python 校验 wrapper，
+仍将完整 final JSON 原始字节传给 peer，不重新编码、截取或改写自然语言。
+P4 文本 runner 与 `roles/*.md` 仍用于原来的纯文本实验；mutation runner 使用脚本中的 P6 role prompt。
+
+本机 `codex-cli 0.153.4` 的 `exec --help` 和 `exec resume --help` 均列出
+`--output-schema`。构造形式为：
+
+```text
+codex exec [--ephemeral] --json --color never ... --output-schema <file> -
+codex exec --json --color never ... --output-schema <file> resume <thread-id> -
+```
+
+schema 放在 `exec` 公共参数区；Executor 使用 ephemeral，Reviewer 创建 persistent thread
+并在 review 显式 resume。恢复过程中因不完整 Reviewer attempt 而创建 fresh persistent
+Reviewer 时，必须完整 bootstrap 四份治理文件。local schema validator 也拒绝重复 JSON key、
+非标准数值、未知字段及错误角色 wrapper。
+[Codex CLI 参数说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli) 与
+[Structured Outputs 支持的 schema 子集](https://developers.openai.com/api/docs/guides/structured-outputs)
+可供核对。由于服务端 schema 子集不支持 `if/then/else`、`allOf`，verdict 与 nullable 字段的
+跨字段关系在本地机械验证；枚举、必填字段、长度和 nullability 在 schema 中声明。
+
+Runtime 写权限默认关闭。只有 Human 启动参数 `--enable-runtime-transition` 与 workload
+Runtime machine block 同时授权，合法 Reviewer ACCEPT 才能触发写入。示例 block：
+
+```markdown
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "schema_version": 1,
+  "workload_id": "disposable-workload",
+  "transition_mode": "reviewer_accept_once",
+  "active_step": {"id": "S1", "status": "ACTIVE"},
+  "last_transition_id": null
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->
+```
+
+两个 marker 在文件中必须各出现一次，之间必须为合法 JSON。`workload_id` 必须与 CLI
+workload key 一致。配套 workload Static 必须由 Human 明确授权这一 orchestrator capability；
+Python 不解析周边 Markdown 的授权语义。不要把已关闭、Human-owned 的 `multiLanguage_v1`
+改成 fixture。P6 测试使用临时 Git repository 和独立 workload governance。
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
+  --target-repo /absolute/disposable/target \
+  --target-branch p62-fixture \
+  --workload-static /absolute/disposable/governance/workload_static.md \
+  --workload-runtime /absolute/disposable/governance/workload_runtime.md \
+  --workload-id disposable-workload \
+  --enable-runtime-transition
+```
+
+Runtime 必须是 target/run/state/profile 目录之外的独立普通文件；拒绝符号链接、硬链接及
+protected governance alias。实际写入路径仅来自 `--workload-runtime`，绝不来自 Agent
+字段。Framework Static/Runtime 和关闭 workload 的两份治理文件始终拒绝作为写入目标。
+两个 Agent 仍禁止直接写任何治理文件；P5.1 的 prompt-defined role isolation 和 turn 后
+机械审计继续生效。
+
+ACCEPT 会验证成功的 Reviewer profile、thread/bootstrap/resume 关系、四份 governance
+hash、target repo/branch/HEAD、clean worktree、Runtime preimage 和 active step。evidence
+至少包含一个完整、存在、从当前 HEAD 可达的 commit ID；不接受 `HEAD` 等浮动 revision。
+每条 evidence 都必须有 `kind`、`locator` 和 `sha256`。commit SHA-256 是
+`git cat-file commit <full-id>` 原始字节的 SHA-256。`file`、`artifact`、`test` 的 locator
+必须是 target 或当前 run root 内实际文件的绝对路径，SHA-256 必须与实际字节一致；symlink
+逃逸失败。`test` 指向已保存的测试输出文件，Python 校验其存在与 hash，测试语义由 Reviewer
+独立检查。ACCEPT 不得包含 repair instruction。
+
+REJECT 必须给出一个非空、至多 8000 字符的 `next_instruction`，Runtime 不变；在原有
+cycle/no-op 停止边界允许继续时，完整 Reviewer wrapper 传给下一 fresh Executor。
+HUMAN_GATE 不修改 Runtime，checkpoint 进入 `HUMAN_GATE`，终端显示 `peer_message`
+中的 Human 原因。自由文本中的 ACCEPT/REJECT/READY/BLOCKED 没有控制权限。
+
+一次合法 transition 的状态顺序是：
+
+```text
+REVIEW_COMPLETED -> RUNTIME_TRANSITION_PENDING
+-> same-directory temp write + flush/fsync + os.replace + directory fsync
+-> exact postimage/state verification -> RUNTIME_TRANSITION_COMMITTED -> stop
+```
+
+首版只把同一个 step 从 `ACTIVE` 改为 `COMPLETED`，`next_active_step` 必须是 null；同时
+将 `transition_mode` 改为 `disabled`，保存 `last_transition_id`，不启动下一个 Active Step。
+只替换 machine block 内容，其他现有字节保留，并在文件尾追加 deterministic JSON transition
+record，包含唯一 ID、旧/新状态、accepted preimage hash、Reviewer verdict locator/hash、
+target HEAD、evidence locator/hash 和 UTC 时间。
+
+PENDING checkpoint 复用 P6.1 恢复系统，保存原始 preimage、固定 transition record 和预期
+postimage hash。使用原参数加 `--resume`：写入前中断会重新校验全部 evidence 并应用一次；
+写入后、COMMITTED checkpoint 前中断会识别精确 postimage，只补记 COMMITTED；COMMITTED
+恢复只验证结果，不再写 Runtime。I/O 错误保留可恢复状态；无法解释的 Runtime 字节或过期
+evidence 会 fail closed/Human Gate，不猜测性修复。旧 P6.1 checkpoint 因缺少 schema/config
+绑定不能直接升级恢复，需要 Human 处理旧 run。checkpoint 与 Runtime 是可信的本地恢复
+输入，不提供同时回滚这两者之后的外部防篡改账本。
+
+验证：
+
+```bash
+1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_runtime_transition.py -v
+1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -v
+1PCloop/.local/venv/bin/python -W error::ResourceWarning -m unittest discover -s 1PCloop/tests -v
+```
+
+P6.2 不迁移 raw evidence 默认目录、不实现 per-turn summary retention 或 commit/push
+automation；`evidence_summary` 仅提前提供给 P6.3。当前运行假设一个 Human contributor、一个
+loop、顺序退出的 Agent process；没有 lock/watcher 或多 writer 一致性保证。target-HEAD
+refresh 只有 deterministic validation，本阶段未做 live concurrent-HEAD 实验或 P7 fault injection。
+
+### P6.2 implementation validation observation — 2026-09-07
+
+Implementation/test evidence only; P6.2 remains subject to independent Reviewer/Human review.
+No framework or closed-workload governance was updated by this implementation task.
+
+Validation environment: Python 3.9, `jsonschema 4.25.1`, local Codex CLI `0.153.4`.
+The commands above were run with `/tmp/1pcloop-p62-venv/bin/python`:
+
+- P6.2 focused suite: **21 tests passed**, including parameterized invalid-output,
+  freshness, capability, evidence and restart cases.
+- Full P4/P5/P6.1/P6.2 regression: **53 tests passed**.
+- Full regression with `-W error::ResourceWarning`: **53 tests passed**, with no
+  ResourceWarning, unraisable exception or traceback in the captured log.
+- `git diff --check`: passed; the four protected governance files, P4 helper/tests,
+  P4 role files and `.gitignore` remain unchanged.
+
+Test logic: valid ACCEPT checks unchanged Markdown history, a single appended record,
+exact completed machine state, target cleanliness and unchanged peer payload bytes.
+Negative cases vary schema, role/profile, resume relationship, target/governance/Runtime
+freshness, active step, evidence existence/reachability/hash/boundary, and both capabilities.
+REJECT routing is exercised deterministically with ordinary disposable commits; HUMAN_GATE
+prints its reason and leaves Runtime untouched. Atomic replace failure verifies the full
+preimage and temporary-file cleanup. Stops at PENDING, after Runtime replace and at COMMITTED
+verify no repeated Executor/Reviewer calls or transition records. Recovery also checks changed
+file evidence, invalid checkpoint state, post-replace I/O failure and full fresh Reviewer bootstrap.
+These are deterministic boundary tests, not live kill-9 or P7 defect-injection experiments.
+
+A real Codex/real Git disposable smoke completed the persistent Reviewer → ephemeral Executor
+→ resumed Reviewer path, with **3/3 successful turns**, verified resume relationship and
+verbatim peer transport. Executor created only `P62_SMOKE.txt`, committed it, and left the
+fixture target clean. Reviewer independently inspected the commit/file and reran the byte
+assertion. The orchestrator applied one opted-in S1 completion and stopped at
+`RUNTIME_TRANSITION_COMMITTED`. A subsequent `--resume` using the final implementation
+verified the exact result without another Agent turn or Runtime write.
+
+```text
+local smoke root = /private/var/folders/10/81g7llps60j555m_0191lzsc0000gn/T/1pcloop-p62-real-smoke-_zmixrkj
+raw run          = <local smoke root>/runs/smoke/
+compact check    = <local smoke root>/validation-summary.json
+initial target   = 228e0d9d11f7067e2a60ef8750b1719ed95059ee
+final target     = 4e8a9f26715c7e7719b3067f4162fc3c5b69acdd
+Reviewer thread  = 01a07c98-2aca-79e1-a2d7-a538a61d4c87
+transition ID    = 7eb03f31dc67fa6bb6b66fea11e6453a6b42464cc4acbaa1cfd49bfc06d4d598
+Runtime preimage = 26add868b797042a19a4a00d7cbf4a17c60679ec0828937e1fcae47e24824799
+Runtime postimage= 455bc07c9c542e1260abb7cc343d5db4d2c73024521717a32db852d0e4d0bfd2
+verdict SHA-256  = 762893bae32cecfd97e7a9f24016885ef5901d5686afabdf573c2b3cccae75dd
+```
+
+The smoke root is disposable local evidence, not retained Git provenance. The tests and this
+compact observation are tracked; no raw evidence migration or summary commit/push automation
+was introduced. Neither the real `multiLanguage_v1` workload nor its target was used for
+mutation/transition tests, and no target push or merge occurred.

@@ -1,0 +1,2 @@
+# Local validation of the same JSON Schemas supplied to codex exec --output-schema.
+jsonschema>=4.18,<5

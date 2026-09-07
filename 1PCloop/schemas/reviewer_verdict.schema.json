@@ -1,0 +1,186 @@
+{
+  "type": "object",
+  "properties": {
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "reviewer_verdict"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "evidence_summary": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "maxLength": 2000
+    },
+    "peer_message": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "HUMAN_GATE"
+      ]
+    },
+    "active_step_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "maxLength": 128
+    },
+    "reviewed_target": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      },
+      "required": [
+        "repo",
+        "branch",
+        "head"
+      ],
+      "additionalProperties": false
+    },
+    "governance_hashes": {
+      "type": "object",
+      "properties": {
+        "framework_static_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "framework_runtime_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "workload_static_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "workload_runtime_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "framework_static_sha256",
+        "framework_runtime_sha256",
+        "workload_static_sha256",
+        "workload_runtime_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "expected_runtime_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "commit",
+              "file",
+              "artifact",
+              "test"
+            ]
+          },
+          "locator": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "kind",
+          "locator",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 64
+    },
+    "next_instruction": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "maxLength": 8000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_transition": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "new_status": {
+              "type": "string",
+              "enum": [
+                "COMPLETED"
+              ]
+            },
+            "next_active_step": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "new_status",
+            "next_active_step"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "message_type",
+    "schema_version",
+    "evidence_summary",
+    "peer_message",
+    "verdict",
+    "active_step_id",
+    "reviewed_target",
+    "governance_hashes",
+    "expected_runtime_sha256",
+    "evidence",
+    "next_instruction",
+    "runtime_transition"
+  ],
+  "additionalProperties": false
+}

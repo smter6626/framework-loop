@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run a fail-closed, recoverable Reviewer/Executor mutation loop.
 
-P6.1 adds an overwrite-only local checkpoint and live terminal progress to the P5
-orchestrator. Agent final messages remain opaque byte payloads until the separately
-scoped P6.2 structured-verdict work.
+P6 uses runtime-enforced role schemas and the overwrite-only checkpoint to apply
+one explicitly authorized workload Runtime transition. Peer payload bytes are
+preserved; embedded natural language is never interpreted by Python.
 """
 
 from __future__ import annotations
@@ -13,12 +13,14 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -33,6 +35,13 @@ DEFAULT_FRAMEWORK_STATIC = ACTIVE_ROOT / "docs/miniloop_static.md"
 DEFAULT_FRAMEWORK_RUNTIME = ACTIVE_ROOT / "docs/miniloop_runtime.md"
 DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
 DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
+SCHEMAS_ROOT = ACTIVE_ROOT / "schemas"
+REVIEWER_INSTRUCTION = "reviewer_instruction"
+EXECUTOR_RECEIPT = "executor_receipt"
+REVIEWER_VERDICT = "reviewer_verdict"
+TURN_SCHEMAS = (REVIEWER_INSTRUCTION, EXECUTOR_RECEIPT, REVIEWER_VERDICT)
+RUNTIME_STATE_BEGIN = b"<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->"
+RUNTIME_STATE_END = b"<!-- 1PCLOOP_RUNTIME_STATE_END -->"
 
 FRESH_EPHEMERAL = "fresh-ephemeral"
 NEW_PERSISTENT = "new-persistent"
@@ -91,6 +100,68 @@ P4 = load_p4_helpers()
 
 class InvariantViolation(RuntimeError):
     """A mechanical invariant failed and the loop must not continue."""
+
+
+def strict_json(data: bytes) -> Any:
+    """Reject duplicate keys and non-JSON numbers, without touching peer bytes."""
+    def pairs(items: Any) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    def invalid_constant(value: str) -> None:
+        raise ValueError(f"invalid JSON constant: {value}")
+
+    try:
+        return json.loads(data.decode("utf-8"), object_pairs_hook=pairs,
+                          parse_constant=invalid_constant)
+    except (ValueError, UnicodeError) as exc:
+        raise InvariantViolation(f"invalid JSON: {exc}") from exc
+
+
+def validate_json_schema(value: Any, schema: Mapping[str, Any]) -> None:
+    try:
+        from jsonschema import Draft202012Validator
+    except ImportError as exc:
+        raise InvariantViolation(
+            "P6 requires jsonschema; install 1PCloop/requirements.txt"
+        ) from exc
+    Draft202012Validator.check_schema(schema)
+    error = next(Draft202012Validator(schema).iter_errors(value), None)
+    if error is not None:
+        # Do not echo a potentially huge or sensitive peer payload in the terminal.
+        raise InvariantViolation(
+            f"schema validation failed at {list(error.absolute_path)}: {error.validator}"
+        )
+
+
+def schema_path(message_type: str) -> Path:
+    if message_type not in TURN_SCHEMAS:
+        raise InvariantViolation("unknown turn schema")
+    return SCHEMAS_ROOT / f"{message_type}.schema.json"
+
+
+def validate_turn_payload(payload: bytes, message_type: str) -> Dict[str, Any]:
+    schema = strict_json(schema_path(message_type).read_bytes())
+    value = strict_json(payload)
+    validate_json_schema(value, schema)
+    if message_type == REVIEWER_VERDICT:
+        # Structured Outputs does not support if/then/else or allOf. Keep the
+        # top-level verdict explicit and enforce its cross-field contract here.
+        verdict = value["verdict"]
+        if verdict == "REJECT":
+            if value["next_instruction"] is None or value["runtime_transition"] is not None:
+                raise InvariantViolation("REJECT requires one bounded next_instruction and no transition")
+        elif verdict == "HUMAN_GATE":
+            if value["next_instruction"] is not None or value["runtime_transition"] is not None:
+                raise InvariantViolation("HUMAN_GATE must not request repair or transition")
+        elif (value["next_instruction"] is not None
+              or value["runtime_transition"] is None or not value["evidence"]):
+            raise InvariantViolation("ACCEPT requires evidence and transition, and forbids repair instruction")
+    return value
 
 
 def emit_progress(message: str) -> None:
@@ -323,6 +394,7 @@ def turn_reference(turn: TurnResult, run_root: Path) -> Dict[str, str]:
         "final_path": relative_evidence_path(final_path, run_root),
         "final_sha256": P4.sha256_bytes(turn.final_message),
         "process_path": relative_evidence_path(process_path, run_root),
+        "process_sha256": P4.sha256_file(process_path),
     }
 
 
@@ -341,6 +413,8 @@ def load_turn_reference(reference: Mapping[str, Any], run_root: Path) -> TurnRes
         raise InvariantViolation("checkpoint turn reference escapes the run root") from exc
     if not final_path.is_file() or not process_path.is_file():
         raise InvariantViolation("checkpoint turn artifact is missing")
+    if P4.sha256_file(process_path) != reference.get("process_sha256"):
+        raise InvariantViolation("checkpoint turn process hash mismatch")
     final_message = final_path.read_bytes()
     if P4.sha256_bytes(final_message) != expected_sha:
         raise InvariantViolation("checkpoint turn final-message hash mismatch")
@@ -350,6 +424,7 @@ def load_turn_reference(reference: Mapping[str, Any], run_root: Path) -> TurnRes
         raise InvariantViolation(f"checkpoint turn process is unreadable: {exc}") from exc
     if not isinstance(process, dict) or not process.get("success"):
         raise InvariantViolation("checkpoint turn process is not successful")
+    validate_turn_payload(final_message, process.get("output_schema"))
     return TurnResult(final_path.parent, final_message, process)
 
 
@@ -740,7 +815,7 @@ def validate_authoritative_prompt(authoritative: AuthoritativePrompt) -> None:
 
 
 def reviewer_initial_prompt(target_repo: Path, target_branch: str) -> bytes:
-    return f"""# P5 persistent Reviewer initial turn
+    return f"""# P6 persistent Reviewer initial turn
 
 You are the Reviewer in a multi-cycle Reviewer/Executor mutation loop. You are not
 the Human Owner. The deterministic context envelope below contains complete bytes
@@ -758,13 +833,15 @@ bounded natural-language instruction for the next fresh Executor.
 
 Do not ask the Executor to push, merge, rewrite history, change branches, or modify
 framework/workload governance. Do not rely on Python interpreting your wording.
-Your complete final response is an opaque peer payload; no JSON, XML, marker, or
-machine-parsed verdict is required.
+Return the runtime-enforced reviewer_instruction JSON wrapper: schema_version=1,
+message_type=reviewer_instruction, evidence_summary (at most 2000 characters), and
+peer_message containing your complete bounded natural-language instruction. You have
+no verdict authority in this instruction turn. The full JSON bytes are routed unchanged.
 """.encode("utf-8")
 
 
 def reviewer_review_prompt(target_repo: Path, target_branch: str) -> bytes:
-    return f"""# P5 persistent Reviewer review turn
+    return f"""# P6 persistent Reviewer review turn
 
 You are the Reviewer in a multi-cycle Reviewer/Executor mutation loop. You are not
 the Human Owner. The Executor's complete natural-language final response is appended
@@ -777,20 +854,33 @@ review only. You MUST NOT modify target code or other target files, alter target
 state, modify framework Static/Runtime, or modify workload Static/Runtime. These
 behavioral restrictions are audited mechanically after the turn.
 
-Review the prior work and return natural-language review reasoning. If more work is
-needed, include exactly one next bounded instruction. Otherwise, return the readiness
-or Human-blocker handoff you judge appropriate. Python will not classify any of these
-meanings; a following fresh Executor receives the entire final response as an opaque
-payload.
+Return the runtime-enforced reviewer_verdict JSON wrapper. Include your complete
+natural-language review in peer_message and a concise evidence_summary (<=2000 chars).
+Only this Reviewer review turn may set verdict: ACCEPT, REJECT, or HUMAN_GATE.
+Bind reviewed_target.repo/branch/head and all four governance_hashes to the current
+deterministic envelope; expected_runtime_sha256 is its workload Runtime SHA-256.
+Read active_step_id from the workload Runtime machine block. If no block exists and
+no step ID can be established, use "unavailable" and HUMAN_GATE; never invent ACCEPT.
+ACCEPT requires nonempty evidence, next_instruction=null, and runtime_transition=
+{{"new_status":"COMPLETED","next_active_step":null}}. Evidence includes at least one
+full reachable commit ID and actual file/test/artifact locators. Each evidence entry
+has kind, locator, sha256: for commits hash raw `git cat-file commit <full-id>` bytes;
+for files hash actual file bytes. File locators must be absolute paths inside the
+target repository or this run's evidence directory. Independently inspect evidence.
+REJECT requires one nonempty next_instruction of at most 8000 characters and
+runtime_transition=null. HUMAN_GATE requires both fields null; explain the Human
+blocker in peer_message. Empty evidence is permitted only for REJECT/HUMAN_GATE.
+An ACCEPT requests exactly one current step completion; it does not authorize direct
+Runtime writes. The orchestrator alone may write after CLI and Runtime opt-in checks.
+The next Executor, when needed, receives the full final JSON payload unchanged.
 
 Do not ask the Executor to push, merge, rewrite history, change branches, or modify
-framework/workload governance. No JSON, XML, marker, or machine-parsed verdict is
-required.
+framework/workload governance. Follow the supplied runtime-enforced JSON Schema.
 """.encode("utf-8")
 
 
 def reviewer_refresh_prompt(target_repo: Path, target_branch: str) -> bytes:
-    return f"""# P5 Reviewer pre-execution freshness turn
+    return f"""# P6 Reviewer pre-execution freshness turn
 
 Authoritative governance and/or the target repository HEAD changed after your prior
 bounded instruction and before the next Executor launch. Apply the deterministic
@@ -804,8 +894,9 @@ and review only. You MUST NOT modify target code or other target files, alter ta
 Git state, modify framework Static/Runtime, or modify workload Static/Runtime. These
 behavioral restrictions are audited mechanically after the turn. Do not ask the
 Executor to push, merge, rewrite history, change branches, or modify governance.
-Python routes your complete final response opaquely and does not interpret its
-semantics.
+Return the runtime-enforced reviewer_instruction wrapper with schema_version=1,
+message_type=reviewer_instruction, evidence_summary, and complete peer_message.
+Do not emit a verdict in this instruction refresh. Python preserves the full JSON bytes.
 """.encode("utf-8")
 
 
@@ -815,7 +906,7 @@ def executor_prompt(
     governance_paths = "\n".join(
         f"- {name}: {governance.documents[name].path}" for name in DOCUMENT_ORDER
     )
-    return f"""# P5 fresh Executor mutation turn
+    return f"""# P6 fresh Executor mutation turn
 
 You are the Executor, not the Reviewer or Human Owner. The Reviewer's complete
 natural-language instruction follows after the transport marker. Execute only that
@@ -838,8 +929,12 @@ Requirements:
 Protected governance inputs:
 {governance_paths}
 
-Your final response is transported verbatim. No JSON, XML, marker, or other
-machine-parsed semantic schema is required.
+Return the runtime-enforced executor_receipt wrapper with schema_version=1,
+message_type=executor_receipt, evidence_summary (<=2000 characters), and peer_message
+containing the complete natural-language execution receipt and evidence locators.
+You cannot emit verdict, next_instruction, or runtime_transition. The complete JSON
+is transported verbatim. When the peer payload is a Reviewer REJECT wrapper, follow
+its bounded next_instruction within the same current step.
 """.encode("utf-8")
 
 
@@ -850,6 +945,7 @@ def build_codex_command(
     final_path: Path,
     session_mode: str,
     resume_target_thread_id: Optional[str],
+    output_schema: Path = SCHEMAS_ROOT / "reviewer_instruction.schema.json",
 ) -> List[str]:
     if session_mode not in (FRESH_EPHEMERAL, NEW_PERSISTENT, RESUME):
         raise ValueError(f"unknown session mode: {session_mode}")
@@ -870,6 +966,8 @@ def build_codex_command(
             str(workspace),
             "--output-last-message",
             str(final_path),
+            "--output-schema",
+            str(output_schema),
         ]
     )
     if session_mode == RESUME:
@@ -1050,7 +1148,14 @@ def run_codex_turn(
     peer_source: Optional[str] = None,
     progress_interval_seconds: float = 15.0,
     progress_label: Optional[str] = None,
+    message_type: str = REVIEWER_INSTRUCTION,
 ) -> TurnResult:
+    if (role == "executor" and message_type != EXECUTOR_RECEIPT) or (
+        role == "reviewer" and message_type not in (REVIEWER_INSTRUCTION, REVIEWER_VERDICT)
+    ):
+        raise InvariantViolation("turn role cannot use the requested schema")
+    output_schema = schema_path(message_type)
+    output_schema_sha = P4.sha256_file(output_schema)
     turn_dir.mkdir(parents=True, exist_ok=False)
     prompt_path = turn_dir / "prompt.txt"
     events_path = turn_dir / "events.jsonl"
@@ -1119,6 +1224,7 @@ def run_codex_turn(
         final_path=final_path,
         session_mode=session_mode,
         resume_target_thread_id=resume_target_thread_id,
+        output_schema=output_schema,
     )
     environment = os.environ.copy()
     environment["CODEX_HOME"] = str(codex_home)
@@ -1186,6 +1292,17 @@ def run_codex_turn(
                 else relationship_failure
             )
 
+    try:
+        if P4.sha256_file(output_schema) != output_schema_sha:
+            raise InvariantViolation("output schema changed during turn")
+        validate_turn_payload(final_message, message_type)
+        if (event_metadata["event_parse"]["thread_started_events"] != 1
+                or event_metadata["event_parse"]["turn_completed_events"] != 1):
+            raise InvariantViolation("turn completion/thread events are missing or ambiguous")
+    except (OSError, RuntimeError, ValueError) as exc:
+        success = False
+        failure = f"{failure}; {exc}" if failure else str(exc)
+
     process = {
         "authoritative_context": authoritative_evidence,
         "approval_policy": "bypassed",
@@ -1209,6 +1326,8 @@ def run_codex_turn(
         "input_tokens": event_metadata["input_tokens"],
         "observed_resume_thread_id": observed_resume_thread_id,
         "output_tokens": event_metadata["output_tokens"],
+        "output_schema": message_type,
+        "output_schema_sha256": output_schema_sha,
         "prompt_path": relative_evidence_path(prompt_path, run_root),
         "prompt_sha256": P4.sha256_bytes(prompt),
         "reasoning_output_tokens": event_metadata["reasoning_output_tokens"],
@@ -1243,10 +1362,11 @@ def invoke_reviewer(
     reviewer_home: Path,
     timeout_seconds: int,
     progress_interval_seconds: float = 15.0,
+    review: bool = False,
 ) -> TurnResult:
     policy = choose_freshness_policy(governance, state)
     authoritative = build_authoritative_prompt(
-        role_prompt=role_prompt,
+        role_prompt=role_prompt + f"\nRun evidence boundary: {run_root.resolve()}\n".encode("utf-8"),
         current=governance,
         state=state,
         policy=policy,
@@ -1262,6 +1382,7 @@ def invoke_reviewer(
         workspace=target.repo,
         timeout_seconds=timeout_seconds,
         role="reviewer",
+        message_type=REVIEWER_VERDICT if review else REVIEWER_INSTRUCTION,
         prompt=authoritative.prompt,
         session_mode=policy.session_mode,
         resume_target_thread_id=policy.resume_target_thread_id,
@@ -1421,6 +1542,8 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
     return {
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "executor_home": str(args.executor_home.resolve()),
+        "enable_runtime_transition": bool(getattr(args, "enable_runtime_transition", False)),
+        "turn_schema_hashes": {name: P4.sha256_file(schema_path(name)) for name in TURN_SCHEMAS},
         "framework_runtime": str(args.framework_runtime.resolve()),
         "framework_static": str(args.framework_static.resolve()),
         "max_cycles": args.max_cycles,
@@ -1481,6 +1604,7 @@ def completed_turn_from_dir(turn_dir: Path, run_root: Path) -> Optional[TurnResu
     expected = process.get("final_message_sha256")
     if not final_message or expected != P4.sha256_bytes(final_message):
         return None
+    validate_turn_payload(final_message, process.get("output_schema"))
     try:
         relative_evidence_path(final_path, run_root)
     except ValueError:
@@ -1534,6 +1658,13 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
         WORKLOAD_RUNTIME: args.workload_runtime,
     }
     governance = capture_governance(governance_paths)
+    validate_json_schema({}, {"type": "object"})
+    for name in TURN_SCHEMAS:
+        strict_json(schema_path(name).read_bytes())
+    if args.reviewer_home.resolve() == args.executor_home.resolve():
+        raise InvariantViolation("Reviewer and Executor profiles must be distinct")
+    if getattr(args, "enable_runtime_transition", False):
+        validate_runtime_destination(args)
     for label, home in (
         ("Reviewer CODEX_HOME", args.reviewer_home),
         ("Executor CODEX_HOME", args.executor_home),
@@ -1636,6 +1767,282 @@ def ensure_instruction_fresh(
     return refresh, current, refresh, freshness
 
 
+def runtime_state(content: bytes) -> Tuple[Dict[str, Any], int, int]:
+    if content.count(RUNTIME_STATE_BEGIN) != 1 or content.count(RUNTIME_STATE_END) != 1:
+        raise InvariantViolation("Runtime requires exactly one begin/end machine block")
+    start = content.index(RUNTIME_STATE_BEGIN) + len(RUNTIME_STATE_BEGIN)
+    end = content.index(RUNTIME_STATE_END)
+    if start >= end:
+        raise InvariantViolation("Runtime machine markers are out of order")
+    value = strict_json(content[start:end])
+    validate_json_schema(value, {
+        "type": "object", "additionalProperties": False,
+        "required": ["schema_version", "workload_id", "transition_mode", "active_step", "last_transition_id"],
+        "properties": {
+            "schema_version": {"type": "integer", "enum": [1]},
+            "workload_id": {"type": "string", "minLength": 1},
+            "transition_mode": {"enum": ["reviewer_accept_once", "disabled"]},
+            "active_step": {
+                "type": "object", "additionalProperties": False,
+                "required": ["id", "status"],
+                "properties": {
+                    "id": {"type": "string", "minLength": 1, "maxLength": 128},
+                    "status": {"enum": ["ACTIVE", "COMPLETED"]},
+                },
+            },
+            "last_transition_id": {"type": ["string", "null"]},
+        },
+    })
+    return value, start, end
+
+
+def validate_runtime_destination(args: argparse.Namespace) -> Path:
+    """No output path ever comes from an Agent. Forbid protected-file aliases."""
+    requested = args.workload_runtime
+    path = requested.resolve()
+    protected = [args.framework_static, args.framework_runtime, args.workload_static,
+                 DEFAULT_FRAMEWORK_STATIC, DEFAULT_FRAMEWORK_RUNTIME]
+    closed = ACTIVE_ROOT / "workloads/multiLanguage_v1"
+    protected.extend([closed / "workload_static.md", closed / "workload_runtime.md"])
+    if requested.is_symlink() or not path.is_file() or path.stat().st_nlink != 1:
+        raise InvariantViolation("Runtime destination must be a regular, unaliased file")
+    for other in protected:
+        if path == other.resolve() or (other.exists() and path.samefile(other)):
+            raise InvariantViolation("Runtime destination aliases protected governance")
+    for boundary in (args.target_repo, args.runs_root,
+                     getattr(args, "state_root", DEFAULT_STATE_ROOT),
+                     args.reviewer_home, args.executor_home):
+        if paths_overlap(path, boundary):
+            raise InvariantViolation("Runtime destination overlaps target/run/state/profile boundary")
+    return path
+
+
+def validate_review_authority(
+    turn: TurnResult, args: argparse.Namespace, state: ReviewerState,
+    target: TargetState, governance: GovernanceSnapshot,
+) -> Dict[str, Any]:
+    value = validate_turn_payload(turn.final_message, REVIEWER_VERDICT)
+    process = turn.process
+    if (process.get("role") != "reviewer" or process.get("success") is not True
+            or process.get("exit_code") != 0 or process.get("failure") is not None
+            or process.get("codex_home") != str(args.reviewer_home.resolve())
+            or process.get("reviewer_target_read_only_verified") is not True
+            or process.get("output_schema") != REVIEWER_VERDICT
+            or process.get("output_schema_sha256") != P4.sha256_file(schema_path(REVIEWER_VERDICT))
+            or process.get("final_message_sha256") != P4.sha256_bytes(turn.final_message)):
+        raise InvariantViolation("verdict lacks successful Reviewer profile/schema authority")
+    thread = process.get("thread_id")
+    if not thread or thread != state.reviewer_thread_id:
+        raise InvariantViolation("verdict Reviewer thread does not match checkpoint")
+    context = process.get("authoritative_context") or {}
+    validation = context.get("validation") or {}
+    if (validation.get("source_bytes_verified") is not True
+            or validation.get("prompt_bytes_verified") is not True
+            or context.get("current_hashes") != governance.hashes()
+            or state.known_hashes != governance.hashes()
+            or state.known_target_head != target.head):
+        raise InvariantViolation("verdict Reviewer governance/target context is stale")
+    mode = process.get("session_mode")
+    if mode == RESUME:
+        if (process.get("resume_relationship_verified") is not True
+                or process.get("observed_resume_thread_id") != thread
+                or process.get("resume_target_thread_id") != thread
+                or context.get("session_known_thread_id") != thread):
+            raise InvariantViolation("verdict Reviewer resume relationship is unverified")
+    elif mode == NEW_PERSISTENT:
+        policy = context.get("freshness_policy") or {}
+        if (process.get("created_thread_id") != thread
+                or policy.get("injected_files") != list(DOCUMENT_ORDER)
+                or process.get("resume_target_thread_id") is not None):
+            raise InvariantViolation("fresh Reviewer verdict lacks complete persistent bootstrap")
+    else:
+        raise InvariantViolation("verdict requires a persistent/resumed Reviewer")
+    if (process.get("reviewer_target_before") != target.metadata()
+            or process.get("reviewer_target_after") != target.metadata()
+            or value["reviewed_target"] != {
+                "repo": str(target.repo), "branch": target.branch, "head": target.head,
+            }):
+        raise InvariantViolation("reviewed target repository/branch/HEAD is stale")
+    if value["governance_hashes"] != governance.hashes():
+        raise InvariantViolation("verdict governance hashes are stale")
+    if value["expected_runtime_sha256"] != governance.documents[WORKLOAD_RUNTIME].sha256:
+        raise InvariantViolation("verdict Runtime preimage hash is stale")
+    return value
+
+
+def validate_accept_evidence(
+    value: Mapping[str, Any], target: TargetState, run_root: Path,
+) -> None:
+    commits = 0
+    for item in value["evidence"]:
+        locator = item["locator"]
+        if item["kind"] == "commit":
+            if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", locator) is None:
+                raise InvariantViolation("commit evidence must use a full object ID")
+            if git_text(target.repo, ["cat-file", "-t", locator]) != "commit":
+                raise InvariantViolation("commit evidence is not a commit")
+            if not is_ancestor(target.repo, locator, target.head):
+                raise InvariantViolation("commit evidence is not reachable from target HEAD")
+            content = git_bytes(target.repo, ["cat-file", "commit", locator])
+            commits += 1
+        else:
+            path = Path(locator)
+            if not path.is_absolute():
+                raise InvariantViolation("file/artifact evidence requires an absolute locator")
+            resolved = path.resolve()
+            if not (P4.path_is_within(resolved, target.repo)
+                    or P4.path_is_within(resolved, run_root)):
+                raise InvariantViolation("file/artifact evidence escapes target/run boundary")
+            if not resolved.is_file():
+                raise InvariantViolation("file/artifact evidence is missing")
+            content = resolved.read_bytes()
+        if P4.sha256_bytes(content) != item["sha256"]:
+            raise InvariantViolation("evidence SHA-256 mismatch")
+    if commits == 0:
+        raise InvariantViolation("ACCEPT requires at least one reachable commit evidence")
+
+
+def validate_accept(
+    *, args: argparse.Namespace, turn: TurnResult, state: ReviewerState,
+    target: TargetState, governance: GovernanceSnapshot, run_root: Path,
+) -> Dict[str, Any]:
+    if not getattr(args, "enable_runtime_transition", False):
+        raise InvariantViolation("Runtime transition CLI capability is disabled")
+    path = validate_runtime_destination(args)
+    value = validate_review_authority(turn, args, state, target, governance)
+    if value["verdict"] != "ACCEPT":
+        raise InvariantViolation("Runtime transition requires Reviewer ACCEPT")
+    document = governance.documents[WORKLOAD_RUNTIME]
+    if path != document.path:
+        raise InvariantViolation("Runtime destination differs from governance input")
+    machine, _, _ = runtime_state(document.content)
+    if (machine["workload_id"] != workload_id_for_args(args)
+            or machine["transition_mode"] != "reviewer_accept_once"
+            or machine["last_transition_id"] is not None
+            or machine["active_step"]["status"] != "ACTIVE"):
+        raise InvariantViolation("Runtime machine block does not authorize one unused transition")
+    if machine["active_step"]["id"] != value["active_step_id"]:
+        raise InvariantViolation("active_step_id differs from Runtime machine block")
+    validate_accept_evidence(value, target, run_root)
+    return value
+
+
+def build_runtime_transition(
+    *, preimage: bytes, value: Mapping[str, Any], verdict_path: Path,
+    verdict_sha256: str, runtime_path: Path, timestamp: str,
+) -> Tuple[Dict[str, Any], bytes]:
+    old, start, end = runtime_state(preimage)
+    preimage_sha = P4.sha256_bytes(preimage)
+    identity = json.dumps([str(runtime_path), preimage_sha, verdict_sha256],
+                          ensure_ascii=True, separators=(",", ":")).encode("ascii")
+    transition_id = P4.sha256_bytes(identity)
+    new = copy.deepcopy(old)
+    new["active_step"]["status"] = value["runtime_transition"]["new_status"]
+    new["transition_mode"] = "disabled"
+    new["last_transition_id"] = transition_id
+    record = {
+        "schema_version": 1, "transition_id": transition_id,
+        "accepted_preimage_sha256": preimage_sha,
+        "old_state": old, "new_state": new,
+        "reviewer_verdict_locator": str(verdict_path),
+        "reviewer_verdict_sha256": verdict_sha256,
+        "target_head": value["reviewed_target"]["head"],
+        "evidence": value["evidence"], "timestamp": timestamp,
+    }
+    # ASCII JSON escapes angle brackets so arbitrary identifiers/locators cannot
+    # inject another Markdown marker or alter the historical record boundary.
+    def encoded(obj: Any) -> bytes:
+        return json.dumps(obj, ensure_ascii=True, sort_keys=True, indent=2).replace(
+            "<", "\\u003c").replace(">", "\\u003e").encode("ascii")
+    result = (preimage[:start] + b"\n" + encoded(new) + b"\n" + preimage[end:]
+              + b"\n\n<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->\n```json\n"
+              + encoded(record) + b"\n```\n")
+    plan = {
+        "transition_id": transition_id, "preimage_sha256": preimage_sha,
+        "postimage_sha256": P4.sha256_bytes(result),
+        "preimage_hex": preimage.hex(), "record": record,
+    }
+    return plan, result
+
+
+def atomic_replace_runtime(path: Path, preimage: bytes, postimage: bytes) -> None:
+    """Same-directory durable replace; never expose a partly written Runtime."""
+    temporary: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix=f".{path.name}.tmp-", dir=path.parent,
+                                         delete=False) as handle:
+            temporary = Path(handle.name)
+            os.fchmod(handle.fileno(), path.stat().st_mode & 0o777)
+            handle.write(postimage)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if path.read_bytes() != preimage:
+            raise InvariantViolation("Runtime preimage changed immediately before atomic replace")
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
+def snapshot_with_runtime_preimage(
+    snapshot: GovernanceSnapshot, preimage: bytes,
+) -> GovernanceSnapshot:
+    documents = dict(snapshot.documents)
+    documents[WORKLOAD_RUNTIME] = replace(
+        documents[WORKLOAD_RUNTIME], content=preimage,
+        sha256=P4.sha256_bytes(preimage), byte_length=len(preimage),
+        line_count=P4.count_lines(preimage),
+    )
+    return GovernanceSnapshot(documents)
+
+
+def reconcile_runtime_transition(
+    *, plan: Mapping[str, Any], args: argparse.Namespace, turn: TurnResult,
+    state: ReviewerState, run_root: Path, governance_paths: Mapping[str, Path],
+    committed: bool = False,
+) -> None:
+    """Revalidate one checkpointed plan; accept only its exact pre/postimage."""
+    try:
+        preimage = bytes.fromhex(plan["preimage_hex"])
+        timestamp = plan["record"]["timestamp"]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise InvariantViolation("Runtime transition checkpoint is incomplete") from exc
+    current = capture_governance(governance_paths)
+    document = current.documents[WORKLOAD_RUNTIME]
+    target = capture_target_state(args.target_repo, args.target_branch, require_clean=True)
+    value = validate_accept(args=args, turn=turn, state=state, target=target,
+                            governance=snapshot_with_runtime_preimage(current, preimage),
+                            run_root=run_root)
+    expected_plan, postimage = build_runtime_transition(
+        preimage=preimage, value=value, verdict_path=turn.turn_dir / "final.txt",
+        verdict_sha256=P4.sha256_bytes(turn.final_message), runtime_path=document.path,
+        timestamp=timestamp,
+    )
+    if plan != expected_plan:
+        raise InvariantViolation("Runtime transition plan does not match authoritative evidence")
+    validate_snapshot_sources(current)
+    if document.content == postimage:
+        machine, _, _ = runtime_state(document.content)
+        if machine["last_transition_id"] != plan["transition_id"]:
+            raise InvariantViolation("Runtime postimage transition ID mismatch")
+        emit_progress(f"transition={plan['transition_id']} already_applied=true")
+        return
+    if committed or document.content != preimage:
+        raise InvariantViolation("Runtime is neither the permitted preimage nor committed postimage")
+    atomic_replace_runtime(document.path, preimage, postimage)
+    if document.path.read_bytes() != postimage:
+        raise InvariantViolation("Runtime post-write verification failed")
+    machine, _, _ = runtime_state(postimage)
+    if machine["last_transition_id"] != plan["transition_id"]:
+        raise InvariantViolation("Runtime post-write state verification failed")
+    emit_progress(f"transition={plan['transition_id']} runtime_write_verified=true")
+
+
 def orchestrate(
     *,
     args: argparse.Namespace,
@@ -1657,7 +2064,7 @@ def orchestrate(
     }
     if resume_requested:
         checkpoint = checkpoint_store.load()
-        if checkpoint["state"] in TERMINAL_CHECKPOINT_STATES:
+        if checkpoint["state"] in {HUMAN_GATE, FAILED_CLOSED}:
             raise InvariantViolation("terminal checkpoint has no incomplete work to resume")
         if checkpoint.get("configuration") != configuration:
             raise InvariantViolation("resume configuration does not match checkpoint")
@@ -1669,7 +2076,31 @@ def orchestrate(
         if not isinstance(started_at, str):
             raise InvariantViolation("checkpoint start time is invalid")
         target_initial = target_state_from_metadata(checkpoint.get("target_initial", {}))
-        if checkpoint.get("governance_initial_hashes") != governance_initial.hashes():
+        transition_plan = checkpoint.get("runtime_transition")
+        initial_hashes = checkpoint.get("governance_initial_hashes")
+        if checkpoint["state"] in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}:
+            if not isinstance(transition_plan, dict) or not isinstance(initial_hashes, dict):
+                raise InvariantViolation("Runtime transition recovery metadata is missing")
+            last = checkpoint.get("last_state_transition", {})
+            allowed_from = ({REVIEW_COMPLETED, RUNTIME_TRANSITION_PENDING}
+                            if checkpoint["state"] == RUNTIME_TRANSITION_PENDING
+                            else {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED})
+            if last.get("to") != checkpoint["state"] or last.get("from") not in allowed_from:
+                raise InvariantViolation("checkpoint does not permit this Runtime transition state")
+            for name, sha in governance_initial.hashes().items():
+                allowed = {initial_hashes.get(name)}
+                if name == f"{WORKLOAD_RUNTIME}_sha256":
+                    allowed.add(transition_plan.get("postimage_sha256"))
+                if sha not in allowed:
+                    raise InvariantViolation("governance changed outside checkpointed Runtime transition")
+            try:
+                preimage = bytes.fromhex(transition_plan["preimage_hex"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise InvariantViolation("Runtime checkpoint preimage is invalid") from exc
+            governance_initial = snapshot_with_runtime_preimage(governance_initial, preimage)
+            if governance_initial.hashes() != initial_hashes:
+                raise InvariantViolation("Runtime checkpoint preimage does not match initial hashes")
+        elif initial_hashes != governance_initial.hashes():
             raise InvariantViolation("governance changed since the checkpointed run began")
         cycles = checkpoint.get("cycles")
         processes = checkpoint.get("processes")
@@ -1714,6 +2145,10 @@ def orchestrate(
                     "an incomplete checkpoint exists; use --resume or explicitly remove "
                     "the local checkpoint after Human review"
                 )
+            previous_plan = previous.get("runtime_transition")
+            if isinstance(previous_plan, dict):
+                if previous_plan.get("preimage_sha256") == governance_initial.documents[WORKLOAD_RUNTIME].sha256:
+                    raise InvariantViolation("an already accepted/planned Runtime preimage cannot start a new run")
         run_id = P4.validate_run_id(args.run_id)
         run_root = args.runs_root.resolve() / run_id
         run_root.mkdir(parents=True, exist_ok=False)
@@ -1730,6 +2165,8 @@ def orchestrate(
         target_after_metadata = None
         summary_progress: List[str] = []
         runtime_transition_applied = False
+        transition_plan = None
+        initial_hashes = governance_initial.hashes()
         framework_evidence_committed = False
         framework_evidence_pushed = False
         run_configuration = {
@@ -1766,7 +2203,7 @@ def orchestrate(
             "cycle_number": cycle_number,
             "cycles": cycles,
             "executor_reference": executor_reference,
-            "governance_initial_hashes": governance_initial.hashes(),
+            "governance_initial_hashes": initial_hashes,
             "framework_evidence_committed": framework_evidence_committed,
             "framework_evidence_pushed": framework_evidence_pushed,
             "instruction_reference": instruction_reference,
@@ -1779,6 +2216,7 @@ def orchestrate(
             "processes": processes,
             "reviewer_state": reviewer_state_record(reviewer_state),
             "runtime_transition_applied": runtime_transition_applied,
+            "runtime_transition": transition_plan,
             "run_configuration": run_configuration,
             "run_id": run_id,
             "run_root": str(run_root),
@@ -2035,6 +2473,7 @@ def orchestrate(
                         workspace=target_before.repo,
                         timeout_seconds=args.timeout_seconds,
                         role="executor",
+                        message_type=EXECUTOR_RECEIPT,
                         prompt=executor_full_prompt,
                         session_mode=FRESH_EPHEMERAL,
                         peer_payload=instruction.final_message,
@@ -2173,6 +2612,7 @@ def orchestrate(
                         role_prompt=reviewer_review_prompt(
                             target_after.repo, target_after.branch
                         ),
+                        review=True,
                         peer_payload=executor.final_message,
                         peer_source=relative_evidence_path(
                             executor.turn_dir / "final.txt", run_root
@@ -2196,6 +2636,34 @@ def orchestrate(
                 continue
 
             if state == REVIEW_COMPLETED:
+                if instruction is None:
+                    raise InvariantViolation("Reviewer verdict checkpoint reference is missing")
+                current_target = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
+                )
+                current_governance = capture_governance(governance_paths)
+                value = validate_review_authority(
+                    instruction, args, reviewer_state, current_target, current_governance
+                )
+                emit_progress(f"run={run_id} cycle={cycle_number} verdict={value['verdict']}")
+                if value["verdict"] == "HUMAN_GATE":
+                    emit_progress(f"waiting_for_human: {value['peer_message']}")
+                    persist(HUMAN_GATE, manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                            manifest_reason="reviewer_human_gate")
+                    return 0, run_root
+                if value["verdict"] == "ACCEPT":
+                    validate_accept(args=args, turn=instruction, state=reviewer_state,
+                                    target=current_target, governance=current_governance,
+                                    run_root=run_root)
+                    transition_plan, _ = build_runtime_transition(
+                        preimage=current_governance.documents[WORKLOAD_RUNTIME].content,
+                        value=value, verdict_path=instruction.turn_dir / "final.txt",
+                        verdict_sha256=P4.sha256_bytes(instruction.final_message),
+                        runtime_path=args.workload_runtime.resolve(), timestamp=P4.utc_now(),
+                    )
+                    persist(RUNTIME_TRANSITION_PENDING)
+                    continue
+                # Only a schema-valid REJECT can reach another bounded repair cycle.
                 if not isinstance(target_before_metadata, dict) or not isinstance(
                     target_after_metadata, dict
                 ):
@@ -2225,14 +2693,38 @@ def orchestrate(
                 persist(INSTRUCTION_READY)
                 continue
 
+            if state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}:
+                if not isinstance(transition_plan, dict) or instruction is None:
+                    raise InvariantViolation("Runtime transition checkpoint is incomplete")
+                was_committed = state == RUNTIME_TRANSITION_COMMITTED
+                reconcile_runtime_transition(
+                    plan=transition_plan, args=args, turn=instruction, state=reviewer_state,
+                    run_root=run_root, governance_paths=governance_paths,
+                    committed=was_committed,
+                )
+                runtime_transition_applied = True
+                persist(RUNTIME_TRANSITION_COMMITTED,
+                        manifest_status=RUNTIME_TRANSITION_COMMITTED,
+                        manifest_reason="one_reviewer_accept_transition_completed")
+                return 0, run_root
+
             raise InvariantViolation(f"unsupported checkpoint state: {state}")
     except (OSError, RuntimeError, ValueError) as exc:
         reason = str(exc)
+        emit_progress(f"run={run_id} stopped: {reason}")
         active_turn_relative = None
+        transition_interrupted = state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}
+        # An I/O failure can happen after os.replace (including checkpoint fsync).
+        # Preserve the pending plan so --resume can compare exact bytes. Unknown
+        # state/evidence is a Human Gate, never a guessed repair.
+        failure_state = (
+            state if transition_interrupted and isinstance(exc, OSError)
+            else HUMAN_GATE if transition_interrupted else FAILED_CLOSED
+        )
         try:
             persist(
-                FAILED_CLOSED,
-                manifest_status="FAILED_CLOSED",
+                failure_state,
+                manifest_status="STOPPED_FOR_HUMAN_REVIEW" if transition_interrupted else "FAILED_CLOSED",
                 manifest_reason=reason,
             )
         except (OSError, RuntimeError, ValueError) as checkpoint_exc:
@@ -2256,6 +2748,7 @@ def preflight_report(
         "executor_home": str(args.executor_home.resolve()),
         "governance": governance.metadata(),
         "max_cycles": args.max_cycles,
+        "runtime_transition_cli_enabled": bool(getattr(args, "enable_runtime_transition", False)),
         "preflight": "passed",
         "reviewer_home": str(args.reviewer_home.resolve()),
         "target": {
@@ -2273,6 +2766,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--target-branch", required=True)
     parser.add_argument("--workload-static", type=Path, required=True)
     parser.add_argument("--workload-runtime", type=Path, required=True)
+    parser.add_argument("--enable-runtime-transition", action="store_true",
+                        help="allow one Reviewer ACCEPT transition if workload Runtime also opts in")
     parser.add_argument("--max-cycles", type=int, default=8)
     parser.add_argument(
         "--framework-static", type=Path, default=DEFAULT_FRAMEWORK_STATIC
@@ -2294,7 +2789,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="resume the single non-terminal checkpoint for this workload key",
+        help="resume pending work, or verify a committed Runtime transition without replay",
     )
     parser.add_argument(
         "--progress-interval-seconds",

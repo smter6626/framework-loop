@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "executor_receipt"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "evidence_summary": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "maxLength": 2000
+    },
+    "peer_message": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    }
+  },
+  "required": [
+    "message_type",
+    "schema_version",
+    "evidence_summary",
+    "peer_message"
+  ],
+  "additionalProperties": false
+}

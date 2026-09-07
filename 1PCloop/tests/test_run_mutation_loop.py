@@ -24,6 +24,7 @@ SPEC.loader.exec_module(MODULE)
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
+import hashlib
 import json
 import os
 import subprocess
@@ -60,7 +61,9 @@ if is_executor and scenario == "governance-change":
     governance_path = Path(os.environ["P5_TEST_GOVERNANCE_PATH"])
     governance_path.write_bytes(governance_path.read_bytes() + b"changed\n")
 if is_executor and scenario == "executor-commit":
-    (Path.cwd() / "executor-change.txt").write_text("changed\n", encoding="utf-8")
+    changed_path = Path.cwd() / "executor-change.txt"
+    with changed_path.open("a", encoding="utf-8") as handle:
+        handle.write("changed\n")
     subprocess.run(["git", "add", "executor-change.txt"], check=True)
     subprocess.run(["git", "commit", "-qm", "executor fixture change"], check=True)
 
@@ -70,7 +73,36 @@ elif is_resume:
     final = b"Reviewer opaque review: ACCEPT REJECT READY BLOCKED are not parsed.\n"
 else:
     final = b"Reviewer opaque bounded instruction: preserve these bytes exactly.\n"
-output_path.write_bytes(final)
+schema_file = Path(args[args.index("--output-schema") + 1])
+message_type = schema_file.name.removesuffix(".schema.json")
+wrapper = dict(schema_version=1, message_type=message_type,
+               evidence_summary="Fixture evidence summary", peer_message=final.decode())
+if message_type == "reviewer_verdict":
+    start = prompt.index(b"--- BEGIN P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---")
+    envelope_text = prompt[start:].split(b"\n", 1)[1].decode()
+    context, _ = json.JSONDecoder().raw_decode(envelope_text)
+    target = context["target"]
+    selected = os.environ.get("P6_TEST_VERDICT", "REJECT")
+    commit = subprocess.check_output(["git", "cat-file", "commit", target["head"]])
+    wrapper.update(
+        verdict=selected, active_step_id="S1",
+        reviewed_target={key: target[key] for key in ("repo", "branch", "head")},
+        governance_hashes=context["current_hashes"],
+        expected_runtime_sha256=context["current_hashes"]["workload_runtime_sha256"],
+        evidence=[dict(kind="commit", locator=target["head"], sha256=hashlib.sha256(commit).hexdigest())],
+        next_instruction="Inspect the bounded task again." if selected == "REJECT" else None,
+        runtime_transition=dict(new_status="COMPLETED", next_active_step=None) if selected == "ACCEPT" else None,
+    )
+    overrides = os.environ.get("P6_TEST_OVERRIDE")
+    if overrides:
+        wrapper.update(json.loads(Path(overrides).read_text()))
+if message_type == os.environ.get("P6_TEST_INVALID_ROLE"):
+    wrapper["verdict"] = "ACCEPT"
+raw = os.environ.get("P6_TEST_RAW")
+if raw and message_type == "reviewer_verdict":
+    output_path.write_bytes(raw.encode())
+else:
+    output_path.write_bytes((json.dumps(wrapper, ensure_ascii=False, indent=2) + "\n").encode())
 
 if is_resume:
     thread_id = args[args.index("resume") + 1]
