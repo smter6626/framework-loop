@@ -29,6 +29,12 @@ Multi-cycle mutation orchestration
 Reviewer persistent + explicit resume
 = PREFERRED IMPLEMENTATION CANDIDATE
 = NOT A PERMANENT ARCHITECTURE INVARIANT
+
+P6 control-plane hardening
+= HUMAN AUTHORIZED / ACTIVE
+
+P7 controlled REJECT -> REPAIR fault injection
+= DEFERRED UNTIL P6 ACCEPTANCE
 ```
 
 Real workload run `20260906T102252Z-52187` stopped mechanically at
@@ -1072,3 +1078,313 @@ No further P5 non-blocking cleanup is pending. P6 crash/restart reconstruction,
 capability-gated authoritative Runtime transition, rejection/repair evidence, and
 curated-evidence policy remain intentionally scoped next-phase control-plane work;
 they must not be mislabeled as small maintenance fixes.
+
+## 2026-09-06 — P6 Human-authorized control-plane hardening plan
+
+Status: `ACTIVE — HUMAN AUTHORIZED; IMPLEMENTATION NOT STARTED`
+
+This section is the authoritative P6 plan. It supersedes the earlier proposed
+sequencing that placed controlled `REJECT -> REPAIR -> re-review` before Runtime
+transition work. The Human Owner has decided that P6 first closes the known
+control-plane gaps below. Controlled rejection/fault injection is deferred to P7.
+
+P6 is implementation work, not evidence that these mechanisms are already accepted.
+Each subphase must be implemented, mechanically tested, and separately recorded before
+its status can change to accepted.
+
+### P6.0 — Approved scope and authority boundary
+
+Status: `DECISION COMPLETE — DEFINES P6 IMPLEMENTATION BOUNDARY`
+
+The approved scope is:
+
+1. implement runtime-enforced structured Agent outputs and a capability-gated
+   Reviewer `ACCEPT -> workload Runtime transition` path;
+2. implement an overwrite-in-place local checkpoint sufficient for crash/restart
+   reconstruction, plus live terminal progress output;
+3. stop committing future raw run evidence by default; retain it locally under a
+   Git-ignored path and commit a concise LLM-authored per-turn evidence summary;
+4. retain the current sequential, non-awaiting Reviewer/Executor lifecycle and do
+   not add background Agents, locks, watchers, or multi-writer coordination;
+5. do not extend or live-test concurrent target-HEAD refresh in P6; document the
+   single-contributor/single-loop operating assumption and existing deterministic-only
+   validation boundary;
+6. defer controlled `REJECT -> REPAIR -> re-review` fault injection until P7.
+
+Only a workload Runtime that explicitly opts into orchestrator-mediated Reviewer
+transition may be mutated by the P6 loop. Framework Static and framework Runtime
+remain read-only governance inputs during the loop under test. The closed
+`multiLanguage_v1` workload is not a destructive P6 transition fixture: its current
+Static says that its Runtime is Human-owned, and its accepted history must not be
+retroactively repurposed. P6 validation must use a disposable repository and paired
+workload governance, or a new bounded workload whose Static explicitly grants this
+capability.
+
+Executor remains unable to accept its own work or modify any Runtime. Reviewer may
+request a transition only through the validated control-plane output described below.
+Python remains prohibited from searching free text for `ACCEPT`, `REJECT`, readiness,
+or any equivalent semantic marker.
+
+### P6.1 — Overwrite-only local checkpoint and visible execution progress
+
+Status: `AUTHORITATIVE ACTIVE STEP`
+
+Implement one current local checkpoint per workload/run key under a Git-ignored path,
+with a default layout equivalent to:
+
+```text
+1PCloop/.local/state/<workload-id>/checkpoint.json
+```
+
+The checkpoint is recovery state, not long-term research evidence. Each transition
+must atomically replace the same file through a temporary file, flush/fsync as needed,
+and `os.replace`; it must not create an append-only checkpoint history. A later run
+may overwrite a terminal checkpoint. An incomplete checkpoint must not be silently
+discarded by a new run: the runner must resume it or stop for an explicit Human
+discard decision.
+
+Minimum checkpoint state machine:
+
+```text
+PREFLIGHT_PASSED
+REVIEWER_INSTRUCTION_RUNNING
+INSTRUCTION_READY
+EXECUTOR_RUNNING
+EXECUTOR_COMMITTED
+REVIEW_PENDING
+REVIEW_COMPLETED
+RUNTIME_TRANSITION_PENDING
+RUNTIME_TRANSITION_COMMITTED
+HUMAN_GATE
+FAILED_CLOSED
+```
+
+Minimum checkpoint content:
+
+- schema version, run/workload ID and cycle number;
+- current state and last completed state transition;
+- Reviewer thread ID when available;
+- target repository, branch, known HEAD and worktree expectation;
+- framework/workload Static and Runtime hashes;
+- current instruction, Executor receipt and Reviewer verdict local locators plus
+  content hashes;
+- whether the per-turn summary was already appended;
+- whether Runtime transition, framework evidence commit and push were already
+  completed.
+
+Restart behavior must be idempotent:
+
+- compare checkpoint state against the actual branch, HEAD, worktree and governance
+  hashes before resuming;
+- resume only the next incomplete action;
+- never re-run an Executor whose commit is already recorded and verified;
+- never append or apply the same Runtime transition twice;
+- reuse the Reviewer thread when its relationship can still be verified;
+- if the Reviewer thread is unavailable, create a fresh Reviewer and fully bootstrap
+  it from repository-backed governance plus the pending evidence payload;
+- if actual state cannot be reconciled mechanically, fail closed or enter Human Gate
+  instead of reset, checkout, stash, history rewrite, or guessed recovery.
+
+The runner must also emit live, flushed terminal progress. A long Codex turn may not
+appear silent until `subprocess.run()` returns. The implementation should stream
+process output to local raw evidence while showing concise terminal events and a
+periodic elapsed-time heartbeat, including at least:
+
+```text
+timestamp / run / cycle / role / state / elapsed time / target HEAD
+```
+
+Terminal output should expose turn start, useful tool/test activity, turn completion,
+validation, verdict, transition, Human Gate and failure. It should not dump the entire
+raw JSONL stream or hidden reasoning to the terminal.
+
+P6.1 acceptance requires deterministic crash simulation after the important state
+boundaries, successful reconstruction of the exact next action, proof that Executor
+commits and Runtime transitions are not duplicated, and captured evidence that
+progress is visible and flushed while a turn is still running.
+
+### P6.2 — Runtime-enforced JSON verdict and authoritative Runtime transition
+
+Status: `QUEUED AFTER P6.1`
+
+Use the Codex CLI runtime-enforced `--output-schema` mechanism. Prompt-only requests
+to emit JSON are insufficient. P6 turn schemas must preserve a complete Agent-to-Agent
+message while exposing a small enumerated control wrapper and an evidence-summary
+field. Python may validate and route those declared fields; it must not infer new
+semantic fields from the embedded natural-language message.
+
+The Reviewer review schema must include at least:
+
+```json
+{
+  "schema_version": 1,
+  "verdict": "ACCEPT | REJECT | HUMAN_GATE",
+  "active_step_id": "string",
+  "reviewed_target": {
+    "branch": "string",
+    "head": "commit sha"
+  },
+  "expected_runtime_sha256": "string",
+  "evidence": [
+    {
+      "kind": "commit | test | file | artifact",
+      "locator": "string"
+    }
+  ],
+  "evidence_summary": "string",
+  "peer_message": "string",
+  "next_instruction": "string or null",
+  "runtime_transition": {
+    "new_status": "string",
+    "next_active_step": "object or null"
+  }
+}
+```
+
+Exact production schema may split common turn fields from verdict-only fields, but
+must retain the following behavior:
+
+- the complete schema-conforming raw payload is transported to the peer without
+  Python rewriting its natural-language meaning;
+- every turn supplies a concise LLM-authored `evidence_summary`;
+- only Reviewer review turns can carry an authoritative verdict;
+- Executor output cannot trigger acceptance or Runtime progression;
+- `ACCEPT` requires a non-empty mechanically checkable evidence list, an exact current
+  target branch/HEAD, the exact Runtime preimage hash, current governance hashes, and
+  a verified Reviewer session/role relationship;
+- commit locators must exist and be reachable from the current target HEAD; file and
+  artifact locators must satisfy the configured evidence boundary;
+- stale hash, stale HEAD, missing evidence, wrong role, malformed JSON or schema
+  mismatch fails closed;
+- `REJECT` requires one bounded `next_instruction` and performs no Runtime transition;
+- `HUMAN_GATE` stops and performs no Runtime transition;
+- `ACCEPT` must not carry a repair instruction and may progress only the explicitly
+  authorized workload Runtime.
+
+The workload Runtime should contain one uniquely delimited machine-owned current-state
+JSON block. Python validates and replaces only that block and appends a deterministic
+transition record; it does not semantically parse the surrounding Markdown. Runtime
+write must use a validated preimage hash and atomic replacement. The transition record
+must include transition ID, prior/new state, Reviewer verdict locator, target HEAD,
+evidence locators and hashes, and timestamp.
+
+The initial safe behavior is to apply one accepted transition and stop after recording
+`RUNTIME_TRANSITION_COMMITTED`. Continuous next-step execution may be enabled only
+after this one-transition path passes deterministic tests and a disposable real smoke.
+
+P6.2 acceptance tests must cover valid ACCEPT, invalid/schema-breaking output, stale
+Runtime hash, stale target HEAD, missing or unreachable evidence, attempted Executor
+ACCEPT, REJECT without Runtime mutation, HUMAN_GATE without Runtime mutation, atomic
+write failure, and restart after a completed write without duplicate transition.
+
+### P6.3 — Local raw evidence and tracked per-turn summary
+
+Status: `QUEUED AFTER P6.2`
+
+Future raw evidence must default to a Git-ignored path equivalent to:
+
+```text
+1PCloop/.local/runs/<run-id>/
+```
+
+This includes prompts, raw `events.jsonl`, stderr, process detail, peer payload copies,
+checkpoint material and full final-message bytes. Existing committed historical runs
+remain untouched; adding an ignore rule does not rewrite or shrink existing Git
+history.
+
+The tracked durable artifact should be equivalent to:
+
+```text
+1PCloop/evidence-summaries/<run-id>.md
+```
+
+After every completed turn, Python appends a deterministic heading and mechanical
+metadata plus that turn's LLM-authored `evidence_summary`. Each entry should include
+role/cycle, time, input/output target HEAD, relevant governance hashes, cited evidence,
+test result when supplied, verdict when applicable, and hashes/locators for local raw
+evidence. A compact machine-readable manifest may also be committed when it contains
+only the fields required to audit control transitions; full process/event duplication
+must remain local.
+
+Appending happens locally after each turn and is checkpointed so restart cannot
+duplicate paragraphs. To avoid replacing raw-log growth with commit-count growth,
+the framework repository is committed once when the run reaches `ACCEPT`,
+`HUMAN_GATE`, or `FAILED_CLOSED`, rather than once per turn. The commit may include
+only the summary, compact manifest, accepted Runtime transition and directly required
+small governance changes. It must not push or merge the target repository.
+
+After the framework evidence commit, push it to the configured framework remote. A
+push failure must be visible in the terminal and checkpoint, preserve the local commit,
+and stop safely rather than discard evidence or repeat the accepted target work.
+
+P6.3 acceptance requires proof that new raw evidence is ignored/untracked, summary
+entries are complete and non-duplicated across restart, terminal-state framework
+evidence is committed once, and push failure is recoverable without replaying Agent
+work.
+
+### P6.4 — Sequential lifecycle and external-mutation boundary
+
+Status: `DOCUMENTATION/BOUNDARY WORK QUEUED IN P6`
+
+The supported operating assumption is:
+
+```text
+one Human contributor
++ one active loop per target repository
++ Reviewer/Executor processes exit after each turn
++ no stopped Agent can continue accessing or mutating the repository
+```
+
+P6 will not implement an awaiting Agent, background Agent process, repository lock,
+filesystem watcher, multi-Executor queue, or multi-writer reconciliation. Existing
+low-cost turn-boundary assertions for branch, HEAD, cleanliness, descendant history,
+Reviewer read-only behavior and governance hashes should remain because they also
+detect loop/self-state errors. Unexpected state still fails closed; P6 does not
+attempt automatic reset or destructive repair.
+
+Target-HEAD refresh receives no new implementation or live concurrent-commit test in
+P6. The README must state that the path has deterministic validation only, that the
+supported deployment assumes a unique contributor plus the loop as the only normal
+writer, and that no concurrency consistency guarantee is claimed. The existing
+mechanical checks may remain, but must not be described as a fully validated
+multi-contributor coordination mechanism.
+
+### P6 completion gate
+
+P6 may be accepted only after all of the following are true:
+
+1. the local overwrite-only checkpoint and restart state machine pass deterministic
+   crash-boundary tests;
+2. terminal progress remains visible during long Reviewer and Executor turns;
+3. runtime-enforced schemas reject malformed or stale control output;
+4. a valid Reviewer ACCEPT atomically advances exactly one opted-in workload Runtime
+   and cannot be replayed;
+5. REJECT and HUMAN_GATE do not advance Runtime;
+6. raw evidence defaults to ignored local storage;
+7. a concise per-turn LLM evidence summary plus compact required metadata is committed
+   once at terminal state and pushed to the framework remote;
+8. the single-writer/no-concurrency boundary is documented;
+9. existing text-loop and mutation-loop deterministic regressions remain green;
+10. a disposable real-Git smoke demonstrates the accepted one-transition path without
+    modifying or reopening the closed `multiLanguage_v1` workload.
+
+Until this gate is satisfied, P6 remains the only authoritative framework Active Step.
+
+### P7 sequencing decision
+
+Status: `DEFERRED — NOT ACTIVE`
+
+After P6 acceptance, P7 may introduce a controlled, explicitly recorded defect in a
+disposable repository or dedicated test branch to exercise:
+
+```text
+Reviewer detects defect
+-> REJECT
+-> bounded repair instruction
+-> fresh Executor repairs
+-> same Reviewer re-reviews
+```
+
+The injected commit, actor, timing, expected defect and experiment boundary must be
+recorded so the result is not misreported as a naturally occurring Executor error.
+No rejection fault injection is authorized as part of P6.
