@@ -77,6 +77,14 @@ Orchestrator 只为每次调用设置角色、`CODEX_HOME`、sandbox、turn/run 
 
 ## P6.1 checkpoint 与终端进度
 
+mutation runner 从 P6.2 起显式依赖 `jsonschema`。首次运行、恢复或执行完整回归前，
+先创建 repo-local Python 环境并安装声明依赖：
+
+```bash
+python3 -m venv 1PCloop/.local/venv
+1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
+```
+
 `run_mutation_loop.py` 会为每个 workload key 维护一份可覆盖的本地 checkpoint：
 
 ```text
@@ -88,7 +96,7 @@ Orchestrator 只为每次调用设置角色、`CODEX_HOME`、sandbox、turn/run 
 恢复未完成 run 时，使用与原 run 相同的 target、governance、角色配置和 cycle 上限，并增加：
 
 ```bash
-python3 1PCloop/scripts/run_mutation_loop.py \
+1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
   <原有参数> \
   --resume
 ```
@@ -97,21 +105,17 @@ python3 1PCloop/scripts/run_mutation_loop.py \
 
 Codex 子进程输出现在边运行边写入原始 evidence，同时终端显示 turn 开始/结束、可公开的工具事件和定时 heartbeat。默认 heartbeat 间隔为 15 秒，可用 `--progress-interval-seconds` 调整。Ctrl-C 等可处理的父进程中断会先终止当前 Codex 子进程，避免它成为继续修改仓库的后台 Agent。
 
-运行 transport self-check：
+运行完整 mutation 回归：
 
 ```bash
-python3 -m unittest discover -s 1PCloop/tests -v
+1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -v
 ```
 
 ## P6.2 structured verdict 与单次 Runtime transition
 
 P6 mutation runner 的每个 turn 都通过 Codex CLI `--output-schema` 请求 runtime-enforced
-JSON，并用同一份 JSON Schema 在本地再次验证。先在运行 runner 的 Python 环境安装依赖：
-
-```bash
-python3 -m venv 1PCloop/.local/venv
-1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
-```
+JSON，并用同一份 JSON Schema 在本地再次验证。运行与测试统一使用上面安装了
+`1PCloop/requirements.txt` 的 repo-local Python 环境。
 
 三份 schema 分别是 `schemas/reviewer_instruction.schema.json`、
 `schemas/executor_receipt.schema.json` 和 `schemas/reviewer_verdict.schema.json`。
@@ -224,8 +228,8 @@ refresh 只有 deterministic validation，本阶段未做 live concurrent-HEAD �
 
 ### P6.2 implementation validation observation — 2026-09-07
 
-Implementation/test evidence only; P6.2 remains subject to independent Reviewer/Human review.
-No framework or closed-workload governance was updated by this implementation task.
+The independent Reviewer accepted P6.2 from this implementation/test evidence. P6 remains
+active, with P6.3 as its next Active Step. No closed-workload governance was updated.
 
 Validation environment: Python 3.9, `jsonschema 4.25.1`, local Codex CLI `0.153.4`.
 The commands above were run with `/tmp/1pcloop-p62-venv/bin/python`:

@@ -31,7 +31,7 @@ Reviewer persistent + explicit resume
 = NOT A PERMANENT ARCHITECTURE INVARIANT
 
 P6 control-plane hardening
-= ACTIVE / P6.1 DETERMINISTICALLY ACCEPTED / P6.2 NEXT
+= ACTIVE / P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 NEXT
 
 P7 controlled REJECT -> REPAIR fault injection
 = DEFERRED UNTIL P6 ACCEPTANCE
@@ -1081,7 +1081,7 @@ they must not be mislabeled as small maintenance fixes.
 
 ## 2026-09-06 — P6 Human-authorized control-plane hardening plan
 
-Status: `ACTIVE — P6.1 IMPLEMENTED; P6.2 IS THE NEXT ACTIVE STEP`
+Status: `ACTIVE — P6.1 AND P6.2 ACCEPTED; P6.3 IS THE NEXT ACTIVE STEP`
 
 This section is the authoritative P6 plan. It supersedes the earlier proposed
 sequencing that placed controlled `REJECT -> REPAIR -> re-review` before Runtime
@@ -1318,7 +1318,7 @@ therefore advances to P6.2.
 
 ### P6.2 — Runtime-enforced JSON verdict and authoritative Runtime transition
 
-Status: `AUTHORITATIVE ACTIVE STEP`
+Status: `IMPLEMENTED AND DETERMINISTICALLY ACCEPTED`
 
 Use the Codex CLI runtime-enforced `--output-schema` mechanism. Prompt-only requests
 to emit JSON are insufficient. P6 turn schemas must preserve a complete Agent-to-Agent
@@ -1390,9 +1390,71 @@ Runtime hash, stale target HEAD, missing or unreachable evidence, attempted Exec
 ACCEPT, REJECT without Runtime mutation, HUMAN_GATE without Runtime mutation, atomic
 write failure, and restart after a completed write without duplicate transition.
 
+Implementation result:
+
+- implementation commit: `d56a5c6fd0bffe183f368d52ca4f555cbefae9e6`;
+- Reviewer instruction, Executor receipt and Reviewer verdict use three independent
+  schemas, and every fresh, ephemeral or resumed turn supplies its own
+  `--output-schema`;
+- final output is validated again locally against the same schema, with duplicate
+  keys and non-standard JSON constants rejected;
+- only the Reviewer review turn has verdict authority; Reviewer instruction and
+  Executor receipt cannot carry an authoritative verdict;
+- Runtime transition requires both the Human CLI capability
+  `--enable-runtime-transition` and an opted-in workload Runtime machine block;
+- ACCEPT mechanically verifies target repository/branch/HEAD/cleanliness,
+  framework and workload governance hashes, Runtime preimage, active step,
+  Reviewer thread/profile relationship, and every evidence locator/hash;
+- the deterministic orchestrator performs a same-directory temporary write,
+  flush/fsync, `os.replace`, postimage verification and one appended transition
+  record, then stops after one transition;
+- restart reconciliation covers `RUNTIME_TRANSITION_PENDING`, an already-written
+  postimage without a committed checkpoint, and `RUNTIME_TRANSITION_COMMITTED`
+  without replaying the transition;
+- the complete schema-conforming peer JSON bytes continue to be routed verbatim;
+  Python does not re-encode or summarize the peer message.
+
+Test logic/evidence summary:
+
+1. A valid Reviewer ACCEPT advances one opted-in disposable Runtime exactly once.
+2. Malformed JSON, schema-invalid output and output from a role without verdict
+   authority fail closed, including free text containing `ACCEPT`.
+3. Stale Runtime/governance/target state or a mismatched active step fails closed.
+4. Missing, unreachable, out-of-boundary or hash-mismatched evidence fails closed.
+5. REJECT and HUMAN_GATE reach their defined control states without writing Runtime.
+6. A simulated atomic-replace failure retains a complete preimage; deterministic
+   stops at the PENDING, post-write and COMMITTED boundaries resume without
+   duplicating Agent turns, Runtime writes or transition records.
+7. A fresh Reviewer reconstruction must perform the complete governance bootstrap;
+   tests also preserve protected-governance and target-cleanliness checks.
+8. The focused P6.2 suite passed `21 / 21`; the complete P4/P5/P6.1/P6.2 regression
+   passed `53 / 53` with `ResourceWarning` promoted to an error.
+9. A disposable real-service smoke completed `3 / 3` turns, mechanically verified
+   the Reviewer resume relationship, applied one Runtime transition and stopped at
+   `RUNTIME_TRANSITION_COMMITTED`.
+
+Interpretation boundary:
+
+- `jsonschema` is a new explicit runtime dependency; the runner must use a Python
+  environment with `1PCloop/requirements.txt` installed;
+- raw smoke evidence remains disposable local evidence rather than durable Git
+  provenance;
+- raw evidence default migration, tracked per-turn summaries and terminal-state
+  automatic commit/push remain P6.3 work;
+- validation did not perform a real `kill -9`, P7 fault injection or a live
+  concurrent target-HEAD experiment;
+- the supported operating boundary remains single writer with no concurrency
+  guarantee;
+- the closed `multiLanguage_v1` workload was neither reopened nor used as a Runtime
+  transition fixture.
+
+The independent Reviewer verdict closes P6.2. P6 as a whole is not yet accepted;
+P6.3 is the sole authoritative Active Step, P6.4 remains queued, and P7 remains
+deferred.
+
 ### P6.3 — Local raw evidence and tracked per-turn summary
 
-Status: `QUEUED AFTER P6.2`
+Status: `AUTHORITATIVE ACTIVE STEP`
 
 Future raw evidence must default to a Git-ignored path equivalent to:
 
