@@ -91,7 +91,7 @@ python3 -m venv 1PCloop/.local/venv
 1PCloop/.local/state/<workload-id>/checkpoint.json
 ```
 
-`1PCloop/.local/` 被 Git 忽略。默认 workload ID 是 `--workload-static` 所在目录名，也可以用 `--workload-id` 显式指定。checkpoint 在每个控制面边界原子替换，不保存逐版本历史。terminal checkpoint 可以由下一次新 run 覆盖；未完成 checkpoint 不会被静默覆盖。
+`1PCloop/.local/` 被 Git 忽略。默认 workload ID 是 `--workload-static` 所在目录名，也可以用 `--workload-id` 显式指定。checkpoint 在每个控制面边界原子替换，不保存逐版本历史。P6.3 起，逻辑终态还必须完成 evidence commit/push；只有 `FRAMEWORK_EVIDENCE_PUSHED` 才允许后续新 run 覆盖 checkpoint。
 
 恢复未完成 run 时，使用与原 run 相同的 target、governance、角色配置和 cycle 上限，并增加：
 
@@ -188,8 +188,9 @@ hash、target repo/branch/HEAD、clean worktree、Runtime preimage 和 active st
 
 REJECT 必须给出一个非空、至多 8000 字符的 `next_instruction`，Runtime 不变；在原有
 cycle/no-op 停止边界允许继续时，完整 Reviewer wrapper 传给下一 fresh Executor。
-HUMAN_GATE 不修改 Runtime，checkpoint 进入 `HUMAN_GATE`，终端显示 `peer_message`
-中的 Human 原因。自由文本中的 ACCEPT/REJECT/READY/BLOCKED 没有控制权限。
+HUMAN_GATE 不修改 Runtime，checkpoint 记录 `HUMAN_GATE` logical outcome；终端指向
+tracked summary 中的 Human 原因，不打印完整 peer payload。自由文本中的
+ACCEPT/REJECT/READY/BLOCKED 没有控制权限。
 
 一次合法 transition 的状态顺序是：
 
@@ -278,3 +279,66 @@ The smoke root is disposable local evidence, not retained Git provenance. The te
 compact observation are tracked; no raw evidence migration or summary commit/push automation
 was introduced. Neither the real `multiLanguage_v1` workload nor its target was used for
 mutation/transition tests, and no target push or merge occurred.
+
+## P6.3 local raw evidence 与 tracked summary
+
+mutation runner 的未来 raw evidence 默认写到：
+
+```text
+1PCloop/.local/runs/<run-id>/
+```
+
+显式 `--runs-root` 仍可覆盖该位置。既有 `1PCloop/runs/` 历史不会移动或重写。
+默认 tracked artifact 是 `1PCloop/evidence-summaries/<run-id>.md`；每个完成的 turn
+对应一个 deterministic entry ID。条目只保存 target/governance metadata、schema 声明的
+`evidence_summary`、Reviewer verdict/evidence（如有）以及 raw 文件 locator、SHA-256 和
+byte length，不复制 prompt、peer message、events、stderr、hidden reasoning 或 process 正文。
+
+`evidence_summary` 以 JSON string 写入固定 Markdown envelope；换行、heading、反引号和
+HTML angle bracket 都会被确定性转义，Unicode 保持可读。summary 的每次逻辑 append 先把
+entry bytes 与 preimage/postimage hash 写入 checkpoint，再通过同目录临时文件、fsync 和
+`os.replace` 替换。恢复只接受精确 preimage 或 postimage；额外字节、部分写入、hash 错误
+或缺失 entry 均 fail closed。
+
+逻辑结果与 evidence finalization 分开记录：
+
+```text
+RUNTIME_TRANSITION_COMMITTED | HUMAN_GATE | FAILED_CLOSED
+-> EVIDENCE_FINALIZATION_PENDING
+-> FRAMEWORK_EVIDENCE_COMMITTED
+-> FRAMEWORK_EVIDENCE_PUSHED
+```
+
+一次 run 只创建一个 framework evidence commit。commit allowlist 仅包含该 run 的 summary，
+以及确实位于 framework repository 内且已由 P6.2 合法写入的 workload Runtime。提交前验证
+framework branch/HEAD、干净的起始状态、显式 path set、blob content hash、ordinary parent
+和 run-ID trailer；stage 只调用 `git add -- <explicit paths>`。Static、`.local`、target 文件、
+closed workload 和预先存在的修改不在 allowlist。
+
+默认 framework 配置是当前 repository、`main`、`origin` 和 `refs/heads/main`。disposable
+framework repository 可通过以下参数显式注入：
+
+```text
+--framework-repo <repo-root>
+--framework-branch <branch>
+--framework-remote <remote>
+--framework-push-ref refs/heads/<branch>
+--summary-root <tracked-summary-directory>
+```
+
+framework 与 target 必须是不重叠的独立 Git repository；framework Static/Runtime 和 summary
+必须位于 framework repo 内。push 只在 framework repo 中执行非 force refspec，并在前后
+验证 remote ref。push 失败保留本地 commit 与 `FRAMEWORK_EVIDENCE_COMMITTED` checkpoint；
+`--resume` 只重试 push。若远端已收到 exact commit 但 checkpoint 尚未更新，恢复只补记
+`already-present`，不会重跑 Agent、重写 Runtime、追加 summary 或创建第二个 commit。
+
+P6.3 configuration 将 summary 路径、framework repo/branch/remote/ref 与 schema hash 写入
+checkpoint。缺少这些字段的旧 checkpoint 不会自动升级；如需处理，必须由 Human 明确处置，
+不能让新 run 猜测性覆盖。实时终端只显示 summary/commit/push 的 pending、written、
+reconciled、succeeded 或 failed 控制事件，不输出完整 LLM summary 或 raw 内容。
+
+专项验证：
+
+```bash
+1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_evidence_summary.py -v
+```

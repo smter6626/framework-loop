@@ -2,8 +2,9 @@
 """Run a fail-closed, recoverable Reviewer/Executor mutation loop.
 
 P6 uses runtime-enforced role schemas and the overwrite-only checkpoint to apply
-one explicitly authorized workload Runtime transition. Peer payload bytes are
-preserved; embedded natural language is never interpreted by Python.
+one explicitly authorized workload Runtime transition, retain raw evidence locally,
+and publish one tracked evidence summary. Peer payload bytes are preserved;
+embedded natural language is never interpreted by Python.
 """
 
 from __future__ import annotations
@@ -29,8 +30,9 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 SCRIPT_PATH = Path(__file__).resolve()
 FRAMEWORK_ROOT = SCRIPT_PATH.parents[2]
 ACTIVE_ROOT = FRAMEWORK_ROOT / "1PCloop"
-DEFAULT_RUNS_ROOT = ACTIVE_ROOT / "runs"
+DEFAULT_RUNS_ROOT = ACTIVE_ROOT / ".local" / "runs"
 DEFAULT_STATE_ROOT = ACTIVE_ROOT / ".local" / "state"
+DEFAULT_SUMMARY_ROOT = ACTIVE_ROOT / "evidence-summaries"
 DEFAULT_FRAMEWORK_STATIC = ACTIVE_ROOT / "docs/miniloop_static.md"
 DEFAULT_FRAMEWORK_RUNTIME = ACTIVE_ROOT / "docs/miniloop_runtime.md"
 DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
@@ -76,10 +78,11 @@ RUNTIME_TRANSITION_PENDING = "RUNTIME_TRANSITION_PENDING"
 RUNTIME_TRANSITION_COMMITTED = "RUNTIME_TRANSITION_COMMITTED"
 HUMAN_GATE = "HUMAN_GATE"
 FAILED_CLOSED = "FAILED_CLOSED"
+EVIDENCE_FINALIZATION_PENDING = "EVIDENCE_FINALIZATION_PENDING"
+FRAMEWORK_EVIDENCE_COMMITTED = "FRAMEWORK_EVIDENCE_COMMITTED"
+FRAMEWORK_EVIDENCE_PUSHED = "FRAMEWORK_EVIDENCE_PUSHED"
 TERMINAL_CHECKPOINT_STATES = {
-    RUNTIME_TRANSITION_COMMITTED,
-    HUMAN_GATE,
-    FAILED_CLOSED,
+    FRAMEWORK_EVIDENCE_PUSHED,
 }
 
 
@@ -96,6 +99,20 @@ def load_p4_helpers() -> ModuleType:
 
 
 P4 = load_p4_helpers()
+
+
+def load_p63_helpers() -> ModuleType:
+    path = SCRIPT_PATH.with_name("p63_evidence.py")
+    spec = importlib.util.spec_from_file_location("_p63_evidence", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load P6.3 helpers: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+P63 = load_p63_helpers()
 
 
 class InvariantViolation(RuntimeError):
@@ -1503,11 +1520,15 @@ def write_manifest(
     cycles: Sequence[Dict[str, Any]],
     processes: Sequence[Dict[str, Any]],
     run_configuration: Mapping[str, Any],
+    evidence_finalization: Optional[Mapping[str, Any]] = None,
+    logical_outcome: Optional[Mapping[str, Any]] = None,
 ) -> None:
     manifest = {
         "cycles": list(cycles),
+        "evidence_finalization": dict(evidence_finalization or {}),
         "finished_at": P4.utc_now() if status != "RUNNING" else None,
         "governance_initial": governance_initial.metadata(),
+        "logical_outcome": dict(logical_outcome) if logical_outcome is not None else None,
         "reason": reason,
         "reviewer_state": reviewer_state.metadata(),
         "run_configuration": dict(run_configuration),
@@ -1532,6 +1553,33 @@ def workload_id_for_args(args: argparse.Namespace) -> str:
     return P4.validate_run_id(candidate)
 
 
+def p63_enabled(args: argparse.Namespace) -> bool:
+    """CLI namespaces always opt in; older programmatic P6 fixtures remain valid."""
+    return getattr(args, "framework_repo", None) is not None
+
+
+def framework_repo_for_args(args: argparse.Namespace) -> Path:
+    return Path(getattr(args, "framework_repo", FRAMEWORK_ROOT)).resolve()
+
+
+def summary_path_for_args(args: argparse.Namespace, run_id: str) -> Path:
+    root = Path(getattr(args, "summary_root", DEFAULT_SUMMARY_ROOT)).resolve()
+    return root / f"{P4.validate_run_id(run_id)}.md"
+
+
+def framework_settings(args: argparse.Namespace) -> Dict[str, str]:
+    repo = framework_repo_for_args(args)
+    branch = getattr(args, "framework_branch", "main")
+    remote = getattr(args, "framework_remote", "origin")
+    push_ref = getattr(args, "framework_push_ref", f"refs/heads/{branch}")
+    return {
+        "branch": branch,
+        "push_ref": push_ref,
+        "remote": remote,
+        "repo": str(repo),
+    }
+
+
 def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
     return state_root.resolve() / workload_id_for_args(args) / "checkpoint.json"
@@ -1539,7 +1587,7 @@ def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
 
 def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
-    return {
+    configuration = {
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "executor_home": str(args.executor_home.resolve()),
         "enable_runtime_transition": bool(getattr(args, "enable_runtime_transition", False)),
@@ -1557,6 +1605,16 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         "workload_runtime": str(args.workload_runtime.resolve()),
         "workload_static": str(args.workload_static.resolve()),
     }
+    if p63_enabled(args):
+        settings = framework_settings(args)
+        configuration.update({
+            "evidence_summary": str(summary_path_for_args(args, args.run_id)),
+            "framework_branch": settings["branch"],
+            "framework_push_ref": settings["push_ref"],
+            "framework_remote": settings["remote"],
+            "framework_repo": settings["repo"],
+        })
+    return configuration
 
 
 def target_state_from_metadata(value: Mapping[str, Any]) -> TargetState:
@@ -1628,11 +1686,73 @@ def recover_reviewer_state_from_turn(turn: TurnResult) -> ReviewerState:
     )
 
 
+def validate_framework_preflight(args: argparse.Namespace) -> Dict[str, Any]:
+    settings = framework_settings(args)
+    repo = Path(settings["repo"])
+    summary_path = summary_path_for_args(args, args.run_id)
+    runs_root = args.runs_root.resolve()
+    state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT).resolve()
+    if paths_overlap(repo, args.target_repo):
+        raise InvariantViolation(
+            "target repository and framework repository must be independent, non-overlapping trees"
+        )
+    for label, path in (
+        ("framework Static", args.framework_static.resolve()),
+        ("framework Runtime", args.framework_runtime.resolve()),
+        ("tracked summary", summary_path),
+    ):
+        if not P4.path_is_within(path, repo):
+            raise InvariantViolation(f"{label} must be inside the configured framework repository")
+    if not P4.path_is_within(summary_path, Path(getattr(args, "summary_root")).resolve()):
+        raise InvariantViolation("summary path escapes the configured summary root")
+    if paths_overlap(summary_path, runs_root) or paths_overlap(summary_path, state_root):
+        raise InvariantViolation("tracked summary overlaps local raw/state storage")
+    if paths_overlap(runs_root, state_root):
+        raise InvariantViolation("runs root and checkpoint state root must be distinct")
+    for governance_path in (
+        args.framework_static, args.framework_runtime,
+        args.workload_static, args.workload_runtime,
+    ):
+        if summary_path == governance_path.resolve():
+            raise InvariantViolation("tracked summary must be distinct from governance inputs")
+    for label, local_root in (("runs root", runs_root), ("state root", state_root)):
+        if P4.path_is_within(local_root, repo):
+            relative = local_root.relative_to(repo)
+            probe = relative / ".1pcloop-ignore-probe"
+            completed = subprocess.run(
+                ["git", "check-ignore", "-q", "--no-index", "--", probe.as_posix()],
+                cwd=str(repo), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+            if completed.returncode != 0:
+                raise InvariantViolation(f"{label} inside framework repository must be Git-ignored")
+    if summary_path.is_symlink() or summary_path.parent.is_symlink():
+        raise InvariantViolation("tracked summary path must not use a symlink")
+    try:
+        state = P63.capture_framework(
+            repo=repo,
+            branch=settings["branch"],
+            remote=settings["remote"],
+            push_ref=settings["push_ref"],
+            require_clean=not bool(getattr(args, "resume", False)),
+        )
+    except P63.EvidenceError as exc:
+        raise InvariantViolation(str(exc)) from exc
+    if not getattr(args, "resume", False):
+        if state["remote_head"] != state["head"]:
+            raise InvariantViolation(
+                "framework remote ref must equal the local framework HEAD before a new run"
+            )
+        if summary_path.exists():
+            raise InvariantViolation("tracked evidence summary already exists for this run ID")
+    return state
+
+
 def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, GovernanceSnapshot]:
     target_repo = args.target_repo.resolve()
     runs_root = args.runs_root.resolve()
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT).resolve()
-    if paths_overlap(target_repo, FRAMEWORK_ROOT):
+    framework_repo = framework_repo_for_args(args)
+    if paths_overlap(target_repo, framework_repo):
         raise InvariantViolation(
             "target repository and framework repository must be independent, non-overlapping trees"
         )
@@ -1658,6 +1778,8 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
         WORKLOAD_RUNTIME: args.workload_runtime,
     }
     governance = capture_governance(governance_paths)
+    if p63_enabled(args):
+        validate_framework_preflight(args)
     validate_json_schema({}, {"type": "object"})
     for name in TURN_SCHEMAS:
         strict_json(schema_path(name).read_bytes())
@@ -2043,6 +2165,37 @@ def reconcile_runtime_transition(
     emit_progress(f"transition={plan['transition_id']} runtime_write_verified=true")
 
 
+def framework_commit_allowlist(
+    args: argparse.Namespace,
+    summary_path: Path,
+    *,
+    include_runtime_transition: bool,
+) -> List[Path]:
+    repo = framework_repo_for_args(args)
+    allowed = [summary_path.resolve()]
+    runtime = args.workload_runtime.resolve()
+    if include_runtime_transition and P4.path_is_within(runtime, repo):
+        allowed.append(runtime)
+    return allowed
+
+
+def turn_summary_context(
+    turn: TurnResult,
+    *,
+    fallback_before: Optional[Mapping[str, Any]],
+    fallback_after: Optional[Mapping[str, Any]],
+    fallback_hashes: Optional[Mapping[str, str]],
+) -> Tuple[Optional[Mapping[str, Any]], Optional[Mapping[str, Any]], Dict[str, str]]:
+    process = turn.process
+    before = process.get("reviewer_target_before") or process.get("target_before") or fallback_before
+    after = process.get("reviewer_target_after") or process.get("target_after") or fallback_after
+    context = process.get("authoritative_context")
+    hashes = context.get("current_hashes") if isinstance(context, dict) else None
+    if not isinstance(hashes, dict):
+        hashes = fallback_hashes or {}
+    return before, after, dict(hashes)
+
+
 def orchestrate(
     *,
     args: argparse.Namespace,
@@ -2054,8 +2207,13 @@ def orchestrate(
 ) -> Tuple[int, Path]:
     checkpoint_store = CheckpointStore(checkpoint_path_for_args(args))
     resume_requested = bool(getattr(args, "resume", False))
+    evidence_finalization_enabled = p63_enabled(args)
     configuration = checkpoint_configuration(args)
     progress_interval = float(getattr(args, "progress_interval_seconds", 15.0))
+    summary_path = (
+        summary_path_for_args(args, args.run_id)
+        if evidence_finalization_enabled else None
+    )
     governance_paths = {
         FRAMEWORK_STATIC: args.framework_static.resolve(),
         FRAMEWORK_RUNTIME: args.framework_runtime.resolve(),
@@ -2064,7 +2222,8 @@ def orchestrate(
     }
     if resume_requested:
         checkpoint = checkpoint_store.load()
-        if checkpoint["state"] in {HUMAN_GATE, FAILED_CLOSED}:
+        if (not evidence_finalization_enabled
+                and checkpoint["state"] in {HUMAN_GATE, FAILED_CLOSED}):
             raise InvariantViolation("terminal checkpoint has no incomplete work to resume")
         if checkpoint.get("configuration") != configuration:
             raise InvariantViolation("resume configuration does not match checkpoint")
@@ -2078,15 +2237,28 @@ def orchestrate(
         target_initial = target_state_from_metadata(checkpoint.get("target_initial", {}))
         transition_plan = checkpoint.get("runtime_transition")
         initial_hashes = checkpoint.get("governance_initial_hashes")
-        if checkpoint["state"] in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}:
+        transition_recovery = checkpoint["state"] in {
+            RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED
+        } or (
+            checkpoint["state"] in {
+                EVIDENCE_FINALIZATION_PENDING,
+                FRAMEWORK_EVIDENCE_COMMITTED,
+                FRAMEWORK_EVIDENCE_PUSHED,
+            }
+            and bool(checkpoint.get("runtime_transition_applied", False))
+        )
+        if transition_recovery:
             if not isinstance(transition_plan, dict) or not isinstance(initial_hashes, dict):
                 raise InvariantViolation("Runtime transition recovery metadata is missing")
-            last = checkpoint.get("last_state_transition", {})
-            allowed_from = ({REVIEW_COMPLETED, RUNTIME_TRANSITION_PENDING}
-                            if checkpoint["state"] == RUNTIME_TRANSITION_PENDING
-                            else {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED})
-            if last.get("to") != checkpoint["state"] or last.get("from") not in allowed_from:
-                raise InvariantViolation("checkpoint does not permit this Runtime transition state")
+            if checkpoint["state"] in {
+                RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED
+            }:
+                last = checkpoint.get("last_state_transition", {})
+                allowed_from = ({REVIEW_COMPLETED, RUNTIME_TRANSITION_PENDING}
+                                if checkpoint["state"] == RUNTIME_TRANSITION_PENDING
+                                else {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED})
+                if last.get("to") != checkpoint["state"] or last.get("from") not in allowed_from:
+                    raise InvariantViolation("checkpoint does not permit this Runtime transition state")
             for name, sha in governance_initial.hashes().items():
                 allowed = {initial_hashes.get(name)}
                 if name == f"{WORKLOAD_RUNTIME}_sha256":
@@ -2122,6 +2294,13 @@ def orchestrate(
         target_before_metadata = checkpoint.get("target_before")
         target_after_metadata = checkpoint.get("target_after")
         summary_progress = checkpoint.get("summary_progress", [])
+        summary_pending = checkpoint.get("summary_pending")
+        logical_outcome = checkpoint.get("logical_outcome")
+        framework_initial = checkpoint.get("framework_initial")
+        framework_commit_plan = checkpoint.get("framework_commit_plan")
+        framework_commit_id = checkpoint.get("framework_commit_id")
+        framework_push_result = checkpoint.get("framework_push_result")
+        evidence_finalization_error = checkpoint.get("evidence_finalization_error")
         runtime_transition_applied = bool(
             checkpoint.get("runtime_transition_applied", False)
         )
@@ -2133,6 +2312,11 @@ def orchestrate(
         )
         if not isinstance(summary_progress, list):
             raise InvariantViolation("checkpoint summary progress is invalid")
+        if evidence_finalization_enabled:
+            if not isinstance(framework_initial, dict):
+                raise InvariantViolation("checkpoint framework preimage is missing")
+            if summary_path != Path(configuration["evidence_summary"]).resolve():
+                raise InvariantViolation("checkpoint summary path is inconsistent")
         emit_progress(
             f"run={run_id} resume state={state} cycle={cycle_number} "
             f"target_head={target_initial.head}"
@@ -2140,7 +2324,12 @@ def orchestrate(
     else:
         if checkpoint_store.exists():
             previous = checkpoint_store.load()
-            if previous["state"] not in TERMINAL_CHECKPOINT_STATES:
+            completed_states = (
+                TERMINAL_CHECKPOINT_STATES
+                if evidence_finalization_enabled
+                else {RUNTIME_TRANSITION_COMMITTED, HUMAN_GATE, FAILED_CLOSED}
+            )
+            if previous["state"] not in completed_states:
                 raise InvariantViolation(
                     "an incomplete checkpoint exists; use --resume or explicitly remove "
                     "the local checkpoint after Human review"
@@ -2163,12 +2352,22 @@ def orchestrate(
         active_turn_relative = None
         target_before_metadata = None
         target_after_metadata = None
-        summary_progress: List[str] = []
+        summary_progress: List[Dict[str, Any]] = []
+        summary_pending = None
+        logical_outcome = None
         runtime_transition_applied = False
         transition_plan = None
         initial_hashes = governance_initial.hashes()
         framework_evidence_committed = False
         framework_evidence_pushed = False
+        framework_commit_plan = None
+        framework_commit_id = None
+        framework_push_result = None
+        evidence_finalization_error = None
+        framework_initial = (
+            validate_framework_preflight(args)
+            if evidence_finalization_enabled else None
+        )
         run_configuration = {
             "approval_policy": "bypassed",
             "approvals_and_sandbox_bypassed": True,
@@ -2178,7 +2377,10 @@ def orchestrate(
             "executor_sandbox": NO_CODEX_SANDBOX,
             "executor_session_mode": FRESH_EPHEMERAL,
             "execution_policy": "prompt-defined-roles-with-post-turn-mechanical-audit",
-            "framework_git_head": git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"]),
+            "framework_git_head": (
+                framework_initial["head"] if framework_initial is not None
+                else git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"])
+            ),
             "max_cycles": args.max_cycles,
             "reviewer_home": str(args.reviewer_home.resolve()),
             "reviewer_session_mode": "persistent-with-explicit-resume",
@@ -2187,6 +2389,11 @@ def orchestrate(
             "timeout_seconds": args.timeout_seconds,
             "workload_id": workload_id_for_args(args),
         }
+        if evidence_finalization_enabled:
+            run_configuration["evidence_finalization"] = {
+                **framework_settings(args),
+                "summary_path": str(summary_path),
+            }
 
     def persist(
         checkpoint_state: str,
@@ -2206,11 +2413,17 @@ def orchestrate(
             "governance_initial_hashes": initial_hashes,
             "framework_evidence_committed": framework_evidence_committed,
             "framework_evidence_pushed": framework_evidence_pushed,
+            "evidence_finalization_error": evidence_finalization_error,
+            "framework_commit_id": framework_commit_id,
+            "framework_commit_plan": framework_commit_plan,
+            "framework_initial": framework_initial,
+            "framework_push_result": framework_push_result,
             "instruction_reference": instruction_reference,
             "last_state_transition": {
                 "from": prior_state,
                 "to": checkpoint_state,
             },
+            "logical_outcome": logical_outcome,
             "manifest_reason": manifest_reason,
             "manifest_status": manifest_status,
             "processes": processes,
@@ -2222,6 +2435,7 @@ def orchestrate(
             "run_root": str(run_root),
             "started_at": started_at,
             "summary_progress": summary_progress,
+            "summary_pending": summary_pending,
             "target_after": target_after_metadata,
             "target_before": target_before_metadata,
             "target_initial": target_initial.metadata(),
@@ -2239,9 +2453,256 @@ def orchestrate(
             cycles=cycles,
             processes=processes,
             run_configuration=run_configuration,
+            evidence_finalization={
+                "commit_id": framework_commit_id,
+                "committed": framework_evidence_committed,
+                "error": evidence_finalization_error,
+                "pushed": framework_evidence_pushed,
+                "push_result": framework_push_result,
+                "summary_entries": [
+                    item.get("entry_id") for item in summary_progress
+                ],
+                "summary_path": str(summary_path) if summary_path is not None else None,
+            },
+            logical_outcome=logical_outcome,
         )
         if checkpoint_observer is not None:
             checkpoint_observer(checkpoint_state, written)
+
+    def logical_manifest() -> Tuple[str, Optional[str]]:
+        if isinstance(logical_outcome, dict):
+            return (
+                str(logical_outcome.get("manifest_status", "RUNNING")),
+                logical_outcome.get("reason"),
+            )
+        return "RUNNING", None
+
+    def reconcile_pending_summary() -> None:
+        nonlocal summary_pending
+        if not evidence_finalization_enabled or summary_pending is None:
+            return
+        assert summary_path is not None
+        emit_progress(
+            f"run={run_id} summary_entry={summary_pending.get('entry_id')} "
+            "state=reconciling"
+        )
+        record = P63.reconcile_summary_plan(
+            plan=summary_pending,
+            summary_path=summary_path,
+            run_id=run_id,
+            run_root=run_root,
+            progress=summary_progress,
+        )
+        if any(item.get("entry_id") == record["entry_id"] for item in summary_progress):
+            raise InvariantViolation("pending summary entry is already checkpointed")
+        summary_progress.append(record)
+        summary_pending = None
+        status, reason = logical_manifest()
+        persist(state, manifest_status=status, manifest_reason=reason)
+        emit_progress(
+            f"run={run_id} summary_entry={record['entry_id']} state=reconciled"
+        )
+
+    def record_turn_summary(
+        turn: TurnResult,
+        *,
+        fallback_before: Optional[Mapping[str, Any]] = None,
+        fallback_after: Optional[Mapping[str, Any]] = None,
+        fallback_hashes: Optional[Mapping[str, str]] = None,
+    ) -> None:
+        nonlocal summary_pending
+        if not evidence_finalization_enabled:
+            return
+        assert summary_path is not None
+        structured: Optional[Dict[str, Any]] = None
+        if turn.success:
+            try:
+                structured = validate_turn_payload(
+                    turn.final_message, turn.process.get("output_schema")
+                )
+            except (OSError, RuntimeError, ValueError):
+                structured = None
+        before, after, hashes = turn_summary_context(
+            turn,
+            fallback_before=fallback_before,
+            fallback_after=fallback_after,
+            fallback_hashes=fallback_hashes,
+        )
+        entry = P63.build_turn_entry(
+            run_id=run_id,
+            run_root=run_root,
+            cycle_number=cycle_number,
+            turn_dir=turn.turn_dir,
+            process=turn.process,
+            structured_payload=structured,
+            target_before=before,
+            target_after=after,
+            governance_hashes=hashes,
+        )
+        existing = [
+            item for item in summary_progress
+            if item.get("entry_id") == entry["entry_id"]
+        ]
+        if existing:
+            P63.validate_summary_file(
+                summary_path=summary_path,
+                run_id=run_id,
+                run_root=run_root,
+                progress=summary_progress,
+            )
+            if len(existing) != 1:
+                raise InvariantViolation("summary entry ID is not unique")
+            emit_progress(
+                f"run={run_id} summary_entry={entry['entry_id']} state=already-recorded"
+            )
+            return
+        plan = P63.build_summary_plan(
+            summary_path=summary_path,
+            run_id=run_id,
+            run_root=run_root,
+            progress=summary_progress,
+            entry=entry,
+        )
+        summary_pending = plan
+        emit_progress(
+            f"run={run_id} summary_entry={plan['entry_id']} state=pending"
+        )
+        status, reason = logical_manifest()
+        persist(state, manifest_status=status, manifest_reason=reason)
+        P63.reconcile_summary_plan(
+            plan=plan,
+            summary_path=summary_path,
+            run_id=run_id,
+            run_root=run_root,
+            progress=summary_progress,
+        )
+        summary_progress.append(plan)
+        summary_pending = None
+        persist(state, manifest_status=status, manifest_reason=reason)
+        emit_progress(
+            f"run={run_id} summary_entry={plan['entry_id']} state=written"
+        )
+
+    def finish_evidence() -> Tuple[int, Path]:
+        nonlocal framework_commit_plan, framework_commit_id
+        nonlocal framework_evidence_committed, framework_evidence_pushed
+        nonlocal framework_push_result, evidence_finalization_error
+        if not evidence_finalization_enabled:
+            if not isinstance(logical_outcome, dict):
+                raise InvariantViolation("logical outcome is missing")
+            return int(logical_outcome["exit_code"]), run_root
+        if not isinstance(logical_outcome, dict) or not isinstance(framework_initial, dict):
+            raise InvariantViolation("evidence finalization metadata is incomplete")
+        evidence_finalization_error = None
+        assert summary_path is not None
+        status, reason = logical_manifest()
+        P63.validate_summary_file(
+            summary_path=summary_path,
+            run_id=run_id,
+            run_root=run_root,
+            progress=summary_progress,
+        )
+        if state not in {
+            EVIDENCE_FINALIZATION_PENDING,
+            FRAMEWORK_EVIDENCE_COMMITTED,
+            FRAMEWORK_EVIDENCE_PUSHED,
+        }:
+            emit_progress(
+                f"run={run_id} logical_outcome={logical_outcome['state']} "
+                "evidence_finalization=pending"
+            )
+            persist(
+                EVIDENCE_FINALIZATION_PENDING,
+                manifest_status=status,
+                manifest_reason=reason,
+            )
+        if state == EVIDENCE_FINALIZATION_PENDING:
+            settings = framework_settings(args)
+            if framework_commit_plan is None:
+                framework_commit_plan = P63.build_framework_commit_plan(
+                    repo=Path(settings["repo"]),
+                    branch=settings["branch"],
+                    remote=settings["remote"],
+                    push_ref=settings["push_ref"],
+                    expected_parent=framework_initial["head"],
+                    expected_remote_head=framework_initial["remote_head"],
+                    expected_remote_url=framework_initial["remote_url"],
+                    run_id=run_id,
+                    allowed_paths=framework_commit_allowlist(
+                        args,
+                        summary_path,
+                        include_runtime_transition=runtime_transition_applied,
+                    ),
+                    required_summary=summary_path,
+                )
+                emit_progress(f"run={run_id} framework_commit=pending")
+                persist(
+                    EVIDENCE_FINALIZATION_PENDING,
+                    manifest_status=status,
+                    manifest_reason=reason,
+                )
+            framework_commit_id, commit_result = P63.commit_or_reconcile(
+                framework_commit_plan
+            )
+            framework_evidence_committed = True
+            emit_progress(
+                f"run={run_id} framework_commit={commit_result} "
+                f"commit={framework_commit_id}"
+            )
+            persist(
+                FRAMEWORK_EVIDENCE_COMMITTED,
+                manifest_status=status,
+                manifest_reason=reason,
+            )
+        if state == FRAMEWORK_EVIDENCE_COMMITTED:
+            if not isinstance(framework_commit_plan, dict) or not isinstance(
+                framework_commit_id, str
+            ):
+                raise InvariantViolation("framework evidence commit checkpoint is incomplete")
+            emit_progress(
+                f"run={run_id} framework_push=pending commit={framework_commit_id}"
+            )
+            framework_push_result = P63.push_or_reconcile(
+                framework_commit_plan, framework_commit_id
+            )
+            framework_evidence_pushed = True
+            emit_progress(
+                f"run={run_id} framework_push={framework_push_result} "
+                f"commit={framework_commit_id}"
+            )
+            persist(
+                FRAMEWORK_EVIDENCE_PUSHED,
+                manifest_status=status,
+                manifest_reason=reason,
+            )
+        if state == FRAMEWORK_EVIDENCE_PUSHED:
+            if not framework_evidence_committed or not framework_evidence_pushed:
+                raise InvariantViolation("final evidence checkpoint flags are incomplete")
+            if P63.push_or_reconcile(framework_commit_plan, framework_commit_id) != "already-present":
+                raise InvariantViolation("final framework remote verification was not idempotent")
+            return int(logical_outcome["exit_code"]), run_root
+        raise InvariantViolation("unsupported evidence finalization state")
+
+    def reach_logical_outcome(
+        outcome_state: str,
+        *,
+        manifest_status: str,
+        reason: str,
+        exit_code: int,
+    ) -> Tuple[int, Path]:
+        nonlocal logical_outcome
+        logical_outcome = {
+            "exit_code": exit_code,
+            "manifest_status": manifest_status,
+            "reason": reason,
+            "state": outcome_state,
+        }
+        persist(
+            outcome_state,
+            manifest_status=manifest_status,
+            manifest_reason=reason,
+        )
+        return finish_evidence()
 
     def active_turn_path(default: Path) -> Path:
         if isinstance(active_turn_relative, str):
@@ -2278,6 +2739,25 @@ def orchestrate(
 
     if not resume_requested:
         persist(PREFLIGHT_PASSED)
+    elif evidence_finalization_enabled:
+        if summary_pending is not None:
+            reconcile_pending_summary()
+        else:
+            assert summary_path is not None
+            P63.validate_summary_file(
+                summary_path=summary_path,
+                run_id=run_id,
+                run_root=run_root,
+                progress=summary_progress,
+            )
+        if state in {
+            HUMAN_GATE,
+            FAILED_CLOSED,
+            EVIDENCE_FINALIZATION_PENDING,
+            FRAMEWORK_EVIDENCE_COMMITTED,
+            FRAMEWORK_EVIDENCE_PUSHED,
+        }:
+            return finish_evidence()
 
     instruction: Optional[TurnResult] = (
         load_turn_reference(instruction_reference, run_root)
@@ -2336,9 +2816,21 @@ def orchestrate(
                         progress_interval_seconds=progress_interval,
                     )
                 if not recovered.success:
+                    record_turn_summary(
+                        recovered,
+                        fallback_before=target_initial.metadata(),
+                        fallback_after=target_initial.metadata(),
+                        fallback_hashes=initial_hashes,
+                    )
                     raise InvariantViolation(
                         f"initial Reviewer process failed: {recovered.process['failure']}"
                     )
+                record_turn_summary(
+                    recovered,
+                    fallback_before=target_initial.metadata(),
+                    fallback_after=target_initial.metadata(),
+                    fallback_hashes=initial_hashes,
+                )
                 instruction = recovered
                 processes.append(instruction.process)
                 instruction_reference = turn_reference(instruction, run_root)
@@ -2374,6 +2866,12 @@ def orchestrate(
                     freshness["target_head_changed"]
                 )
                 if refresh is not None:
+                    record_turn_summary(
+                        refresh,
+                        fallback_before=target_for_freshness.metadata(),
+                        fallback_after=target_for_freshness.metadata(),
+                        fallback_hashes=governance_before.hashes(),
+                    )
                     processes.append(refresh.process)
                     cycle["reviewer_pre_executor_refresh"] = refresh.process
                     cycle["reviewer_instruction_source"] = relative_evidence_path(
@@ -2440,12 +2938,12 @@ def orchestrate(
                     if current_target.head != target_before.head:
                         active_turn_relative = None
                         target_after_metadata = current_target.metadata()
-                        persist(
+                        return reach_logical_outcome(
                             HUMAN_GATE,
                             manifest_status="STOPPED_FOR_HUMAN_REVIEW",
-                            manifest_reason="executor_outcome_ambiguous_after_restart",
+                            reason="executor_outcome_ambiguous_after_restart",
+                            exit_code=0,
                         )
-                        return 0, run_root
                     if turn_dir.exists():
                         turn_dir = next_turn_attempt(cycle_dir / "executor")
                         active_turn_relative = relative_evidence_path(turn_dir, run_root)
@@ -2503,6 +3001,16 @@ def orchestrate(
                     or reviewer_state.known_hashes.get(f"{name}_sha256")
                     != governance_after.hashes()[f"{name}_sha256"]
                 ]
+                executor.process["target_before"] = target_before.metadata()
+                executor.process["target_after"] = target_after.metadata()
+                executor.process["governance_hashes"] = governance_after.hashes()
+                P4.write_json(executor.turn_dir / "process.json", executor.process)
+                record_turn_summary(
+                    executor,
+                    fallback_before=target_before.metadata(),
+                    fallback_after=target_after.metadata(),
+                    fallback_hashes=governance_after.hashes(),
+                )
                 cycle["governance_after_executor"] = governance_after.metadata()
                 cycle["governance_changes_during_executor"] = governance_changes
                 if reviewer_state.known_hashes != governance_after.hashes():
@@ -2623,9 +3131,21 @@ def orchestrate(
                         progress_interval_seconds=progress_interval,
                     )
                 if not recovered.success:
+                    record_turn_summary(
+                        recovered,
+                        fallback_before=target_after.metadata(),
+                        fallback_after=target_after.metadata(),
+                        fallback_hashes=capture_governance(governance_paths).hashes(),
+                    )
                     raise InvariantViolation(
                         f"Reviewer review process failed: {recovered.process['failure']}"
                     )
+                record_turn_summary(
+                    recovered,
+                    fallback_before=target_after.metadata(),
+                    fallback_after=target_after.metadata(),
+                    fallback_hashes=capture_governance(governance_paths).hashes(),
+                )
                 instruction = recovered
                 processes.append(instruction.process)
                 cycle["reviewer_review"] = instruction.process
@@ -2647,10 +3167,15 @@ def orchestrate(
                 )
                 emit_progress(f"run={run_id} cycle={cycle_number} verdict={value['verdict']}")
                 if value["verdict"] == "HUMAN_GATE":
-                    emit_progress(f"waiting_for_human: {value['peer_message']}")
-                    persist(HUMAN_GATE, manifest_status="STOPPED_FOR_HUMAN_REVIEW",
-                            manifest_reason="reviewer_human_gate")
-                    return 0, run_root
+                    emit_progress(
+                        "waiting_for_human: reason recorded in the tracked evidence summary"
+                    )
+                    return reach_logical_outcome(
+                        HUMAN_GATE,
+                        manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                        reason="reviewer_human_gate",
+                        exit_code=0,
+                    )
                 if value["verdict"] == "ACCEPT":
                     validate_accept(args=args, turn=instruction, state=reviewer_state,
                                     target=current_target, governance=current_governance,
@@ -2671,19 +3196,19 @@ def orchestrate(
                 before = target_state_from_metadata(target_before_metadata)
                 after = target_state_from_metadata(target_after_metadata)
                 if after.head == before.head:
-                    persist(
+                    return reach_logical_outcome(
                         HUMAN_GATE,
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
-                        manifest_reason="target_head_unchanged",
+                        reason="target_head_unchanged",
+                        exit_code=0,
                     )
-                    return 0, run_root
                 if cycle_number == args.max_cycles:
-                    persist(
+                    return reach_logical_outcome(
                         HUMAN_GATE,
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
-                        manifest_reason="max_cycles_reached",
+                        reason="max_cycles_reached",
+                        exit_code=0,
                     )
-                    return 0, run_root
                 cycle_number += 1
                 executor = None
                 executor_reference = None
@@ -2703,10 +3228,12 @@ def orchestrate(
                     committed=was_committed,
                 )
                 runtime_transition_applied = True
-                persist(RUNTIME_TRANSITION_COMMITTED,
-                        manifest_status=RUNTIME_TRANSITION_COMMITTED,
-                        manifest_reason="one_reviewer_accept_transition_completed")
-                return 0, run_root
+                return reach_logical_outcome(
+                    RUNTIME_TRANSITION_COMMITTED,
+                    manifest_status=RUNTIME_TRANSITION_COMMITTED,
+                    reason="one_reviewer_accept_transition_completed",
+                    exit_code=0,
+                )
 
             raise InvariantViolation(f"unsupported checkpoint state: {state}")
     except (OSError, RuntimeError, ValueError) as exc:
@@ -2721,6 +3248,68 @@ def orchestrate(
             state if transition_interrupted and isinstance(exc, OSError)
             else HUMAN_GATE if transition_interrupted else FAILED_CLOSED
         )
+        if evidence_finalization_enabled:
+            if state in {
+                EVIDENCE_FINALIZATION_PENDING,
+                FRAMEWORK_EVIDENCE_COMMITTED,
+                FRAMEWORK_EVIDENCE_PUSHED,
+            }:
+                evidence_finalization_error = reason
+                emit_progress(
+                    f"run={run_id} evidence_finalization=failed state={state}"
+                )
+                try:
+                    status, original_reason = logical_manifest()
+                    persist(
+                        state,
+                        manifest_status=status,
+                        manifest_reason=original_reason,
+                    )
+                except (OSError, RuntimeError, ValueError) as checkpoint_exc:
+                    emit_progress(
+                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                    )
+                return 1, run_root
+            if transition_interrupted and isinstance(exc, OSError):
+                try:
+                    persist(
+                        state,
+                        manifest_status="STOPPED_FOR_HUMAN_REVIEW",
+                        manifest_reason=reason,
+                    )
+                except (OSError, RuntimeError, ValueError) as checkpoint_exc:
+                    emit_progress(
+                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                    )
+                return 1, run_root
+            try:
+                return reach_logical_outcome(
+                    failure_state,
+                    manifest_status=(
+                        "STOPPED_FOR_HUMAN_REVIEW"
+                        if transition_interrupted else "FAILED_CLOSED"
+                    ),
+                    reason=reason,
+                    exit_code=1,
+                )
+            except (OSError, RuntimeError, ValueError) as finalization_exc:
+                evidence_finalization_error = str(finalization_exc)
+                emit_progress(
+                    f"run={run_id} evidence_finalization=failed "
+                    f"state={state}"
+                )
+                try:
+                    status, original_reason = logical_manifest()
+                    persist(
+                        state,
+                        manifest_status=status,
+                        manifest_reason=original_reason,
+                    )
+                except (OSError, RuntimeError, ValueError) as checkpoint_exc:
+                    emit_progress(
+                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                    )
+                return 1, run_root
         try:
             persist(
                 failure_state,
@@ -2737,7 +3326,7 @@ def orchestrate(
 def preflight_report(
     target: TargetState, governance: GovernanceSnapshot, args: argparse.Namespace
 ) -> Dict[str, Any]:
-    return {
+    report = {
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "execution_policy": {
             "approval_policy": "bypassed",
@@ -2758,6 +3347,30 @@ def preflight_report(
             "working_tree_clean": target.clean,
         },
     }
+    if p63_enabled(args):
+        report["evidence_finalization"] = {
+            **framework_settings(args),
+            "summary_path": str(summary_path_for_args(args, args.run_id)),
+        }
+    return report
+
+
+def normalize_cli_args(args: argparse.Namespace) -> argparse.Namespace:
+    args.framework_repo = args.framework_repo.resolve()
+    active_root = args.framework_repo / "1PCloop"
+    if args.framework_static is None:
+        args.framework_static = active_root / "docs/miniloop_static.md"
+    if args.framework_runtime is None:
+        args.framework_runtime = active_root / "docs/miniloop_runtime.md"
+    if args.runs_root is None:
+        args.runs_root = active_root / ".local/runs"
+    if args.state_root is None:
+        args.state_root = active_root / ".local/state"
+    if args.summary_root is None:
+        args.summary_root = active_root / "evidence-summaries"
+    if args.framework_push_ref is None:
+        args.framework_push_ref = f"refs/heads/{args.framework_branch}"
+    return args
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -2769,19 +3382,20 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--enable-runtime-transition", action="store_true",
                         help="allow one Reviewer ACCEPT transition if workload Runtime also opts in")
     parser.add_argument("--max-cycles", type=int, default=8)
-    parser.add_argument(
-        "--framework-static", type=Path, default=DEFAULT_FRAMEWORK_STATIC
-    )
-    parser.add_argument(
-        "--framework-runtime", type=Path, default=DEFAULT_FRAMEWORK_RUNTIME
-    )
+    parser.add_argument("--framework-repo", type=Path, default=FRAMEWORK_ROOT)
+    parser.add_argument("--framework-branch", default="main")
+    parser.add_argument("--framework-remote", default="origin")
+    parser.add_argument("--framework-push-ref")
+    parser.add_argument("--framework-static", type=Path)
+    parser.add_argument("--framework-runtime", type=Path)
     parser.add_argument("--reviewer-home", type=Path, default=DEFAULT_REVIEWER_HOME)
     parser.add_argument("--executor-home", type=Path, default=DEFAULT_EXECUTOR_HOME)
     parser.add_argument("--codex-bin", default=shutil.which("codex") or "codex")
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--run-id", default=P4.default_run_id())
-    parser.add_argument("--runs-root", type=Path, default=DEFAULT_RUNS_ROOT)
-    parser.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
+    parser.add_argument("--runs-root", type=Path)
+    parser.add_argument("--state-root", type=Path)
+    parser.add_argument("--summary-root", type=Path)
     parser.add_argument(
         "--workload-id",
         help="stable checkpoint key; defaults to the workload Static parent directory",
@@ -2806,7 +3420,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+    args = normalize_cli_args(parse_args(argv))
     if args.max_cycles <= 0:
         raise SystemExit("--max-cycles must be positive")
     if args.timeout_seconds <= 0:

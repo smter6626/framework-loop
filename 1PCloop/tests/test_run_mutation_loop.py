@@ -76,7 +76,8 @@ else:
 schema_file = Path(args[args.index("--output-schema") + 1])
 message_type = schema_file.name.removesuffix(".schema.json")
 wrapper = dict(schema_version=1, message_type=message_type,
-               evidence_summary="Fixture evidence summary", peer_message=final.decode())
+               evidence_summary=os.environ.get("P6_TEST_SUMMARY", "Fixture evidence summary"),
+               peer_message=final.decode())
 if message_type == "reviewer_verdict":
     start = prompt.index(b"--- BEGIN P5 DETERMINISTIC AUTHORITATIVE CONTEXT ---")
     envelope_text = prompt[start:].split(b"\n", 1)[1].decode()
