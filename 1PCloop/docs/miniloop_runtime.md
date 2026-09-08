@@ -31,7 +31,7 @@ Reviewer persistent + explicit resume
 = NOT A PERMANENT ARCHITECTURE INVARIANT
 
 P6 control-plane hardening
-= ACTIVE / P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 NEXT
+= ACTIVE / P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 ACCEPTED / P6.4 NEXT
 
 P7 controlled REJECT -> REPAIR fault injection
 = DEFERRED UNTIL P6 ACCEPTANCE
@@ -1081,7 +1081,7 @@ they must not be mislabeled as small maintenance fixes.
 
 ## 2026-09-06 — P6 Human-authorized control-plane hardening plan
 
-Status: `ACTIVE — P6.1 AND P6.2 ACCEPTED; P6.3 IS THE NEXT ACTIVE STEP`
+Status: `ACTIVE — P6.1, P6.2 AND P6.3 ACCEPTED; P6.4 IS THE SOLE ACTIVE STEP`
 
 This section is the authoritative P6 plan. It supersedes the earlier proposed
 sequencing that placed controlled `REJECT -> REPAIR -> re-review` before Runtime
@@ -1454,7 +1454,7 @@ deferred.
 
 ### P6.3 — Local raw evidence and tracked per-turn summary
 
-Status: `AUTHORITATIVE ACTIVE STEP`
+Status: `IMPLEMENTED, VALIDATED AND INDEPENDENTLY ACCEPTED`
 
 Future raw evidence must default to a Git-ignored path equivalent to:
 
@@ -1497,9 +1497,72 @@ entries are complete and non-duplicated across restart, terminal-state framework
 evidence is committed once, and push failure is recoverable without replaying Agent
 work.
 
+Implementation and independent review result:
+
+- implementation commit: `c782be79890155a706d1492384aa530afc16333f`;
+- future mutation-loop raw evidence now defaults to Git-ignored
+  `1PCloop/.local/runs/<run-id>/`, while explicit `--runs-root` remains supported and
+  committed `1PCloop/runs/` history remains unchanged;
+- every completed turn produces one deterministic tracked summary entry containing
+  schema-declared evidence summary and bounded mechanical metadata, without copying
+  complete peer messages, prompts, events, stderr, process JSON or hidden reasoning;
+- summary text is encoded in a fixed Markdown/JSON envelope so multiline text,
+  headings, backticks, HTML markers and Unicode cannot inject a second entry or
+  control marker;
+- summary append uses checkpointed entry bytes and preimage/postimage hashes plus a
+  same-directory temporary file, flush/fsync and `os.replace`; restart reconciles
+  pre-write, post-write/pre-checkpoint and checkpointed-entry boundaries without
+  repeating the Agent turn or summary entry;
+- logical outcome remains distinct from evidence finalization through
+  `EVIDENCE_FINALIZATION_PENDING`, `FRAMEWORK_EVIDENCE_COMMITTED` and
+  `FRAMEWORK_EVIDENCE_PUSHED`;
+- one terminal framework evidence commit is bound to the run ID, expected ordinary
+  parent, exact path set/blob hashes and configured framework branch/remote/ref/URL;
+  its allowlist contains the current run summary and, only after an actually applied
+  legal transition, the framework-resident workload Runtime;
+- framework push is non-force and framework-only. A rejected push retains the local
+  commit; resume verifies or pushes that exact commit without rerunning Agents,
+  rewriting Runtime, appending summary entries or creating a second commit;
+- Runtime transition recovery remains idempotent while evidence commit/push is
+  pending. The target repository is never committed or pushed by the framework
+  finalizer.
+
+Independent Reviewer test/evidence summary:
+
+1. The focused P6.3 suite passed `17 / 17` in `36.692s`, covering ignored raw
+   storage, ordered bounded summaries, injection-safe text, summary/commit/push crash
+   boundaries, terminal outcomes, framework allowlists and target-push prohibition.
+2. The complete P4/P5/P6.1/P6.2/P6.3 regression passed `70 / 70` in `97.213s` with
+   `ResourceWarning` promoted to an error; `git diff --check` also passed.
+3. Disposable real-Git smoke evidence at
+   `/private/var/folders/10/81g7llps60j555m_0191lzsc0000gn/T/1pcloop-p63-final-git-smoke-sciux3jb`
+   retained `3` Agent calls and `3` summary entries across resume. Its summary
+   SHA-256 is
+   `ecd10ada6a030a404859fdd4f7736fd84b2e1baa68bcada46887c8ef5eaa0e16`.
+4. The smoke created evidence commit
+   `b9e629bafce32bdcd92bda092fdd7c867cb04516`; after the first push was rejected,
+   resume advanced the framework remote to that exact commit without replay. The
+   target remote remained
+   `afcb2f064c4c169f1b6bf7a63a4aee80f52d41f3` before and after.
+
+Interpretation boundary:
+
+- the smoke used real disposable Git repositories and a local bare remote, while
+  Codex turns used the deterministic test substitute rather than the real Codex
+  service;
+- validation did not perform a real `kill -9`, P7 fault injection or a live
+  concurrent target-HEAD experiment;
+- supported operation remains single writer with no concurrency guarantee;
+- raw evidence remains Git-ignored local evidence, and old checkpoints are not
+  upgraded automatically;
+- these limits do not block the independent Reviewer acceptance of P6.3.
+
+The independent Reviewer verdict closes P6.3. P6 remains active overall; P6.4 is
+the sole authoritative Active Step, and P7 remains deferred.
+
 ### P6.4 — Sequential lifecycle and external-mutation boundary
 
-Status: `DOCUMENTATION/BOUNDARY WORK QUEUED IN P6`
+Status: `AUTHORITATIVE ACTIVE STEP`
 
 The supported operating assumption is:
 
@@ -1543,7 +1606,8 @@ P6 may be accepted only after all of the following are true:
 10. a disposable real-Git smoke demonstrates the accepted one-transition path without
     modifying or reopening the closed `multiLanguage_v1` workload.
 
-Until this gate is satisfied, P6 remains the only authoritative framework Active Step.
+Until this gate is satisfied, P6 remains active overall. Within P6, P6.4 is the sole
+authoritative Active Step.
 
 ### P7 sequencing decision
 
