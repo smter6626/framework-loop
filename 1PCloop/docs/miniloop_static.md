@@ -1,19 +1,24 @@
 # 1PCloop Static
 
-## Objective
+## 目标
 
 在一台 Apple Silicon Mac 上实现并验证一个最小可运行的 Reviewer–Executor 自动闭环（1PCloop）。
 
-除完成工程闭环验证外，本项目的最终目标还包括形成一个具备进一步研究基础的
-research prototype（研究雏形）。项目应把真实实现、失败模式、修复过程、角色隔离、
-context management、evidence-backed acceptance 与 Human Gate 的运行证据，逐步提炼为
-可检验的 research question、明确的 hypothesis 候选和可复现的对照实验方向。
+本项目当前的稳定产出是：
 
-运行过程中已经观察到、但尚未被证明的潜在 Research Questions 记录在 Runtime。具体
-RQ 可以随新 evidence 增补、修正、合并或降级，因此单个 RQ 不是永久 Static contract；
-但保留从工程 evidence 形成研究问题、并支持后续 controlled experiment 的能力，是本项目
-的稳定目标。记录 RQ 不表示相应 hypothesis 已成立，也不表示已经证明 literature novelty、
-形成可发表 contribution 或授权立即开展额外实验。
+- 可运行、可审核的 engineering artifact；
+- 可用于后续受控实验的 experimental harness；
+- 对真实实现、失败模式、修复过程、角色隔离、context management、evidence handling 与 Human Gate 的可追溯记录。
+
+2026-09-09 完成的三轮 adversarial novelty audit 已确认，旧 `researchPlan.md` 中的 authoritative transition、decision-preserving memory、evidence sufficiency 等宽研究方向不再具备可支持的宽泛 novelty。因此：
+
+- `Framework-as-paper` 暂停；
+- Framework 保留为 methodology artifact；
+- 1PCloop 保留为 engineering artifact / experimental harness；
+- 工程验收、regression 通过或 P6 / P7 closure 不得自动升级为 scientific finding 或 paper novelty；
+- 任何未来 cheap pilot 必须先在 `researchPlan.md` 中通过 exact-RQ、direct-prior 与 advisor-judgment 门；任何向正式研究的扩展还必须通过 pilot-result 与资源决策门。
+
+运行过程中仍可记录 research-question signal，但记录不表示 hypothesis 成立、literature novelty 已确认、已形成可发表 contribution 或已授权开展额外实验。已被后续 prior-work audit 覆盖的旧 RQ 只能作为历史记录、engineering requirement 或新 exact RQ 下的局部变量。
 
 当前 active implementation 不再以“单个本地 Ollama/Qwen 模型实例 + 两个逻辑 session”为运行前提，而是使用同一台 M4 Max 上已经独立配置好的两个 ChatGPT/Codex identity：
 
@@ -516,6 +521,8 @@ Reviewer
 
 ## Immediate Implementation Order
 
+> **历史边界：** 以下列表记录 1PCloop 初始 bootstrap 时的实现顺序，不表示当前 active step。当前唯一有效的工程状态和下一步只看 `1PCloop/docs/miniloop_runtime.md`。
+
 当前优先顺序：
 
 1. **DONE — account/profile bootstrap**：建立 `.codex-A` / `.codex-B` 两个独立 profile；
@@ -535,6 +542,8 @@ Reviewer
 ## Completion Definition
 
 当上述 Acceptance Criteria 全部满足并由 Reviewer 基于实际 evidence 验收后，1PCloop task 才能从 `ACTIVE` 迁移为 `COMPLETED`。
+
+该完成定义只针对 engineering artifact。Framework-as-paper、论文 novelty、controlled research outcome 或某个 narrow candidate pilot 都不是 1PCloop 工程完成的前置条件。
 
 在此之前，即使：
 

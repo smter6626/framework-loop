@@ -32,9 +32,21 @@ Reviewer persistent + explicit resume
 
 P6 control-plane hardening
 = ACTIVE / P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 ACCEPTED / P6.4 NEXT
+= ENGINEERING CLOSURE / NOT A PHD-APPLICATION OR PAPER BLOCKER
 
 P7 controlled REJECT -> REPAIR fault injection
-= DEFERRED UNTIL P6 ACCEPTANCE
+= DEFERRED / NOT RESEARCH-AUTHORIZED BY THE OLD PLAN
+
+Framework-as-paper
+= PAUSED AFTER THREE-ROUND NOVELTY AUDIT
+
+1PCloop current research role
+= ENGINEERING ARTIFACT + EXPERIMENTAL HARNESS
+
+researchPlan.md
+= REPLACED ON 2026-09-09
+= CHEAP PILOTS REQUIRE EXACT-RQ + DIRECT-PRIOR + ADVISOR GATES
+= FORMAL EXPANSION ALSO REQUIRES PILOT-RESULT + RESOURCE-DECISION GATES
 ```
 
 Real workload run `20260906T102252Z-52187` stopped mechanically at
@@ -286,6 +298,24 @@ P3 已完成并建立当前 `--ephemeral` baseline。该 evidence 只描述本�
 ---
 
 ## Other Notes
+
+### 2026-09-09 — 研究方向收缩与旧计划失效
+
+2026-09-08 至 2026-09-09 的三轮 adversarial novelty audit 对 Framework / 1PCloop 的宽研究方向作出了新的当前判断：
+
+- execution governance / authoritative transition：`A — DEAD`；
+- decision-semantics-preserving memory / compression：`A — DEAD AS A BROAD DIRECTION`；
+- claim-relative evidence adequacy / layered acceptance：`A — DEAD`。
+
+由此产生的当前 supersession：
+
+- 旧 `researchPlan.md` 中的 RQ1–RQ6、“第一篇论文主线”和 full experiment matrix 不再是当前研究执行依据；
+- `researchPlan.md` 已直接替换为当前方向、三个 narrow candidates 和研究启用门；
+- Framework 保留为 methodology artifact，1PCloop 保留为 engineering artifact / experimental harness；
+- P6.4 仍是当前 authoritative engineering step，但不是 PhD 申请或 paper blocker；
+- P7 仍 deferred；旧 paper plan 不再授权其作为 research experiment。
+
+本记录只追加 current correction / supersession，不回写或删除下方已保留的历史 RQ 记录和 Done evidence。
 
 ### 2026-09-05 — Repository path correction / supersession
 
@@ -574,10 +604,12 @@ Reviewer persistence 继续是 preferred implementation candidate，而不是永
 
 ## Observed Research Questions — Non-Blocking Research Notes
 
-Status: `OBSERVATION ONLY — DOES NOT AFFECT ACTIVE IMPLEMENTATION`
+Status: `HISTORICAL OBSERVATION ONLY — PRIORITY SUPERSEDED BY 2026-09-09 NOVELTY AUDIT`
 
 本节记录在 1PCloop 当前实现、P4-A / P4-B 实验与 review 过程中自然暴露出的 research-question signals。  
 这些内容只是研究方向观察，不属于当前 authoritative Active Step，不修改 Static，不改变已有 Acceptance Criteria，不授权新的 implementation / experiment，也不影响当前工程主线的执行顺序。
+
+**2026-09-09 当前边界：** 下列 RQ 的原建议等级只是历史记录，不再表示当前 priority 或 novelty。当前研究方向、narrow candidates 与启用条件只看 `1PCloop/researchPlan.md`。
 
 ### RQ1 — Persistent session memory 与 authoritative external state 应如何分工？
 
@@ -1612,6 +1644,8 @@ authoritative Active Step.
 ### P7 sequencing decision
 
 Status: `DEFERRED — NOT ACTIVE`
+
+2026-09-09 方向收缩后，P7 不再因旧 paper plan 而自动成为 research experiment。它在 P6 验收后仍可作为 engineering-coverage candidate，但若要作为研究 treatment，必须先满足当前 `researchPlan.md` 定义的 exact-RQ、direct-prior 与 advisor-judgment 门，并被预先定义为 cheap pilot 或已通过 pilot-result 门的扩展实验。
 
 After P6 acceptance, P7 may introduce a controlled, explicitly recorded defect in a
 disposable repository or dedicated test branch to exercise:
