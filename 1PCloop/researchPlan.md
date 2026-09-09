@@ -30,6 +30,53 @@
 
 如果实验无法证明总体收益，也应报告机制在哪些任务或故障类型下有效、无效或成本过高，避免把负面结果隐藏为工程细节。
 
+### 3.1 Novelty风险：被视为简单Multi-Agent应用
+
+一个需要主动面对的负面解释是：1PCloop只是常见的Reviewer–Executor工作流，再附加一些状态管理和工程保护。这个风险是实质性的，因为多Agent角色分工、critique–repair、persistent session、external memory、工具调用和测试执行都已有大量先例。
+
+因此，Reviewer–Executor分解应被明确定位为**实验载体**，而不是论文的主要贡献。论文不应对下列单项机制主张novelty：
+
+- 使用多个Agent；
+- 设置Reviewer和Executor角色；
+- 自动传递消息；
+- persistent context或external memory；
+- critique、REJECT和repair；
+- 测试执行；
+- structured output；
+- 单独存在的普通access control。
+
+需要研究的对象是长时程Agent工作流中的**control semantics**：
+
+- authoritative external state与conversation/session state的区别；
+- state freshness、invalidation和supersession；
+- 不同角色的mutation与transition authority；
+- evidence sufficiency与evidence-backed acceptance；
+- execution success、test success、review verdict和authoritative transition的分层语义；
+- 中断或状态不一致后的fail-closed recovery；
+- 无法机械确认正确性时的Human Gate行为。
+
+因此，论文不应把核心claim写成：
+
+> Reviewer–Executor多Agent架构提高了编码性能。
+
+更可辩护、但仍需要实验支持的claim是：
+
+> 显式权限、可从外部重建的权威状态、基于证据的接受条件和恢复语义，能否减少长时程Agent工作流中的false acceptance与invalid state progression？
+
+候选贡献是围绕workflow authority、state validity、evidence sufficiency和acceptance semantics，对已有机制进行明确整合与可操作化，并证明这种整合能够阻止可测量的故障；不能仅以系统包含这些机制为由宣称创新。
+
+### 3.2 Novelty风险解除标准
+
+只有同时满足以下条件，才能认为“简单Multi-Agent应用”的风险得到实质性缓解：
+
+1. 递增baseline和消融能够区分多Agent分解与Framework控制机制的效果；
+2. 结果表明multi-agent decomposition本身不能完全解释可靠性变化；
+3. 至少一个Framework相对于简单Multi-Agent baseline新增的控制机制，在受控条件下可测量地降低false acceptance、stale-state failure、invalid transition或recovery error；
+4. 该收益不是单纯由更多模型调用、更大token预算或更强模型造成；
+5. 同时报告false rejection、Human Gate和运行成本，避免把“更保守”误写成“更正确”。
+
+如果简单Reviewer–Executor baseline与完整Framework表现相近，则更强的治理机制尚未得到实证支持，应据实缩小或否定相关claim。获得上述证据之前，1PCloop只能描述为research prototype和hypothesis-generating system，不能描述为已经验证的新型Agent架构。
+
 ## 4. Research Questions 与假设
 
 ### RQ1：外部权威状态与恢复正确性
@@ -164,11 +211,12 @@ Reviewer persistent、Executor fresh 的非对称策略，是否优于两个角�
 |---|---|---|
 | A | 单 Agent one-shot，依据自身结果结束 | 最弱基线 |
 | B | 单 Agent persistent session，并进行 self-review | 区分多轮思考和独立审核 |
-| C | Reviewer–Executor 分角色，但共享完整上下文 | 检验角色名称本身是否有效 |
-| D | Reviewer–Executor context isolation，Reviewer检查实际 evidence | 检验独立审核效应 |
-| E | D + repository-backed authoritative state + evidence-gated transition | 检验完整研究机制 |
+| C | Reviewer–Executor 分角色、共享完整上下文，Reviewer可检查实际 evidence | 检验角色分工在不隔离上下文时的效果 |
+| D | C + Reviewer–Executor context isolation | 检验context isolation的增量效应 |
+| E | D + mechanically evidence-gated acceptance | 检验evidence gate的增量效应 |
+| F | E + authoritative Runtime、capability-gated transition、recovery semantics与Human Gate | 检验完整Framework机制 |
 
-如果预算有限，正式研究至少保留 A、D、E；B和C可先用于较小规模的机制消融。
+如果预算有限，正式研究至少保留A、D、F；B、C和E可先用于较小规模的机制消融。但如果论文的主要目标是解除“只是简单Multi-Agent”的novelty风险，C、D、E、F之间至少要保留足够的相邻比较，不能只比较最弱单Agent与完整Framework。
 
 所有实验组应尽可能保持以下条件一致：
 
@@ -258,6 +306,8 @@ Reviewer verdict和Executor汇报都是被研究对象，不能作为最终正�
 - 首轮缺陷检出率；
 - repair success rate；
 - 平均repair轮数；
+- invalid Runtime/state transition rate；
+- stale或superseded state/evidence复用率；
 - 重复执行、重复commit或重复transition次数；
 - Human Gate比例；
 - Human Gate中真正需要人工判断的比例；
@@ -390,6 +440,8 @@ pilot阶段可先对每个任务—条件运行约3次，用于估计结果方�
 - 明确最接近的独立verification、state continuity和coding-agent研究；
 - 冻结第一篇论文的主RQ、主要终点和baseline；
 - 写出哪些内容是已有工作、哪些是待验证差异。
+- 建立“已有单项机制—1PCloop操作化方式—对应消融条件—可测故障”的novelty矩阵；
+- 明确哪些结果会支持核心claim，哪些结果将迫使论文降级为负面结果、经验报告或研究原型说明。
 
 ### 阶段B：Pilot
 
@@ -412,6 +464,7 @@ Pilot只用于调整协议，不与后续正式结果混合报告为确认性证
 - 根据主实验结果选择必要的RQ4、RQ5或RQ6消融；
 - 在额外仓库或模型上验证方向是否一致；
 - 分析可靠性收益来自角色隔离、状态外化、证据审核还是额外计算量。
+- 直接检验简单Reviewer–Executor是否已经能够解释完整Framework的效果；若可以，则不得继续宣称额外治理机制具有独立贡献。
 
 ### 阶段E：论文分析
 
@@ -437,6 +490,7 @@ Pilot只用于调整协议，不与后续正式结果混合报告为确认性证
 - 有受控REJECT → REPAIR和中断恢复数据；
 - 明确报告false acceptance与可靠性成本；
 - 结论没有超出实验覆盖的仓库、任务和模型范围。
+- 至少一个Framework相对于简单Multi-Agent baseline新增的控制机制产生可测量的独立收益。
 
 ## 18. 通俗解释
 
