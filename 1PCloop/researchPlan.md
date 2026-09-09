@@ -77,6 +77,76 @@
 
 如果简单Reviewer–Executor baseline与完整Framework表现相近，则更强的治理机制尚未得到实证支持，应据实缩小或否定相关claim。获得上述证据之前，1PCloop只能描述为research prototype和hypothesis-generating system，不能描述为已经验证的新型Agent架构。
 
+### 3.3 理论抽象：执行状态不等于权威状态
+
+普通Agent workflow通常主要管理conversation、graph或team执行到了哪里。1PCloop拟研究的是另一个层级：一次Agent调用结束后，系统是否具备足够权限、当前状态和实际证据，把任务从一个权威状态推进到下一个权威状态。
+
+可将一次运行的研究状态抽象为：
+
+\[
+X_t=(S,R_t,A_t,V_t,C^R_t,C^E_t,K_t)
+\]
+
+其中：
+
+- \(S\)：相对稳定的任务合同；
+- \(R_t\)：当前authoritative Runtime；
+- \(A_t\)：实际artifact或repository状态；
+- \(V_t\)：可检查的evidence；
+- \(C^R_t\)、\(C^E_t\)：Reviewer和Executor的working context；
+- \(K_t\)：控制流程的checkpoint状态。
+
+该抽象的关键假设是：
+
+\[
+C^R_t,C^E_t \neq authoritative\ truth
+\]
+
+Agent session是可能过期、缺失或重建的working memory，而不是workflow truth。即使Reviewer输出ACCEPT，也只有在下列条件同时成立时，才构成有效的状态推进候选：
+
+\[
+Transition = Verdict_{accept}
+\land EvidenceValid
+\land StateFresh
+\land AuthorityValid
+\land PreconditionsSatisfied
+\]
+
+因此，`Executor声称成功`、`测试进程成功`、`Reviewer给出ACCEPT`与`authoritative state已经推进`必须作为不同事件测量，不能合并为一个宽泛的“任务完成”。
+
+### 3.4 四个核心Control Semantics
+
+为避免论文退化为功能清单，第一篇论文可以把研究对象压缩为四个相互连接的语义：
+
+1. **Authority：** 谁有资格让workflow从 \(S_t\) 正式进入 \(S_{t+1}\)？
+2. **Freshness：** 一个verdict在什么条件下仍然对当前repository、Runtime和evidence有效？
+3. **Evidence：** 什么证据足以支持formal acceptance，而不只是Agent声称成功？
+4. **Recovery：** 中断后如何继续，同时避免重复已成功的side effect，也不基于stale state推进？
+
+它们组成的候选控制链是：
+
+```text
+Current authoritative state
+→ authorized action
+→ artifact
+→ inspectable evidence
+→ verdict
+→ validated transition
+→ next authoritative state
+```
+
+任一必要条件无法验证时，系统进入fail closed或Human Gate。这里的Human Gate不是泛指“Agent不知道答案所以问人”，而是表示control plane无法证明自主推进所需的前置条件成立。
+
+### 3.5 与通用Multi-Agent Framework的定位关系
+
+1PCloop不应被定位成“比某个通用multi-agent framework更高级的framework”。通用框架可以提供routing、state persistence、checkpoint、HITL、guardrail等primitives，应用开发者理论上也可以在其上实现与1PCloop接近的行为。
+
+更稳健的定位是：
+
+> 1PCloop是一套面向长时程Agent workflow的control/governance protocol及其实验性实现；底层执行载体可以是当前Python/Codex组合，也可以是其他Agent runtime。
+
+拟研究的是state、authority、evidence、transition和recovery的语义与效果，而不是Agent A如何把消息发送给Agent B。协议的概念可迁移性不等于第一篇论文必须在所有主流runtime上重新实现；但论文必须承认相同机制原则上可以在其他runtime上实现，不能用“其他框架缺少某个功能”代替实证novelty。
+
 ## 4. Research Questions 与假设
 
 ### RQ1：外部权威状态与恢复正确性
@@ -152,6 +222,14 @@ Reviewer persistent、Executor fresh 的非对称策略，是否优于两个角�
 
 > From Conversation State to Repository-Backed Control: Reliable Recovery and Acceptance for Long-Horizon Coding Agents
 
+候选收益具有明确的适用条件。对于短小、无中断、无状态漂移的happy-path任务，完整控制机制可能只增加latency、I/O、调用次数和不必要的Human Gate；不应预设它在所有任务上优于简单workflow。更合理的研究命题是：
+
+\[
+ReliabilityGain(long\ horizon,\ failures) > GovernanceOverhead
+\]
+
+实验应分别报告正常短任务的额外开销，以及长任务或故障条件下的可靠性收益，并研究收益从什么任务长度、状态复杂度或故障概率开始超过成本。
+
 ## 6. 实验对象与任务采样
 
 ### 6.1 两层任务集
@@ -218,6 +296,8 @@ Reviewer persistent、Executor fresh 的非对称策略，是否优于两个角�
 
 如果预算有限，正式研究至少保留A、D、F；B、C和E可先用于较小规模的机制消融。但如果论文的主要目标是解除“只是简单Multi-Agent”的novelty风险，C、D、E、F之间至少要保留足够的相邻比较，不能只比较最弱单Agent与完整Framework。
 
+主消融应尽可能在同一底层执行载体上进行，只开启或关闭待研究机制。直接比较“1PCloop实现”和“另一个现成框架”会同时改变prompt、调度、状态表示、工具封装和默认行为，难以把差异归因于control semantics。跨框架复现可以作为外部有效性补充，但不应替代同一载体上的递增消融。
+
 所有实验组应尽可能保持以下条件一致：
 
 - 使用相同任务起点；
@@ -274,6 +354,17 @@ initial defective result
 - Reviewer是否依据新evidence更新判断；
 - 最终是否发生错误接受或不必要拒绝。
 
+### 8.4 Control Semantics与实验操作化
+
+| 研究抽象 | 受控干预示例 | 正确反应 | 主要测量 |
+|---|---|---|---|
+| Authority | Executor尝试ACCEPT；错误role请求推进；Reviewer verdict绕过机械条件 | 拒绝未授权推进，权威状态不变 | invalid transition、unauthorized acceptance |
+| Freshness | verdict生成后改变Runtime、target HEAD或相关evidence | 旧verdict失效，停止或重新审核 | stale-state reuse、false acceptance、Human Gate |
+| Evidence | Executor声称测试通过但证据缺失；locator、hash或revision不匹配 | 不把claim视为充分证据 | false acceptance、证据查验率、false rejection |
+| Recovery | 在side effect完成后、确认记录前中断；session history丢失 | 识别已完成副作用，不重复执行，并从当前权威状态继续 | recovery correctness、duplicate execution/transition |
+
+这张映射用于防止论文只做“系统功能演示”。每个核心抽象都必须对应可重复干预、预先定义的正确反应和定量结果。
+
 ## 9. Ground Truth
 
 Reviewer verdict和Executor汇报都是被研究对象，不能作为最终正确性的唯一依据。
@@ -318,6 +409,15 @@ Reviewer verdict和Executor汇报都是被研究对象，不能作为最终正�
 ### 10.3 复合指标限制
 
 不建议只报告一个自定义“总体可靠性分数”。正确率、安全性和成本应分别报告；如果使用复合指标，必须同时公开其组成项和权重，并提供不同权重下的敏感性分析。
+
+### 10.4 Happy Path与Failure Path分层报告
+
+正常短任务与长时程/故障任务应分层报告，不应只给出混合平均值：
+
+- happy path主要衡量治理机制的额外开销和不必要阻断；
+- failure path主要衡量false acceptance、invalid progression和recovery error的下降；
+- 进一步按任务长度、状态变化次数和故障类型分析效果异质性；
+- 如果可靠性收益只出现在人为构造的极端故障中，应明确限制应用结论。
 
 ## 11. 实验流程
 
@@ -442,6 +542,8 @@ pilot阶段可先对每个任务—条件运行约3次，用于估计结果方�
 - 写出哪些内容是已有工作、哪些是待验证差异。
 - 建立“已有单项机制—1PCloop操作化方式—对应消融条件—可测故障”的novelty矩阵；
 - 明确哪些结果会支持核心claim，哪些结果将迫使论文降级为负面结果、经验报告或研究原型说明。
+- 优先核查AutoGen、LangGraph/LangChain、CrewAI、OpenAI Agents SDK等代表性系统的官方文档与论文，区分它们提供的primitives、默认保证以及需要应用自行实现的语义；
+- 避免使用“其他框架不能恢复、没有HITL或没有持久化”等未经严格限定、且容易被反例推翻的比较。
 
 ### 阶段B：Pilot
 
