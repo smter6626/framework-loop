@@ -35,8 +35,12 @@ P6 control-plane hardening
 = P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 ACCEPTED / P6.4 ACCEPTED
 
 P7 controlled REJECT -> REPAIR fault injection
-= ACTIVE NEXT PHASE / NOT YET IMPLEMENTED
-= NOT RESEARCH-AUTHORIZED BY THE OLD PLAN
+= PAUSED BY HUMAN OWNER / NOT ACTIVE
+= MAY RESUME ONLY AFTER EXPLICIT HUMAN REACTIVATION
+
+Current engineering task
+= foundation_v1 / AUTHORITATIVE ACTIVE TASK
+= 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Framework-as-paper
 = PAUSED AFTER THREE-ROUND NOVELTY AUDIT
@@ -46,6 +50,8 @@ Framework-as-paper
 
 researchPlan.md
 = REPLACED ON 2026-09-09
+= PAUSED / FROZEN RESEARCH MAP ON 2026-09-12
+= NOT AN ACTIVE ENGINEERING EXECUTION PLAN
 = CHEAP PILOTS REQUIRE EXACT-RQ + DIRECT-PRIOR + ADVISOR GATES
 = FORMAL EXPANSION ALSO REQUIRES PILOT-RESULT + RESOURCE-DECISION GATES
 ```
@@ -57,9 +63,10 @@ French live transcription, accepted the explicitly recorded residual manual-cove
 limits, and closed the `multiLanguage_v1` workload phase. No run #3 is required.
 Target push and merge remain separate Human-controlled integration actions.
 
-Overall 1PCloop remains `ACTIVE` under the Static Completion Definition. The
-accepted milestones above do not by themselves claim that every final framework
-Acceptance Criterion has been completed.
+Overall 1PCloop remains `ACTIVE` under the Static Completion Definition. Detailed
+foundation progress is maintained only in the task-local Runtime at
+`1PCloop/workloads/foundation_v1/workload_runtime.md`; this global Runtime retains
+the phase pointer and high-level transitions to avoid further unbounded growth.
 
 ## Lossless Historical Compaction
 
@@ -299,6 +306,39 @@ P3 已完成并建立当前 `--ephemeral` baseline。该 evidence 只描述本�
 ---
 
 ## Other Notes
+
+### 2026-09-12 — Post-P6 engineering-foundation transition
+
+Status: `CURRENT SUPERSESSION / HUMAN OWNER AUTHORIZED`
+
+Human Owner changed the current execution priority after P6 closure:
+
+```text
+P6 closed
+-> post-P6 smoke exposed a usability gap
+-> P7 paused by Human decision
+-> foundation_v1 activated
+```
+
+Reason and scope:
+
+- current resources prioritize a daily-usable, diagnosable, recoverable and
+  maintainable engineering foundation rather than continuing a paper-driven P7
+  experiment sequence;
+- this is a Human Owner direction/resource decision informed by recent prior-work
+  review, not a claim that all literature or research space has been exhausted;
+- P4–P6 accepted results remain valid and frozen; P6 is not reopened;
+- P7 is retained as optional future reliability coverage but is not active and may
+  run only after explicit Human reactivation;
+- `foundation_v1` is the sole current engineering task. Its stable contract and
+  detailed state are task-local:
+  - `1PCloop/workloads/foundation_v1/workload_static.md`;
+  - `1PCloop/workloads/foundation_v1/workload_runtime.md`;
+- the durable compact post-P6 observation is
+  `1PCloop/evidence-summaries/post-p6-foundation-smoke-20260912.md`.
+
+This global Runtime will record only future phase pointers and high-level
+transitions; foundation step progress belongs in the task-local Runtime.
 
 ### 2026-09-09 — 研究方向收缩与旧计划失效
 
@@ -1688,17 +1728,17 @@ P6 completion decision — `ACCEPTED / PHASE CLOSED`:
 
 All P6 subphases are independently accepted and the completion gate is satisfied.
 P6 is closed without claiming locking, concurrency safety, a real `kill -9`, a live
-concurrent Target-HEAD experiment or P7 fault injection. P7 is now the sole
-authoritative Active Step.
+concurrent Target-HEAD experiment or P7 fault injection. At the P6-closure
+checkpoint, P7 became the next Active Step; the Human Owner's `2026-09-12`
+engineering-foundation decision above supersedes that activation.
 
 ### P7 sequencing decision
 
-Status: `AUTHORITATIVE ACTIVE STEP`
+Status: `PAUSED BY HUMAN OWNER / NOT ACTIVE`
 
-2026-09-09 方向收缩后，P7 不因旧 paper plan 而自动成为 research experiment。P6 已完成
-验收，因此 P7 现在作为 engineering-coverage step 激活；若要作为研究 treatment，仍必须先
-满足当前 `researchPlan.md` 定义的 exact-RQ、direct-prior 与 advisor-judgment 门，并被预先
-定义为 cheap pilot 或已通过 pilot-result 门的扩展实验。
+P7 在 P6 关闭时曾被激活为下一 engineering-coverage step。Human Owner 于 `2026-09-12`
+暂停该状态并将当前资源转向 foundation_v1；这是 current authoritative supersession。P7
+未删除，只有 Human Owner 明确重新激活后才可执行。旧 paper/research 路线不构成重新激活授权。
 
 P7 retains the authorized objective of introducing a controlled, explicitly recorded
 defect in a disposable repository or dedicated test branch to exercise:
@@ -1713,6 +1753,6 @@ Reviewer detects defect
 
 The injected commit, actor, timing, expected defect and experiment boundary must be
 recorded so the result is not misreported as a naturally occurring Executor error.
-This governance transition activates P7 only. No defect is introduced, no rejection
-path is executed, and no P7 implementation or fault injection is completed in this
-turn.
+No defect has been introduced and no P7 fault injection has been completed. While P7
+is paused, its objective is retained only as historical/future scope; foundation_v1
+is the sole current engineering task.

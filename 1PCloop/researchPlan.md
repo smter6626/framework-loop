@@ -1,27 +1,34 @@
-# 1PCloop 当前研究方向与实验启用规则
+# 1PCloop 暂停/冻结的研究地图与未来实验启用规则
 
-> **状态：** 2026-09-09 起生效的当前研究计划。
+> **状态：** `PAUSED / FROZEN RESEARCH MAP`；`NOT AN ACTIVE ENGINEERING EXECUTION PLAN`。
 >
-> **替代关系：** 本版本直接替代三轮 novelty audit 之前的 1PCloop 论文/实验计划。旧版本仅由 Git 历史保留，不再是当前执行依据。
+> **当前 supersession：** Human Owner 于 `2026-09-12` 暂停 paper/research-driven 路线，
+> 将当前工程资源转向 foundation_v1。本文件保留三轮 novelty audit、dead directions、窄候选
+> 和未来 research gates，但不再驱动当前工程执行。
 >
-> **中心边界：** Framework 不再是预设 paper thesis；1PCloop 保留为 engineering artifact 和 experimental harness。任何 cheap pilot 必须先通过 exact-RQ、direct-prior 与 advisor-judgment 门；任何从 pilot 向正式研究的扩展还必须通过 pilot-result 与资源决策门。不得从 Framework design 本身推断 novelty。
+> **中心边界：** 当前没有 active paper experiment；候选 A/B/C 均未激活。未来只有 Human
+> Owner 明确重新打开 research track 后，本文件才恢复为研究规划输入。foundation_v1 工程
+> 工作不需要通过 research/advisor gate。
 
 ---
 
 ## 1. 文档职责
 
-本文件只维护：
+本文件冻结保留：
 
-- 1PCloop 当前的研究定位；
+- 1PCloop 在暂停时点的研究定位；
 - 已被删除的宽研究方向；
 - 尚可保留的窄候选问题；
-- 未来实验的启用条件、停止条件与 claim boundary。
+- 未来重新启用 research track 时的条件、停止条件与 claim boundary。
 
 本文件不维护：
 
 - P6.4 / P7 等工程执行状态，该状态只由 `1PCloop/docs/miniloop_runtime.md` 维护；
 - 1PCloop 稳定工程约束和验收标准，该内容只由 `1PCloop/docs/miniloop_static.md` 维护；
 - 三轮 audit 的完整 paper-by-paper 论证，详情保留在对应 kill report 与三轮中文研究地图。
+
+当前工程状态只由全局 Runtime 与 foundation_v1 task-local Static/Runtime 维护。本文件不得用来
+激活 P7、候选 A/B/C 或 foundation step，也不把 foundation_v1 的详细进度复制到研究地图。
 
 ---
 
@@ -259,13 +266,14 @@ Runtime transition
 
 ---
 
-## 7. 与 1PCloop 工程路线的关系
+## 7. 与 1PCloop 工程路线的历史/冻结关系
 
 ### P6.4
 
-P6.4 保持当前 active engineering step。它的价值是完善 sequential lifecycle 与 external-mutation boundary，不是恢复旧 paper plan。
+P6.4 曾作为 active engineering step 完善 sequential lifecycle 与 external-mutation boundary，
+随后已独立接受并随 P6 关闭。本段保留当时的研究边界，不是当前工程状态。
 
-P6.4 可以继续，但：
+P6.4 当时可以继续，但：
 
 - 不是 PhD 申请材料的 blocker；
 - 不为旧 RQ1–RQ6 提供 novelty；
@@ -273,25 +281,28 @@ P6.4 可以继续，但：
 
 ### P7
 
-P7 保持 deferred。受控 REJECT→REPAIR fault injection 可以完善 engineering coverage，但 generic repair-loop benefit 不是当前 novelty。
+P7 在 P6 关闭后曾被激活，随后由 Human Owner 于 `2026-09-12` 暂停。受控
+REJECT→REPAIR fault injection 仍可作为未来 optional engineering coverage，但当前不 active，
+generic repair-loop benefit 也不是已建立的 novelty。
 
-只有在以下情况之一发生时，才重新评估 P7 的研究优先级：
+只有 Human Owner 明确重新打开 research track，且以下情况之一发生时，才重新评估 P7 的
+研究优先级：
 
 - 某个经 exact-RQ / direct-prior / advisor-judgment 门通过的新问题确实需要该 treatment，且它被定义为受控 cheap pilot 或已通过 pilot 的扩展实验；
 - 工程完整性本身对 artifact 展示或开源可用性具有明确价值。
 
 ---
 
-## 8. 当前顺序与停止规则
+## 8. Research track 重新启用后的候选顺序与当前停止规则
 
-当前顺序：
+以下顺序仅在 Human Owner 重新启用 research track 后作为候选输入，并非当前执行计划：
 
 1. 完成 Fall 2027 PhD SOP v0/v1；
 2. 与 Professor YooJung Choi 沟通 research direction / problem selection；
 3. 根据 advisor feedback 决定：做候选 A/B/C 的便宜试验、继续独立 narrowing，或优先加入现有 Agent project；
 4. 只对通过启用门的 exact RQ 编写新实验计划。
 
-当前明确停止：
+当前明确停止并继续有效：
 
 - 不继续从 Framework 挖第四个宽理论方向；
 - 不进行 old RQ1–RQ6 的 full experiment matrix；

@@ -1,6 +1,25 @@
 # 1PCloop active implementation
 
-当前 active implementation 是最小的 Codex CLI 文本路由循环：
+## 当前工程阶段
+
+```text
+P6 = ACCEPTED / PHASE CLOSED
+P7 = PAUSED BY HUMAN OWNER / NOT ACTIVE
+current engineering task = foundation_v1
+foundation_v1 status = ACTIVE / F1 NOT EVALUATED
+```
+
+当前目标是把 P6 后的能力完善为可日常运行、可诊断、可恢复、状态可见且可维护的本地
+engineering foundation。当前 task-local 治理入口：
+
+- `1PCloop/workloads/foundation_v1/workload_static.md`；
+- `1PCloop/workloads/foundation_v1/workload_runtime.md`。
+
+本次只初始化治理；F1、CLI/TUI、timer、中文 Prompt 模板规范化和 post-foundation smoke
+尚未实现。P4–P6 技术说明继续作为已接受能力与 operator reference 保留。Paper/research-driven
+experiment 当前暂停，`researchPlan.md` 是 frozen research map，不是工程执行入口。
+
+P4 已实现的基础 Codex CLI 文本路由为：
 
 ```text
 Reviewer (.codex-B)
@@ -420,8 +439,9 @@ HEAD、cleanliness 和 governance；这一窗口再次变化会 fail closed。
 写入一致性或完整协调协议。P6 不为此增加新算法。Human Owner 的常用模式是唯一 contributor，
 加上 loop 作为唯一正常自动化 writer；P6.4 有意维持这一支持边界。
 
-### P7 边界
+### P7 边界（P6.4 阶段记录）
 
-P7 的 controlled `REJECT -> REPAIR -> re-review` fault injection 仍为 deferred。P6.4 不执行
-故障注入，不修改现有 REJECT 路径，也不提前启动 P7。P6.4 的工作仅记录当前顺序生命周期和
-external-mutation 支持边界。
+P6.4 没有执行 controlled `REJECT -> REPAIR -> re-review` fault injection，也没有修改现有
+REJECT 路径。P6 关闭后 P7 曾短暂成为下一步骤，但 Human Owner 于 `2026-09-12` 将其暂停并
+激活 foundation_v1。当前状态以 foundation_v1 task-local Runtime 和全局 Runtime 的阶段指针
+为准；未经 Human Owner 明确重新激活，不得执行 P7。

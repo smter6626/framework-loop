@@ -4,19 +4,43 @@
 
 在一台 Apple Silicon Mac 上实现并验证一个最小可运行的 Reviewer–Executor 自动闭环（1PCloop）。
 
-本项目当前的稳定产出是：
+本项目当前的稳定产出和目标是：
 
 - 可运行、可审核的 engineering artifact；
-- 可用于后续受控实验的 experimental harness；
+- 可日常运行、可诊断、可恢复、状态可见且可维护的本地 Reviewer–Executor engineering
+  foundation；
+- 清晰的 operator 入口、Human Gate 和本地 observability；
+- 可用于未来受控实验的 optional experimental harness；
 - 对真实实现、失败模式、修复过程、角色隔离、context management、evidence handling 与 Human Gate 的可追溯记录。
 
-2026-09-09 完成的三轮 adversarial novelty audit 已确认，旧 `researchPlan.md` 中的 authoritative transition、decision-preserving memory、evidence sufficiency 等宽研究方向不再具备可支持的宽泛 novelty。因此：
+### 2026-09-12 Human Owner current supersession
+
+Human Owner 于 `2026-09-12` 明确把 1PCloop 从 paper/research-driven 路线转向 engineering
+foundation，并暂停 P7。原因是近期 research/prior-work 审查表明，继续以 Framework paper
+novelty 或扩大实验为目标不符合当前资源优先级。该判断是 Owner 的当前方向和资源决定，不是
+“已穷尽所有文献”或关于相关研究空间的普遍科学结论。
+
+本次授权 supersede：
+
+- Framework-as-paper 或 paper-driven experiment 作为当前工程路线；
+- P7 controlled fault injection 作为当前 foundation 完成前置条件；
+- `researchPlan.md` 作为当前工程执行依据。
+
+当前保持不变：双 profile role identity、orchestrator-mediated routing、repository-backed
+authoritative state、Reviewer/Executor separation、deterministic context reconstruction、
+runtime-enforced control output、evidence-backed acceptance、checkpoint/restart、workload
+Runtime transition、local raw evidence 与 tracked summary、fail-closed 和
+single-writer/no-concurrency boundary。P4–P6 的 accepted evidence 继续有效。
+
+2026-09-09 完成的三轮 adversarial novelty audit 已表明，旧 `researchPlan.md` 中的 authoritative transition、decision-preserving memory、evidence sufficiency 等宽研究方向不再具备可支持的宽泛 novelty。因此：
 
 - `Framework-as-paper` 暂停；
 - Framework 保留为 methodology artifact；
 - 1PCloop 保留为 engineering artifact / experimental harness；
 - 工程验收、regression 通过或 P6 / P7 closure 不得自动升级为 scientific finding 或 paper novelty；
-- 任何未来 cheap pilot 必须先在 `researchPlan.md` 中通过 exact-RQ、direct-prior 与 advisor-judgment 门；任何向正式研究的扩展还必须通过 pilot-result 与资源决策门。
+- 任何未来重新激活的 research track 或 cheap pilot 必须先由 Human Owner 明确开启，并在
+  `researchPlan.md` 中通过相应研究 gate；foundation_v1 工程执行不受这些 research gate
+  约束。
 
 运行过程中仍可记录 research-question signal，但记录不表示 hypothesis 成立、literature novelty 已确认、已形成可发表 contribution 或已授权开展额外实验。已被后续 prior-work audit 覆盖的旧 RQ 只能作为历史记录、engineering requirement 或新 exact RQ 下的局部变量。
 
@@ -301,6 +325,36 @@ Reviewer 最终 `ACCEPT` 必须基于 Reviewer 可以直接定位并检查的 ev
 
 Runtime transition 必须能够指出支持该 transition 的 evidence locator。
 
+### 11. Engineering foundation 与本地 UI/observability
+
+当前允许进入 engineering scope：terminal status、run/stage timer、structured progress
+events、doctor/preflight/status/resume/inspect CLI、Human Gate UX 和本地 TUI。后续只能根据
+实际使用 evidence 决定是否需要简单本地 GUI。
+
+“本地 1PCloop UI”用于展示和操作 structured control state；它不等于控制 Codex GUI 的
+GUI automation。UI 不得通过解析自然语言猜测 authoritative state。
+
+### 12. 默认中文 Prompt 模板方向
+
+foundation_v1 将基于 Framework v1.2 的 Static/Runtime Prompt 模板建立 1PCloop task
+bootstrap 规范，默认模板语言为中文。模板必须保持 Static/Runtime 职责分离、Single Active
+Step、evidence-backed transition、task-local freeze、Human Gate、Pending deadline 和
+supersession。
+
+模板是可按任务风险与复杂度裁剪的治理工具，不是要求所有任务使用完整章节的固定 schema。
+其只读固定输入为：
+
+```text
+/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_static.md
+SHA-256: e3ff93b4136c0d3d87d7f1a319ca9c4513f831327daf18aea46f9f3d6659daf7
+
+/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_runtime.md
+SHA-256: 3cbc4c93adff6ac2b1fb351a8a81f4b65dbd73b4de28ee2d0d4141522258ab54
+```
+
+外部 Tools 路径是固定输入，不是 1PCloop 可直接修改的对象。模板规范化属于 foundation_v1
+的独立 deliverable，未实现或验收前不得描述为当前能力。
+
 ---
 
 ## Stable Background
@@ -378,12 +432,15 @@ Static
 3. production-grade quota management；
 4. Reviewer / Executor 的新 filesystem hard-isolation system，除非真实越权 evidence 证明有必要；
 5. conversation history 超长后的复杂压缩/迁移；
-6. 多个并行 Executor；
+6. 多个并行 Executor或多个 active loop 操作同一 target；
 7. 双物理机器 transport（属于 `2PCloop`）；
-8. production-grade queue、distributed database、observability 或 fault recovery；
+8. production Web platform、distributed observability、production-grade queue 或 distributed
+   database；
 9. 长期 memory database / vector database；
 10. 把某个具体 Codex 模型组合证明为理论最优；
 11. 修复不影响 fresh execution 的旧 Codex historical-session metadata。
+12. repository lock、filesystem watcher、multi-writer reconciliation 或通用 concurrency
+    consistency guarantee。
 
 测试任务必须选择不依赖以上能力即可完成的 bounded scenario。
 
@@ -454,9 +511,11 @@ Reviewer: ACCEPT
 
 除非 Reviewer 另外直接检查了支持该 claim 的 evidence。
 
-### F. REJECT -> REPAIR path
+### F. PAUSED optional REJECT -> REPAIR reliability coverage
 
-必须至少通过一个受控测试证明：
+Human Owner 于 `2026-09-12` 暂停 P7，因此本项不再是当前 foundation_v1 完成前置条件。
+未经 Human Owner 明确重新激活，不得执行 fault injection。未来重新激活时，可将以下路径作为
+optional reliability coverage：
 
 ```text
 Reviewer REJECT
@@ -541,9 +600,15 @@ Reviewer
 
 ## Completion Definition
 
-当上述 Acceptance Criteria 全部满足并由 Reviewer 基于实际 evidence 验收后，1PCloop task 才能从 `ACTIVE` 迁移为 `COMPLETED`。
+当前完成判断由 `foundation_v1` task-local Static/Runtime 中的 acceptance criteria 和独立
+Reviewer evidence 决定。只有 foundation_v1 的必需工程交付均通过独立验收后，Human Owner
+才决定 overall 1PCloop 是否从 `ACTIVE` 迁移为 `COMPLETED`。
 
 该完成定义只针对 engineering artifact。Framework-as-paper、论文 novelty、controlled research outcome 或某个 narrow candidate pilot 都不是 1PCloop 工程完成的前置条件。
+
+P7 fault injection、完整 GUI、paper novelty 和 research experiment 同样不是当前 completion
+前置条件；其中任何一项只有在 Human Owner 明确重新激活或 evidence-driven 决策选择后才进入
+对应 task scope。
 
 在此之前，即使：
 
