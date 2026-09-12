@@ -31,11 +31,12 @@ Reviewer persistent + explicit resume
 = NOT A PERMANENT ARCHITECTURE INVARIANT
 
 P6 control-plane hardening
-= ACTIVE / P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 ACCEPTED / P6.4 NEXT
-= ENGINEERING CLOSURE / NOT A PHD-APPLICATION OR PAPER BLOCKER
+= ACCEPTED / PHASE CLOSED
+= P6.1 ACCEPTED / P6.2 ACCEPTED / P6.3 ACCEPTED / P6.4 ACCEPTED
 
 P7 controlled REJECT -> REPAIR fault injection
-= DEFERRED / NOT RESEARCH-AUTHORIZED BY THE OLD PLAN
+= ACTIVE NEXT PHASE / NOT YET IMPLEMENTED
+= NOT RESEARCH-AUTHORIZED BY THE OLD PLAN
 
 Framework-as-paper
 = PAUSED AFTER THREE-ROUND NOVELTY AUDIT
@@ -312,8 +313,9 @@ P3 已完成并建立当前 `--ephemeral` baseline。该 evidence 只描述本�
 - 旧 `researchPlan.md` 中的 RQ1–RQ6、“第一篇论文主线”和 full experiment matrix 不再是当前研究执行依据；
 - `researchPlan.md` 已直接替换为当前方向、三个 narrow candidates 和研究启用门；
 - Framework 保留为 methodology artifact，1PCloop 保留为 engineering artifact / experimental harness；
-- P6.4 仍是当前 authoritative engineering step，但不是 PhD 申请或 paper blocker；
-- P7 仍 deferred；旧 paper plan 不再授权其作为 research experiment。
+- 在本条 `2026-09-09` 记录形成时，P6.4 是 authoritative engineering step，但不是
+  PhD 申请或 paper blocker；
+- 在同一历史时点，P7 仍 deferred；旧 paper plan 不再授权其作为 research experiment。
 
 本记录只追加 current correction / supersession，不回写或删除下方已保留的历史 RQ 记录和 Done evidence。
 
@@ -1113,16 +1115,16 @@ they must not be mislabeled as small maintenance fixes.
 
 ## 2026-09-06 — P6 Human-authorized control-plane hardening plan
 
-Status: `ACTIVE — P6.1, P6.2 AND P6.3 ACCEPTED; P6.4 IS THE SOLE ACTIVE STEP`
+Status: `ACCEPTED / PHASE CLOSED — P6.1, P6.2, P6.3 AND P6.4 ACCEPTED`
 
-This section is the authoritative P6 plan. It supersedes the earlier proposed
-sequencing that placed controlled `REJECT -> REPAIR -> re-review` before Runtime
-transition work. The Human Owner has decided that P6 first closes the known
-control-plane gaps below. Controlled rejection/fault injection is deferred to P7.
+This section records the authoritative P6 plan that superseded the earlier proposed
+sequencing placing controlled `REJECT -> REPAIR -> re-review` before Runtime
+transition work. The Human Owner decided that P6 would first close the known
+control-plane gaps below and defer controlled rejection/fault injection to P7.
 
-P6 is implementation work, not evidence that these mechanisms are already accepted.
-Each subphase must be implemented, mechanically tested, and separately recorded before
-its status can change to accepted.
+The plan itself was not evidence that its mechanisms had already been accepted. Each
+subphase therefore had to be implemented, mechanically tested, independently reviewed
+and separately recorded before its status could change to accepted.
 
 ### P6.0 — Approved scope and authority boundary
 
@@ -1157,7 +1159,7 @@ request a transition only through the validated control-plane output described b
 Python remains prohibited from searching free text for `ACCEPT`, `REJECT`, readiness,
 or any equivalent semantic marker.
 
-Human-mandated execution protocol for every remaining P6.x subphase:
+Human-mandated execution protocol used for the remaining P6.x subphases:
 
 1. reason about the intended change logic before editing;
 2. inspect the affected behavior, files and dependencies and read the necessary
@@ -1169,7 +1171,7 @@ Human-mandated execution protocol for every remaining P6.x subphase:
    locator, observed limitations, and a concise description of test logic rather
    than copying complete test source.
 
-This protocol governs P6.2 and later P6.x work unless the Human Owner changes it.
+This protocol governed P6.2 and later P6.x work through P6 closure.
 
 ### P6.1 — Overwrite-only local checkpoint and visible execution progress
 
@@ -1480,9 +1482,9 @@ Interpretation boundary:
 - the closed `multiLanguage_v1` workload was neither reopened nor used as a Runtime
   transition fixture.
 
-The independent Reviewer verdict closes P6.2. P6 as a whole is not yet accepted;
-P6.3 is the sole authoritative Active Step, P6.4 remains queued, and P7 remains
-deferred.
+At the P6.2 checkpoint, the independent Reviewer verdict closed P6.2 while P6 as a
+whole remained active; P6.3 then became the sole authoritative Active Step, P6.4
+remained queued, and P7 remained deferred.
 
 ### P6.3 — Local raw evidence and tracked per-turn summary
 
@@ -1589,12 +1591,13 @@ Interpretation boundary:
   upgraded automatically;
 - these limits do not block the independent Reviewer acceptance of P6.3.
 
-The independent Reviewer verdict closes P6.3. P6 remains active overall; P6.4 is
-the sole authoritative Active Step, and P7 remains deferred.
+At the P6.3 checkpoint, the independent Reviewer verdict closed P6.3 while P6
+remained active overall; P6.4 then became the sole authoritative Active Step, and
+P7 remained deferred.
 
 ### P6.4 — Sequential lifecycle and external-mutation boundary
 
-Status: `AUTHORITATIVE ACTIVE STEP`
+Status: `IMPLEMENTED, VALIDATED AND INDEPENDENTLY ACCEPTED`
 
 The supported operating assumption is:
 
@@ -1619,6 +1622,38 @@ writer, and that no concurrency consistency guarantee is claimed. The existing
 mechanical checks may remain, but must not be described as a fully validated
 multi-contributor coordination mechanism.
 
+Implementation and independent review result:
+
+- implementation commit: `c33c0d2a34a37eb7e85ca0f81664de3e9922bf70` —
+  `Document P6.4 sequential lifecycle boundary`;
+- the commit changes only `1PCloop/README.md` and adds one directly locatable P6.4
+  section for the current sequential lifecycle, unsupported concurrency features,
+  external mutation, mechanical checks, Target-HEAD refresh and P7 boundary;
+- the documented supported model is one Human contributor, one active loop per
+  target and sequential orchestrator-triggered Reviewer/Executor processes; a
+  persistent Reviewer thread is resumable session state rather than a background
+  Agent process;
+- existing branch/HEAD/cleanliness/history/governance/checkpoint/evidence checks are
+  retained as sequential-state validation and fail-closed/Human-Gate detection, not
+  represented as locking, multi-writer reconciliation or a concurrency protocol;
+- Executor validation ran `test_run_mutation_loop.py` with `12 / 12` passing in
+  `8.083s`; the independent Reviewer reran the same focused suite with `12 / 12`
+  passing in `7.995s`;
+- the independent Reviewer also verified `git diff --check`, the README-only commit
+  path set, clean synchronized `main`, and consistency between the documentation and
+  implementation, then returned `ACCEPT P6.4` with no repair requirement.
+
+Interpretation boundary:
+
+- supported operation remains single writer with no concurrency guarantee;
+- P6.4 did not add a lock, watcher, daemon, awaiting/background Agent, parallel
+  Executor, multi-writer reconciliation or distributed transaction;
+- Target-HEAD refresh has deterministic validation only; no live concurrent
+  Target-HEAD commit experiment was performed;
+- P6.4 did not modify the REJECT path or execute P7 fault injection.
+
+The independent Reviewer verdict closes P6.4.
+
 ### P6 completion gate
 
 P6 may be accepted only after all of the following are true:
@@ -1638,17 +1673,35 @@ P6 may be accepted only after all of the following are true:
 10. a disposable real-Git smoke demonstrates the accepted one-transition path without
     modifying or reopening the closed `multiLanguage_v1` workload.
 
-Until this gate is satisfied, P6 remains active overall. Within P6, P6.4 is the sole
+P6 completion decision — `ACCEPTED / PHASE CLOSED`:
+
+- criteria 1–2 are covered by the accepted P6.1 checkpoint/restart and live-progress
+  evidence;
+- criteria 3–5 are covered by the accepted P6.2 schema, authority, capability-gated
+  transition, REJECT/HUMAN_GATE and replay-prevention evidence;
+- criteria 6–7 are covered by the accepted P6.3 ignored-raw-evidence, tracked-summary,
+  one-commit and recoverable framework-push evidence;
+- criterion 8 is covered by the accepted P6.4 README boundary;
+- criterion 9 is covered by the P6.3 `70 / 70` ResourceWarning-strict regression;
+- criterion 10 is covered by the P6.2 disposable real-Codex/real-Git one-transition
+  smoke, which did not modify or reopen the closed `multiLanguage_v1` workload.
+
+All P6 subphases are independently accepted and the completion gate is satisfied.
+P6 is closed without claiming locking, concurrency safety, a real `kill -9`, a live
+concurrent Target-HEAD experiment or P7 fault injection. P7 is now the sole
 authoritative Active Step.
 
 ### P7 sequencing decision
 
-Status: `DEFERRED — NOT ACTIVE`
+Status: `AUTHORITATIVE ACTIVE STEP`
 
-2026-09-09 方向收缩后，P7 不再因旧 paper plan 而自动成为 research experiment。它在 P6 验收后仍可作为 engineering-coverage candidate，但若要作为研究 treatment，必须先满足当前 `researchPlan.md` 定义的 exact-RQ、direct-prior 与 advisor-judgment 门，并被预先定义为 cheap pilot 或已通过 pilot-result 门的扩展实验。
+2026-09-09 方向收缩后，P7 不因旧 paper plan 而自动成为 research experiment。P6 已完成
+验收，因此 P7 现在作为 engineering-coverage step 激活；若要作为研究 treatment，仍必须先
+满足当前 `researchPlan.md` 定义的 exact-RQ、direct-prior 与 advisor-judgment 门，并被预先
+定义为 cheap pilot 或已通过 pilot-result 门的扩展实验。
 
-After P6 acceptance, P7 may introduce a controlled, explicitly recorded defect in a
-disposable repository or dedicated test branch to exercise:
+P7 retains the authorized objective of introducing a controlled, explicitly recorded
+defect in a disposable repository or dedicated test branch to exercise:
 
 ```text
 Reviewer detects defect
@@ -1660,4 +1713,6 @@ Reviewer detects defect
 
 The injected commit, actor, timing, expected defect and experiment boundary must be
 recorded so the result is not misreported as a naturally occurring Executor error.
-No rejection fault injection is authorized as part of P6.
+This governance transition activates P7 only. No defect is introduced, no rejection
+path is executed, and no P7 implementation or fault injection is completed in this
+turn.
