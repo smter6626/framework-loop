@@ -305,9 +305,9 @@ P7 保持 deferred。受控 REJECT→REPAIR fault injection 可以完善 enginee
 
 当前研究方向来自下列文档：
 
-- Round 1：`/Users/smterpro/.codex/visualizations/2026/09/09/01a08411-296d-76d1-9db3-1cc1b2d1a235/1PCloop_novelty_kill_report.md`
-- Round 2：`/Users/smterpro/.codex/visualizations/2026/09/09/01a08411-296d-76d1-9db3-1cc1b2d1a235/1PCloop_decision_semantics_novelty_kill_round2.md`
-- Round 3：`/Users/smterpro/Documents/1PCloop_novelty_kill_round3.md`
-- 三轮中文地图：`/Users/smterpro/Documents/Framework_Research_Novelty_3Rounds_CN.md`
+- Round 1：`/Users/smterpro/Workspace/Research/probabilistic-circuits/repos/phd_prepare/audits/details/round1_execution_governance.md`
+- Round 2：`/Users/smterpro/Workspace/Research/probabilistic-circuits/repos/phd_prepare/audits/details/round2_decision_semantics.md`
+- Round 3：`/Users/smterpro/Workspace/Research/probabilistic-circuits/repos/phd_prepare/audits/details/round3_residual_directions.md`
+- 三轮中文地图：`/Users/smterpro/Workspace/Research/probabilistic-circuits/repos/phd_prepare/audits/Framework_Research_Novelty_3Rounds_CN.md`
 
 本文件只保存当前方向、启用门和停止规则。需要审核 exact prior 时，必须读取上述报告，不只依赖本文的压缩总结。
