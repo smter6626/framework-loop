@@ -223,9 +223,8 @@ evidence 会 fail closed/Human Gate，不猜测性修复。旧 P6.1 checkpoint �
 ```
 
 P6.2 不迁移 raw evidence 默认目录、不实现 per-turn summary retention 或 commit/push
-automation；`evidence_summary` 仅提前提供给 P6.3。当前运行假设一个 Human contributor、一个
-loop、顺序退出的 Agent process；没有 lock/watcher 或多 writer 一致性保证。target-HEAD
-refresh 只有 deterministic validation，本阶段未做 live concurrent-HEAD 实验或 P7 fault injection。
+automation；`evidence_summary` 仅提前提供给 P6.3。当前顺序生命周期和 external-mutation
+支持边界统一见下文 P6.4 章节。
 
 ### P6.2 implementation validation observation — 2026-09-07
 
@@ -342,3 +341,87 @@ reconciled、succeeded 或 failed 控制事件，不输出完整 LLM summary 或
 ```bash
 1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_evidence_summary.py -v
 ```
+
+## P6.4 当前支持的顺序生命周期边界
+
+### 当前支持的运行模型
+
+当前支持的是 Human Owner 有意选择的顺序隔离和部署模型：
+
+- 一个 Human contributor；
+- 同一个 target repository 同时只有一个 active loop；
+- Human 与该 loop 是正常运行时仅有的 repository writers；
+- Reviewer 与 Executor 由 orchestrator 依次调用，不并行推理或修改 repository；
+- 每个 Reviewer 或 Executor Codex CLI turn 完成后，对应的本地进程退出；
+- 已退出的 Agent process 不会继续访问或修改 repository；
+- Reviewer 的 persistent session 是由 orchestrator 保存 thread relationship、并在需要时
+  显式执行 `codex exec resume` 的会话状态，不是等待中或后台持续运行的 Agent；
+- 下一次 Reviewer 或 Executor 推理只会由 orchestrator 明确触发。
+
+这个模型用于单 contributor、单 loop 的当前 1PCloop engineering artifact。它不宣称适用于
+多个 contributor 或多个 writer 同时修改同一 repository 的环境。
+
+### 当前不支持的并发能力
+
+当前版本不实现或保证：
+
+- awaiting/background Agent process；
+- daemon 或后台 repository access；
+- repository lock；
+- filesystem watcher；
+- 多个并行 Executor；
+- 多个 active loop 操作同一个 target；
+- multi-writer reconciliation；
+- distributed transaction；
+- 通用 concurrency consistency guarantee。
+
+这些能力不属于 P6.4 的实现范围。
+
+### External mutation 的含义
+
+`external mutation` 是无法归因于当前 orchestrator 已授权步骤的 repository 或 governance
+变化，例如：
+
+- Human 或编辑器在 turn 边界之间修改文件；
+- 另一个 shell、Git 操作、进程或 loop 修改 branch、HEAD 或 working tree；
+- checkpoint 保存的 governance hash 与当前文件字节不一致；
+- 出现不属于当前 checkpoint plan 的 commit、Runtime 内容或 evidence 内容。
+
+在受支持的 single-writer 模式中，这些情况通常不应发生。检测仍有必要，因为同一信号也可能
+来自 loop 自身的状态错误、恢复错误或意外副作用。
+
+### 机械检查的作用和限制
+
+当前保留的低成本机械检查包括：
+
+- target branch、HEAD 和 clean working tree；
+- descendant、non-rewriting history 以及 merge prohibition；
+- Reviewer read-only behavior；
+- framework/workload governance hashes；
+- checkpointed preimage/postimage；
+- evidence、summary、framework commit 和 push 的精确恢复状态。
+
+这些检查用于验证当前顺序状态机、检测意外 mutation，并发现 loop/self-state 错误。状态能够
+与 checkpointed plan 精确对应时，orchestrator 只恢复下一个未完成动作；状态无法机械解释时，
+它会 fail closed 或进入 Human Gate。
+
+这些检查不是 repository locking、concurrency protocol、multi-writer conflict resolution，
+也不是已经验证的多 contributor coordination mechanism。遇到无法解释的状态时，runner 不会
+自动 reset、强制覆盖、rebase、force push 或执行其他破坏性修复。
+
+### Target-HEAD refresh 的准确边界
+
+Target-HEAD refresh 路径已有 deterministic validation。当 Executor 启动前观察到当前 target
+HEAD 与 Reviewer 已知 HEAD 不一致时，现有逻辑会让 Reviewer 基于新 HEAD 生成替代 instruction，
+从而保持 instruction freshness。refresh 完成后、Executor 实际启动前还会再次核对 branch、
+HEAD、cleanliness 和 governance；这一窗口再次变化会 fail closed。
+
+该路径尚未经过 live concurrent target-HEAD commit 实验，因此不能被描述为已验证的真实并发
+写入一致性或完整协调协议。P6 不为此增加新算法。Human Owner 的常用模式是唯一 contributor，
+加上 loop 作为唯一正常自动化 writer；P6.4 有意维持这一支持边界。
+
+### P7 边界
+
+P7 的 controlled `REJECT -> REPAIR -> re-review` fault injection 仍为 deferred。P6.4 不执行
+故障注入，不修改现有 REJECT 路径，也不提前启动 P7。P6.4 的工作仅记录当前顺序生命周期和
+external-mutation 支持边界。
