@@ -4,14 +4,14 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
+- 当前 verdict：`REJECTED — NARROW REPAIR REQUIRED`
 - 唯一 Active Step：`F1 — Reviewer verdict 机械纠错与明确终态输出`
 - 当前顶层 Step：`Step 1`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
 - 当前执行方式：Human-mediated Reviewer/Executor
-- 最后更新：`2026-09-12`
+- 最后更新：`2026-09-13`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
 transition。本文件不包含 `1PCLOOP_RUNTIME_STATE` machine block；现有 runner 禁止 framework
@@ -218,13 +218,73 @@ Executor 不得宣告 F1 accepted，也不得推进本 Runtime。
 
 ## 8. Independent Review
 
-- 当前 F1 verdict：`NOT EVALUATED`
-- 独立 evidence access：`NOT YET EVALUATED`
-- 独立 verdict formation：`NOT YET EVALUATED`
-- 独立 evidence-sufficiency judgment：`NOT YET EVALUATED`
-- foundation_v1 整体状态：`ACTIVE`，不得宣告完成。
+- 审核对象：commit `d57c1c146be9ea998572e3d09c923c4e9a77c517` —
+  `Add recoverable Reviewer verdict correction`；
+- 实现范围：`1PCloop/scripts/run_mutation_loop.py`、`1PCloop/README.md`、
+  `1PCloop/tests/test_run_mutation_loop.py` 和新增
+  `1PCloop/tests/test_verdict_correction.py`；
+- 独立 evidence access：`SATISFIED`；Reviewer 直接检查 commit/diff、错误分类、correction
+  状态机、checkpoint/recovery、终态输出和测试；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- Executor focused suite：`16 / 16`，`38.038s`；完整 ResourceWarning-strict regression：
+  `86 / 86`，`125.269s`；
+- Reviewer 独立复跑 focused suite：`16 / 16`，`34.925s`；完整
+  ResourceWarning-strict regression：`86 / 86`，`129.677s`；
+- correction 主路径、同 Reviewer thread、最多两次、Executor 不重跑、实际
+  target/governance/framework/evidence 漂移 default-deny，以及 transition/summary/push
+  recovery 均未发现阻塞问题。
+
+### 2026-09-13 Reviewer verdict：`REJECTED — NARROW REPAIR REQUIRED`
+
+拒绝原因不是 correction 状态机，而是 F1 新增的公开 `FINAL_RESULT` 未真正满足
+“稳定、单行、bounded、不泄露 raw payload”的合同：
+
+- `emit_final_result` 直接以 `key=value` 打印未经单行编码的字符串值；
+- 未分类异常进入 `logical_outcome.reason` 时没有公开长度限制或换行清理；
+- `strict_json` 的 duplicate-key 错误会原样包含由输入控制的 key 名；
+- 因此恶意或异常 reason 可以插入额外换行，伪造后续 `error_code`、`run_root` 等字段。
+
+Reviewer 的最小复现：
+
+```text
+reason input = first line\nerror_code=FORGED\nrun_root=/forged
+
+observed FINAL_RESULT fragment:
+reason=first line
+error_code=FORGED
+run_root=/forged
+error_code=UNCLASSIFIED_CONTROL_FAILURE
+run_root=/real
+```
+
+同一检查还证明 duplicate JSON key 名
+`SECRET\nerror_code=FORGED` 会进入当前 exception text。该行为允许终端字段注入，并与 README
+记录的 `reason=<bounded reason>` 冲突。测试全部通过不能覆盖这个未测试边界。
+
+Required narrow repair：
+
+1. 在 `final_result` 构造边界生成明确长度上限的单行 public reason；
+2. 未分类异常使用固定通用 public reason，详细异常只保留在 Git-ignored local raw evidence；
+3. 对所有公开字符串值进行不会产生新记录行的稳定编码，禁止 CR/LF 字段注入；
+4. `strict_json` 的公开错误不得回显任意 duplicate-key 名称；
+5. 增加 multiline、CR/LF、超长 reason、恶意 duplicate-key 和 forged-field regression；
+6. 重新运行 F1 focused suite 与完整 ResourceWarning-strict regression。
+
+当前状态：F1 保持唯一 Active Step；F2 不激活；Pending Task 倒计时不变化；Static 不变。
+
+### Self-application interpretation
+
+本次是 1PCloop 核心治理思想用于实现 1PCloop 自身的直接 evidence：task-local
+Static/Runtime 编译 F1，Executor 提交实现，独立 Reviewer 直接检查 evidence 并形成明确
+`REJECTED`，随后由 Runtime 保存 repair 原因和当前有效状态。由于现有 mutation runner 禁止
+framework repo 与 target repo 重叠，该 self-application 仍是 Human-mediated
+Reviewer/Executor workflow，不表示 runner 已经自动 self-host 或自动修改/验收自身。
+
+foundation_v1 整体状态仍为 `ACTIVE`，不得宣告完成。
 
 ## 9. Next Direction
 
-只执行 F1。F2–F8 保持 queued；不得提前创建 Prompt 模板、TUI、GUI 或 real-service smoke，
-也不得启动 P7。
+只执行 F1 的上述窄范围 repair。不得重写已通过审核的 correction 状态机，不得扩大错误重试
+集合。F2–F8 保持 queued；不得提前创建 Prompt 模板、TUI、GUI 或 real-service smoke，也不得
+启动 P7。repair 完成后停止于 `AWAITING INDEPENDENT RE-REVIEW`。
