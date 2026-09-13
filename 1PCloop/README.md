@@ -6,7 +6,7 @@
 P6 = ACCEPTED / PHASE CLOSED
 P7 = PAUSED BY HUMAN OWNER / NOT ACTIVE
 current engineering task = foundation_v1
-foundation_v1 status = ACTIVE / F1 NOT EVALUATED
+foundation_v1 status = ACTIVE / F1 IMPLEMENTED AND VALIDATED — AWAITING INDEPENDENT REVIEW
 ```
 
 当前目标是把 P6 后的能力完善为可日常运行、可诊断、可恢复、状态可见且可维护的本地
@@ -15,9 +15,11 @@ engineering foundation。当前 task-local 治理入口：
 - `1PCloop/workloads/foundation_v1/workload_static.md`；
 - `1PCloop/workloads/foundation_v1/workload_runtime.md`。
 
-本次只初始化治理；F1、CLI/TUI、timer、中文 Prompt 模板规范化和 post-foundation smoke
-尚未实现。P4–P6 技术说明继续作为已接受能力与 operator reference 保留。Paper/research-driven
-experiment 当前暂停，`researchPlan.md` 是 frozen research map，不是工程执行入口。
+F1 已实现并完成 Executor deterministic validation，尚未获得独立 Reviewer verdict；不得据此
+宣称 F1 已接受或激活 F2。CLI/TUI、timer、structured progress events、中文 Prompt 模板规范化
+和 post-foundation smoke 仍未实现。P4–P6 技术说明继续作为已接受能力与 operator reference
+保留。Paper/research-driven experiment 当前暂停，`researchPlan.md` 是 frozen research map，
+不是工程执行入口。
 
 P4 已实现的基础 Codex CLI 文本路由为：
 
@@ -360,6 +362,44 @@ reconciled、succeeded 或 failed 控制事件，不输出完整 LLM summary 或
 ```bash
 1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_evidence_summary.py -v
 ```
+
+## foundation_v1 F1 Reviewer verdict 纠错与最终结果
+
+当 Reviewer process、runtime/local schema、profile、read-only audit、persistent thread/resume
+relationship，以及 checkpointed target/governance/Executor identity 均已通过，而 verdict 的
+wrapper/evidence 声明发生可机械定位的错误时，runner 会 checkpoint 一次纠错计划，并恢复形成
+原 verdict 的同一个 Reviewer thread。纠错只要求 Reviewer 重新检查实际 evidence 并重新输出
+完整 `reviewer_verdict`；它不会删除或改写 evidence，不会猜测 hash/commit，也不会重跑已完成的
+Executor。
+
+可纠正集合是代码中显式列举的 control error code，包括 verdict 跨字段关系、声明的
+target/governance/Runtime/active-step identity，以及 commit/file/artifact/test locator、对象、
+边界、可达性和 SHA-256。初始 verdict 之后最多执行两次 correction turn；次数、原 verdict、
+每次 correction locator/hash 和当前错误 code 均保存在同一 checkpoint。第二次仍为可纠正
+错误时以 `VERDICT_CORRECTION_EXHAUSTED` fail closed。
+
+process failure/timeout、schema-invalid JSON、schema 变化、错误 profile/role/thread/resume、
+Reviewer 写入、实际 target/governance/checkpoint/Runtime/framework 漂移、I/O/Git/summary/
+commit/push 错误及未分类错误不进入 correction。它们保持 default-deny，并沿用现有 fail-closed
+或 Human Gate/finalization 恢复边界。
+
+每次非 preflight CLI invocation 返回前输出一个不含 peer payload 的 `FINAL_RESULT`：
+
+```text
+run_id=<id>
+logical_outcome=RUNTIME_TRANSITION_COMMITTED | HUMAN_GATE | FAILED_CLOSED
+exit_code=<integer>
+runtime_transition=APPLIED | NOT_APPLIED | PENDING
+evidence_publication=PUSHED | COMMITTED | FAILED | PENDING | NOT_ENABLED
+reason=<bounded reason>
+error_code=<stable code>
+run_root=<absolute path>
+```
+
+同样的 structured fields 写入 checkpoint 和 raw manifest。`PUSHED` 只表示 framework
+evidence publication 成功，绝不覆盖 `FAILED_CLOSED`；publication 失败也不会伪造已经确定的
+logical outcome。F1 没有实现 run/stage timer、status subcommand、last activity 或 structured
+event stream；这些仍属于 F2。F1 当前仅为 implemented/validated，等待独立 Reviewer。
 
 ## P6.4 当前支持的顺序生命周期边界
 

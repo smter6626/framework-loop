@@ -40,11 +40,18 @@ scenario = os.environ.get("P5_TEST_SCENARIO", "no-op")
 is_reviewer = home.name == "reviewer-home"
 is_executor = home.name == "executor-home"
 is_resume = "resume" in args
+is_correction = "reviewer-verdict-correction" in str(output_path)
+correction_attempt = None
+if is_correction:
+    correction_attempt = int(output_path.parent.name.rsplit("-", 1)[1])
 
 call_log = os.environ.get("P5_TEST_CALL_LOG")
 if call_log:
-    label = "reviewer-resume" if is_reviewer and is_resume else (
+    label = (
+        f"reviewer-correction-{correction_attempt}"
+        if is_correction else "reviewer-resume" if is_reviewer and is_resume else (
         "reviewer-new" if is_reviewer else "executor"
+        )
     )
     with Path(call_log).open("a", encoding="utf-8") as handle:
         handle.write(label + "\n")
@@ -97,11 +104,31 @@ if message_type == "reviewer_verdict":
     overrides = os.environ.get("P6_TEST_OVERRIDE")
     if overrides:
         wrapper.update(json.loads(Path(overrides).read_text()))
+    if not is_correction and os.environ.get("P6_TEST_INITIAL_BAD_LOCATOR"):
+        wrapper["evidence"].append(dict(
+            kind="test", locator="python -m unittest -v",
+            sha256="0" * 64,
+        ))
+    if is_correction and os.environ.get("P6_TEST_CORRECTION_BAD_LOCATOR"):
+        wrapper["evidence"].append(dict(
+            kind="artifact", locator="git status reports clean",
+            sha256="0" * 64,
+        ))
+    if is_correction:
+        correction_override = os.environ.get(
+            f"P6_TEST_CORRECTION_OVERRIDE_{correction_attempt}"
+        )
+        if correction_override:
+            wrapper.update(json.loads(Path(correction_override).read_text()))
 if message_type == os.environ.get("P6_TEST_INVALID_ROLE"):
     wrapper["verdict"] = "ACCEPT"
 raw = os.environ.get("P6_TEST_RAW")
-if raw and message_type == "reviewer_verdict":
-    output_path.write_bytes(raw.encode())
+correction_raw = (
+    os.environ.get(f"P6_TEST_CORRECTION_RAW_{correction_attempt}")
+    if is_correction else None
+)
+if (correction_raw or raw) and message_type == "reviewer_verdict":
+    output_path.write_bytes((correction_raw or raw).encode())
 else:
     output_path.write_bytes((json.dumps(wrapper, ensure_ascii=False, indent=2) + "\n").encode())
 

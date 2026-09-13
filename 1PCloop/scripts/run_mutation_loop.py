@@ -22,6 +22,7 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass, replace
+from enum import Enum
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -74,6 +75,8 @@ EXECUTOR_RUNNING = "EXECUTOR_RUNNING"
 EXECUTOR_COMMITTED = "EXECUTOR_COMMITTED"
 REVIEW_PENDING = "REVIEW_PENDING"
 REVIEW_COMPLETED = "REVIEW_COMPLETED"
+REVIEW_CORRECTION_PENDING = "REVIEW_CORRECTION_PENDING"
+REVIEW_CORRECTION_RUNNING = "REVIEW_CORRECTION_RUNNING"
 RUNTIME_TRANSITION_PENDING = "RUNTIME_TRANSITION_PENDING"
 RUNTIME_TRANSITION_COMMITTED = "RUNTIME_TRANSITION_COMMITTED"
 HUMAN_GATE = "HUMAN_GATE"
@@ -84,6 +87,7 @@ FRAMEWORK_EVIDENCE_PUSHED = "FRAMEWORK_EVIDENCE_PUSHED"
 TERMINAL_CHECKPOINT_STATES = {
     FRAMEWORK_EVIDENCE_PUSHED,
 }
+MAX_REVIEW_CORRECTION_ATTEMPTS = 2
 
 
 def load_p4_helpers() -> ModuleType:
@@ -117,6 +121,84 @@ P63 = load_p63_helpers()
 
 class InvariantViolation(RuntimeError):
     """A mechanical invariant failed and the loop must not continue."""
+
+
+class ControlErrorCode(str, Enum):
+    """Stable public codes for F1 control decisions."""
+
+    VERDICT_REJECT_CONTRACT = "VERDICT_REJECT_CONTRACT"
+    VERDICT_HUMAN_GATE_CONTRACT = "VERDICT_HUMAN_GATE_CONTRACT"
+    VERDICT_ACCEPT_CONTRACT = "VERDICT_ACCEPT_CONTRACT"
+    VERDICT_REVIEWED_TARGET_MISMATCH = "VERDICT_REVIEWED_TARGET_MISMATCH"
+    VERDICT_GOVERNANCE_HASH_MISMATCH = "VERDICT_GOVERNANCE_HASH_MISMATCH"
+    VERDICT_RUNTIME_HASH_MISMATCH = "VERDICT_RUNTIME_HASH_MISMATCH"
+    VERDICT_ACTIVE_STEP_MISMATCH = "VERDICT_ACTIVE_STEP_MISMATCH"
+    EVIDENCE_COMMIT_LOCATOR_INVALID = "EVIDENCE_COMMIT_LOCATOR_INVALID"
+    EVIDENCE_COMMIT_UNRESOLVABLE = "EVIDENCE_COMMIT_UNRESOLVABLE"
+    EVIDENCE_COMMIT_NOT_COMMIT = "EVIDENCE_COMMIT_NOT_COMMIT"
+    EVIDENCE_COMMIT_UNREACHABLE = "EVIDENCE_COMMIT_UNREACHABLE"
+    EVIDENCE_LOCATOR_NOT_ABSOLUTE = "EVIDENCE_LOCATOR_NOT_ABSOLUTE"
+    EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY = "EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY"
+    EVIDENCE_LOCATOR_MISSING = "EVIDENCE_LOCATOR_MISSING"
+    EVIDENCE_HASH_MISMATCH = "EVIDENCE_HASH_MISMATCH"
+    EVIDENCE_COMMIT_REQUIRED = "EVIDENCE_COMMIT_REQUIRED"
+    REVIEW_PROCESS_AUTHORITY_INVALID = "REVIEW_PROCESS_AUTHORITY_INVALID"
+    REVIEW_THREAD_MISMATCH = "REVIEW_THREAD_MISMATCH"
+    REVIEW_CONTEXT_STALE = "REVIEW_CONTEXT_STALE"
+    REVIEW_RESUME_RELATIONSHIP_INVALID = "REVIEW_RESUME_RELATIONSHIP_INVALID"
+    REVIEW_BOOTSTRAP_INVALID = "REVIEW_BOOTSTRAP_INVALID"
+    REVIEW_TARGET_STATE_INVALID = "REVIEW_TARGET_STATE_INVALID"
+    RUNTIME_CAPABILITY_DISABLED = "RUNTIME_CAPABILITY_DISABLED"
+    RUNTIME_DESTINATION_MISMATCH = "RUNTIME_DESTINATION_MISMATCH"
+    RUNTIME_MACHINE_UNAUTHORIZED = "RUNTIME_MACHINE_UNAUTHORIZED"
+    VERDICT_CORRECTION_CHECKPOINT_INVALID = "VERDICT_CORRECTION_CHECKPOINT_INVALID"
+    VERDICT_CORRECTION_PROCESS_FAILED = "VERDICT_CORRECTION_PROCESS_FAILED"
+    VERDICT_CORRECTION_EXHAUSTED = "VERDICT_CORRECTION_EXHAUSTED"
+    UNCLASSIFIED_CONTROL_FAILURE = "UNCLASSIFIED_CONTROL_FAILURE"
+
+
+CORRECTABLE_VERDICT_CODES = frozenset({
+    ControlErrorCode.VERDICT_REJECT_CONTRACT,
+    ControlErrorCode.VERDICT_HUMAN_GATE_CONTRACT,
+    ControlErrorCode.VERDICT_ACCEPT_CONTRACT,
+    ControlErrorCode.VERDICT_REVIEWED_TARGET_MISMATCH,
+    ControlErrorCode.VERDICT_GOVERNANCE_HASH_MISMATCH,
+    ControlErrorCode.VERDICT_RUNTIME_HASH_MISMATCH,
+    ControlErrorCode.VERDICT_ACTIVE_STEP_MISMATCH,
+    ControlErrorCode.EVIDENCE_COMMIT_LOCATOR_INVALID,
+    ControlErrorCode.EVIDENCE_COMMIT_UNRESOLVABLE,
+    ControlErrorCode.EVIDENCE_COMMIT_NOT_COMMIT,
+    ControlErrorCode.EVIDENCE_COMMIT_UNREACHABLE,
+    ControlErrorCode.EVIDENCE_LOCATOR_NOT_ABSOLUTE,
+    ControlErrorCode.EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY,
+    ControlErrorCode.EVIDENCE_LOCATOR_MISSING,
+    ControlErrorCode.EVIDENCE_HASH_MISMATCH,
+    ControlErrorCode.EVIDENCE_COMMIT_REQUIRED,
+})
+
+
+class ControlFailure(InvariantViolation):
+    """A typed control-plane failure with a bounded public reason."""
+
+    def __init__(
+        self, code: ControlErrorCode, reason: str, *, correctable: bool = False
+    ) -> None:
+        super().__init__(reason)
+        self.code = code
+        self.public_reason = reason
+        self.correctable = correctable
+
+
+def correctable_failure(code: ControlErrorCode, reason: str) -> ControlFailure:
+    if code not in CORRECTABLE_VERDICT_CODES:
+        raise ValueError("control error code is not correction-eligible")
+    return ControlFailure(code, reason, correctable=True)
+
+
+def control_error_code(exc: BaseException) -> str:
+    if isinstance(exc, ControlFailure):
+        return exc.code.value
+    return ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value
 
 
 def strict_json(data: bytes) -> Any:
@@ -162,23 +244,43 @@ def schema_path(message_type: str) -> Path:
 
 
 def validate_turn_payload(payload: bytes, message_type: str) -> Dict[str, Any]:
+    """Validate only the runtime-enforced/local JSON Schema contract.
+
+    Reviewer verdict cross-field and authoritative-state relationships are checked
+    later, after process/profile/thread/read-only authority is established.  This
+    separation is what makes a narrow class of schema-valid control declarations
+    eligible for F1 correction without treating schema failure as correctable.
+    """
     schema = strict_json(schema_path(message_type).read_bytes())
     value = strict_json(payload)
     validate_json_schema(value, schema)
-    if message_type == REVIEWER_VERDICT:
-        # Structured Outputs does not support if/then/else or allOf. Keep the
-        # top-level verdict explicit and enforce its cross-field contract here.
-        verdict = value["verdict"]
-        if verdict == "REJECT":
-            if value["next_instruction"] is None or value["runtime_transition"] is not None:
-                raise InvariantViolation("REJECT requires one bounded next_instruction and no transition")
-        elif verdict == "HUMAN_GATE":
-            if value["next_instruction"] is not None or value["runtime_transition"] is not None:
-                raise InvariantViolation("HUMAN_GATE must not request repair or transition")
-        elif (value["next_instruction"] is not None
-              or value["runtime_transition"] is None or not value["evidence"]):
-            raise InvariantViolation("ACCEPT requires evidence and transition, and forbids repair instruction")
     return value
+
+
+def validate_verdict_relationships(value: Mapping[str, Any]) -> None:
+    """Enforce schema-subset cross-field rules with explicit correction codes."""
+    verdict = value["verdict"]
+    if verdict == "REJECT":
+        if value["next_instruction"] is None or value["runtime_transition"] is not None:
+            raise correctable_failure(
+                ControlErrorCode.VERDICT_REJECT_CONTRACT,
+                "REJECT requires one bounded next_instruction and no transition",
+            )
+    elif verdict == "HUMAN_GATE":
+        if value["next_instruction"] is not None or value["runtime_transition"] is not None:
+            raise correctable_failure(
+                ControlErrorCode.VERDICT_HUMAN_GATE_CONTRACT,
+                "HUMAN_GATE must not request repair or transition",
+            )
+    elif (
+        value["next_instruction"] is not None
+        or value["runtime_transition"] is None
+        or not value["evidence"]
+    ):
+        raise correctable_failure(
+            ControlErrorCode.VERDICT_ACCEPT_CONTRACT,
+            "ACCEPT requires evidence and transition, and forbids repair instruction",
+        )
 
 
 def emit_progress(message: str) -> None:
@@ -896,6 +998,37 @@ framework/workload governance. Follow the supplied runtime-enforced JSON Schema.
 """.encode("utf-8")
 
 
+def reviewer_correction_prompt(context: Mapping[str, Any]) -> bytes:
+    """Build a bounded deterministic correction request without peer semantics."""
+    encoded = json.dumps(
+        context, ensure_ascii=False, indent=2, sort_keys=True
+    ).encode("utf-8")
+    return b"""# F1 Reviewer verdict control-output correction
+
+You are the same Reviewer that produced the prior verdict. This is a correction of
+your schema-valid control wrapper, not a new Executor task. Do not modify the target,
+Git state, framework governance, or workload governance. Do not ask for or invoke an
+Executor. Re-open and independently inspect the actual commit/files/test artifacts
+inside the declared evidence boundaries before returning a new verdict.
+
+Return one complete reviewer_verdict object under the same runtime-enforced schema.
+You may return ACCEPT, REJECT, or HUMAN_GATE; you are not required to preserve the
+prior verdict. Re-declare every field from your current inspection. Commit locators
+must be full object IDs. file/artifact/test locators must be absolute paths to
+existing files inside the target repository or current run root. A shell command,
+Git-status description, or natural-language description is never a file locator.
+If no actual test/artifact output file exists, do not invent test/artifact evidence.
+Do not merely edit a string: re-check the actual evidence and its SHA-256 bytes.
+
+The deterministic context below contains only control metadata. It does not contain
+or interpret peer_message semantics.
+
+--- BEGIN F1 VERDICT CORRECTION CONTROL CONTEXT ---
+""" + encoded + b"""
+--- END F1 VERDICT CORRECTION CONTROL CONTEXT ---
+"""
+
+
 def reviewer_refresh_prompt(target_repo: Path, target_branch: str) -> bytes:
     return f"""# P6 Reviewer pre-execution freshness turn
 
@@ -1522,10 +1655,12 @@ def write_manifest(
     run_configuration: Mapping[str, Any],
     evidence_finalization: Optional[Mapping[str, Any]] = None,
     logical_outcome: Optional[Mapping[str, Any]] = None,
+    final_result: Optional[Mapping[str, Any]] = None,
 ) -> None:
     manifest = {
         "cycles": list(cycles),
         "evidence_finalization": dict(evidence_finalization or {}),
+        "final_result": dict(final_result) if final_result is not None else None,
         "finished_at": P4.utc_now() if status != "RUNNING" else None,
         "governance_initial": governance_initial.metadata(),
         "logical_outcome": dict(logical_outcome) if logical_outcome is not None else None,
@@ -1545,6 +1680,73 @@ def write_manifest(
         "turns": list(processes),
     }
     P4.write_json(run_root / "manifest.json", manifest)
+
+
+def emit_final_result(result: Mapping[str, Any]) -> None:
+    """Print one bounded F1 terminal summary; never include raw peer content."""
+    print("FINAL_RESULT", flush=True)
+    for name in (
+        "run_id",
+        "logical_outcome",
+        "exit_code",
+        "runtime_transition",
+        "evidence_publication",
+        "reason",
+        "error_code",
+        "run_root",
+    ):
+        print(f"{name}={result.get(name)}", flush=True)
+
+
+def failure_result_for_main(
+    args: argparse.Namespace, exc: BaseException, *, exit_code: int = 1
+) -> Dict[str, Any]:
+    """Recover bounded status for failures raised before orchestrate can return."""
+    run_id = getattr(args, "run_id", "unavailable")
+    run_root = args.runs_root.resolve() / run_id
+    checkpoint: Dict[str, Any] = {}
+    try:
+        store = CheckpointStore(checkpoint_path_for_args(args))
+        if store.exists():
+            checkpoint = store.load()
+            if isinstance(checkpoint.get("run_id"), str):
+                run_id = checkpoint["run_id"]
+            if isinstance(checkpoint.get("run_root"), str):
+                run_root = Path(checkpoint["run_root"]).resolve()
+    except (OSError, RuntimeError, ValueError):
+        checkpoint = {}
+    logical = checkpoint.get("logical_outcome")
+    outcome = logical if isinstance(logical, dict) else {}
+    if checkpoint.get("runtime_transition_applied") is True:
+        runtime_status = "APPLIED"
+    elif checkpoint.get("state") in {
+        RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED
+    }:
+        runtime_status = "PENDING"
+    else:
+        runtime_status = "NOT_APPLIED"
+    if checkpoint.get("framework_evidence_pushed") is True:
+        publication = "PUSHED"
+    elif checkpoint.get("framework_evidence_committed") is True:
+        publication = "COMMITTED"
+    elif p63_enabled(args) and isinstance(logical, dict):
+        publication = "PENDING"
+    else:
+        publication = "NOT_STARTED" if p63_enabled(args) else "NOT_ENABLED"
+    return {
+        "error_code": control_error_code(exc),
+        "evidence_publication": publication,
+        "exit_code": exit_code,
+        "logical_outcome": outcome.get("state", "PREFLIGHT_FAILED"),
+        "reason": (
+            exc.public_reason
+            if isinstance(exc, ControlFailure)
+            else "mutation loop could not complete; inspect checkpoint and local evidence"
+        ),
+        "run_id": run_id,
+        "run_root": str(run_root),
+        "runtime_transition": runtime_status,
+    }
 
 
 def workload_id_for_args(args: argparse.Namespace) -> str:
@@ -1595,6 +1797,7 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         "framework_runtime": str(args.framework_runtime.resolve()),
         "framework_static": str(args.framework_static.resolve()),
         "max_cycles": args.max_cycles,
+        "max_review_correction_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
         "reviewer_home": str(args.reviewer_home.resolve()),
         "runs_root": str(args.runs_root.resolve()),
         "state_root": str(state_root.resolve()),
@@ -1684,6 +1887,212 @@ def recover_reviewer_state_from_turn(turn: TurnResult) -> ReviewerState:
         cycle_number=state_after.get("cycle_number"),
         known_target_head=state_after.get("reviewer_known_target_head"),
     )
+
+
+def load_correction_turn_reference(
+    reference: Mapping[str, Any], run_root: Path
+) -> TurnResult:
+    try:
+        return load_turn_reference(reference, run_root)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction references missing or changed turn evidence",
+        ) from exc
+
+
+def validate_verdict_correction_record(
+    record: Mapping[str, Any], run_root: Path
+) -> None:
+    """Reject incomplete/tampered correction bookkeeping without guessing."""
+    if (
+        record.get("schema_version") != 1
+        or record.get("maximum_attempts") != MAX_REVIEW_CORRECTION_ATTEMPTS
+        or type(record.get("attempts_completed")) is not int
+        or type(record.get("attempts_started")) is not int
+        or not isinstance(record.get("attempts"), list)
+        or not isinstance(record.get("evidence_guards"), list)
+    ):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction checkpoint metadata is incomplete",
+        )
+    attempts = record["attempts"]
+    if record["attempts_completed"] != len(attempts):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction attempt count differs from recorded turns",
+        )
+    if not (
+        record["attempts_completed"]
+        <= record["attempts_started"]
+        <= min(record["attempts_completed"] + 1, MAX_REVIEW_CORRECTION_ATTEMPTS)
+    ):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction started-attempt count is inconsistent",
+        )
+    if not 0 <= len(attempts) <= MAX_REVIEW_CORRECTION_ATTEMPTS:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction attempt count is outside its fixed bound",
+        )
+    guards = record["evidence_guards"]
+    if len(guards) not in {len(attempts), len(attempts) + 1}:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction evidence-guard sequence is invalid",
+        )
+    if any(
+        not isinstance(guard, dict)
+        or not isinstance(guard.get("source_verdict_sha256"), str)
+        or not isinstance(guard.get("entries"), list)
+        for guard in guards
+    ):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction evidence-guard content is invalid",
+        )
+    original = record.get("original_verdict_reference")
+    source = record.get("source_verdict_reference")
+    if not isinstance(original, dict) or not isinstance(source, dict):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction verdict identity is incomplete",
+        )
+    original_turn = load_correction_turn_reference(original, run_root)
+    reviewer_thread_id = record.get("reviewer_thread_id")
+    if (
+        not isinstance(reviewer_thread_id, str)
+        or original_turn.process.get("output_schema") != REVIEWER_VERDICT
+        or original_turn.process.get("thread_id") != reviewer_thread_id
+    ):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction original verdict identity is invalid",
+        )
+    expected_source = original
+    expected_guard_sources = [original["final_sha256"]]
+    for index, attempt in enumerate(attempts, start=1):
+        if not isinstance(attempt, dict) or attempt.get("attempt") != index:
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction turn sequence is invalid",
+            )
+        reference = attempt.get("turn_reference")
+        if not isinstance(reference, dict):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction turn reference is incomplete",
+            )
+        turn = load_correction_turn_reference(reference, run_root)
+        if (
+            turn.process.get("output_schema") != REVIEWER_VERDICT
+            or turn.process.get("thread_id") != reviewer_thread_id
+            or turn.process.get("resume_target_thread_id") != reviewer_thread_id
+            or turn.process.get("resume_relationship_verified") is not True
+        ):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction turn schema identity is invalid",
+            )
+        expected_source = reference
+        expected_guard_sources.append(reference["final_sha256"])
+    if source != expected_source:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction source verdict is not the latest completed turn",
+        )
+    if [guard.get("source_verdict_sha256") for guard in guards] != expected_guard_sources[:len(guards)]:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction evidence guard is not bound to its verdict sequence",
+        )
+    pending = record.get("pending")
+    if pending is not None:
+        if (
+            not isinstance(pending, dict)
+            or pending.get("attempt") != len(attempts) + 1
+            or pending.get("attempt") > MAX_REVIEW_CORRECTION_ATTEMPTS
+            or pending.get("source_verdict_reference") != source
+            or pending.get("error_code") not in {
+                code.value for code in CORRECTABLE_VERDICT_CODES
+            }
+            or not isinstance(pending.get("reason"), str)
+        ):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction pending plan is inconsistent",
+            )
+
+
+def validate_executor_for_correction(
+    *,
+    executor: Optional[TurnResult],
+    executor_reference: Any,
+    args: argparse.Namespace,
+    target: TargetState,
+    target_after_metadata: Any,
+    governance: GovernanceSnapshot,
+    run_root: Path,
+) -> None:
+    if executor is None or not isinstance(executor_reference, dict):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction lacks a checkpointed Executor receipt",
+        )
+    checkpointed = load_correction_turn_reference(executor_reference, run_root)
+    process = checkpointed.process
+    if (
+        process.get("role") != "executor"
+        or process.get("output_schema") != EXECUTOR_RECEIPT
+        or process.get("codex_home") != str(args.executor_home.resolve())
+        or process.get("session_mode") != FRESH_EPHEMERAL
+        or process.get("target_after") != target.metadata()
+        or process.get("governance_hashes") != governance.hashes()
+        or not isinstance(target_after_metadata, dict)
+        or target_after_metadata != target.metadata()
+        or checkpointed.final_message != executor.final_message
+    ):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "checkpointed Executor receipt does not match current authoritative state",
+        )
+
+
+def validate_framework_for_correction(
+    *,
+    args: argparse.Namespace,
+    framework_initial: Optional[Mapping[str, Any]],
+    summary_path: Optional[Path],
+) -> None:
+    if not p63_enabled(args):
+        return
+    if not isinstance(framework_initial, Mapping) or summary_path is None:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction lacks framework preimage metadata",
+        )
+    settings = framework_settings(args)
+    try:
+        current = P63.capture_framework(
+            repo=Path(settings["repo"]),
+            branch=settings["branch"],
+            remote=settings["remote"],
+            push_ref=settings["push_ref"],
+            require_clean=False,
+        )
+    except P63.EvidenceError as exc:
+        raise InvariantViolation(str(exc)) from exc
+    identity_fields = ("branch", "head", "push_ref", "remote", "remote_head", "remote_url", "repo")
+    if any(current.get(name) != framework_initial.get(name) for name in identity_fields):
+        raise InvariantViolation("framework identity changed before Reviewer correction")
+    permitted = []
+    relative = P63.relative_repo_path(Path(settings["repo"]), summary_path)
+    if summary_path.exists() and relative is not None:
+        permitted.append(relative)
+    if current.get("changes") != sorted(permitted):
+        raise InvariantViolation("framework changes exceed the in-progress evidence summary")
 
 
 def validate_framework_preflight(args: argparse.Namespace) -> Dict[str, Any]:
@@ -1918,6 +2327,148 @@ def runtime_state(content: bytes) -> Tuple[Dict[str, Any], int, int]:
     return value, start, end
 
 
+def plan_verdict_correction(
+    *,
+    current_reference: Mapping[str, Any],
+    error: ControlFailure,
+    evidence_guard: Sequence[Mapping[str, Any]],
+    existing: Optional[Mapping[str, Any]],
+    run_root: Path,
+) -> Dict[str, Any]:
+    if not error.correctable or error.code not in CORRECTABLE_VERDICT_CODES:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "non-correctable failure cannot create a Reviewer correction plan",
+        )
+    current_turn = load_correction_turn_reference(current_reference, run_root)
+    current_thread_id = current_turn.process.get("thread_id")
+    if not isinstance(current_thread_id, str) or not current_thread_id:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction source has no verified thread identity",
+        )
+    if existing is None:
+        record: Dict[str, Any] = {
+            "attempts": [],
+            "attempts_completed": 0,
+            "attempts_started": 0,
+            "evidence_guards": [{
+                "entries": copy.deepcopy(list(evidence_guard)),
+                "source_verdict_sha256": current_reference["final_sha256"],
+            }],
+            "maximum_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
+            "original_verdict_reference": copy.deepcopy(dict(current_reference)),
+            "pending": None,
+            "reviewer_thread_id": current_thread_id,
+            "schema_version": 1,
+            "source_verdict_reference": copy.deepcopy(dict(current_reference)),
+        }
+    else:
+        record = copy.deepcopy(dict(existing))
+        validate_verdict_correction_record(record, run_root)
+        if record.get("source_verdict_reference") != dict(current_reference):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction source differs from the routed verdict",
+            )
+        if record.get("reviewer_thread_id") != current_thread_id:
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction source thread differs from the original Reviewer",
+            )
+        record["evidence_guards"].append({
+            "entries": copy.deepcopy(list(evidence_guard)),
+            "source_verdict_sha256": current_reference["final_sha256"],
+        })
+    attempt = record["attempts_completed"] + 1
+    if attempt > MAX_REVIEW_CORRECTION_ATTEMPTS:
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_EXHAUSTED,
+            "Reviewer verdict correction exhausted after 2 completed attempts",
+        )
+    record["pending"] = {
+        "attempt": attempt,
+        "error_code": error.code.value,
+        "reason": error.public_reason,
+        "source_verdict_reference": copy.deepcopy(dict(current_reference)),
+    }
+    validate_verdict_correction_record(record, run_root)
+    return record
+
+
+def correction_control_context(
+    *,
+    correction: Mapping[str, Any],
+    executor_reference: Mapping[str, Any],
+    target: TargetState,
+    governance: GovernanceSnapshot,
+    run_root: Path,
+) -> Dict[str, Any]:
+    validate_verdict_correction_record(correction, run_root)
+    pending = correction.get("pending")
+    if not isinstance(pending, dict):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction has no pending attempt",
+        )
+    machine, _, _ = runtime_state(governance.documents[WORKLOAD_RUNTIME].content)
+
+    def absolute_final(reference: Mapping[str, Any]) -> str:
+        relative = reference.get("final_path")
+        if not isinstance(relative, str):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction evidence reference is incomplete",
+            )
+        path = (run_root / relative).resolve()
+        try:
+            path.relative_to(run_root.resolve())
+        except ValueError as exc:
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction evidence reference escapes the run root",
+            ) from exc
+        return str(path)
+
+    original = correction["original_verdict_reference"]
+    source = correction["source_verdict_reference"]
+    return {
+        "active_step": copy.deepcopy(machine["active_step"]),
+        "attempt": pending["attempt"],
+        "commit_locator_rule": "full commit object ID reachable from target HEAD",
+        "current_invalid_verdict": {
+            "locator": absolute_final(source),
+            "sha256": source["final_sha256"],
+        },
+        "error": {
+            "code": pending["error_code"],
+            "reason": pending["reason"],
+        },
+        "evidence_boundary": {
+            "run_root": str(run_root.resolve()),
+            "target_repo": str(target.repo.resolve()),
+        },
+        "executor_receipt": {
+            "locator": absolute_final(executor_reference),
+            "sha256": executor_reference["final_sha256"],
+        },
+        "file_locator_rule": (
+            "file/artifact/test must name an existing absolute file inside "
+            "target_repo or run_root; commands, Git status, and prose are invalid"
+        ),
+        "governance_hashes": governance.hashes(),
+        "maximum_attempts": correction["maximum_attempts"],
+        "original_verdict": {
+            "locator": absolute_final(original),
+            "sha256": original["final_sha256"],
+        },
+        "reviewer_thread_id": correction["reviewer_thread_id"],
+        "run_root": str(run_root.resolve()),
+        "schema_version": 1,
+        "target": target.metadata(),
+    }
+
+
 def validate_runtime_destination(args: argparse.Namespace) -> Path:
     """No output path ever comes from an Agent. Forbid protected-file aliases."""
     requested = args.workload_runtime
@@ -1939,10 +2490,14 @@ def validate_runtime_destination(args: argparse.Namespace) -> Path:
     return path
 
 
-def validate_review_authority(
-    turn: TurnResult, args: argparse.Namespace, state: ReviewerState,
-    target: TargetState, governance: GovernanceSnapshot,
+def validate_review_process_authority(
+    turn: TurnResult,
+    args: argparse.Namespace,
+    state: ReviewerState,
+    target: TargetState,
+    governance: GovernanceSnapshot,
 ) -> Dict[str, Any]:
+    """Verify immutable Reviewer/process authority before wrapper declarations."""
     value = validate_turn_payload(turn.final_message, REVIEWER_VERDICT)
     process = turn.process
     if (process.get("role") != "reviewer" or process.get("success") is not True
@@ -1952,10 +2507,16 @@ def validate_review_authority(
             or process.get("output_schema") != REVIEWER_VERDICT
             or process.get("output_schema_sha256") != P4.sha256_file(schema_path(REVIEWER_VERDICT))
             or process.get("final_message_sha256") != P4.sha256_bytes(turn.final_message)):
-        raise InvariantViolation("verdict lacks successful Reviewer profile/schema authority")
+        raise ControlFailure(
+            ControlErrorCode.REVIEW_PROCESS_AUTHORITY_INVALID,
+            "verdict lacks successful Reviewer profile/schema authority",
+        )
     thread = process.get("thread_id")
     if not thread or thread != state.reviewer_thread_id:
-        raise InvariantViolation("verdict Reviewer thread does not match checkpoint")
+        raise ControlFailure(
+            ControlErrorCode.REVIEW_THREAD_MISMATCH,
+            "verdict Reviewer thread does not match checkpoint",
+        )
     context = process.get("authoritative_context") or {}
     validation = context.get("validation") or {}
     if (validation.get("source_bytes_verified") is not True
@@ -1963,32 +2524,66 @@ def validate_review_authority(
             or context.get("current_hashes") != governance.hashes()
             or state.known_hashes != governance.hashes()
             or state.known_target_head != target.head):
-        raise InvariantViolation("verdict Reviewer governance/target context is stale")
+        raise ControlFailure(
+            ControlErrorCode.REVIEW_CONTEXT_STALE,
+            "verdict Reviewer governance/target context is stale",
+        )
     mode = process.get("session_mode")
     if mode == RESUME:
         if (process.get("resume_relationship_verified") is not True
                 or process.get("observed_resume_thread_id") != thread
                 or process.get("resume_target_thread_id") != thread
                 or context.get("session_known_thread_id") != thread):
-            raise InvariantViolation("verdict Reviewer resume relationship is unverified")
+            raise ControlFailure(
+                ControlErrorCode.REVIEW_RESUME_RELATIONSHIP_INVALID,
+                "verdict Reviewer resume relationship is unverified",
+            )
     elif mode == NEW_PERSISTENT:
         policy = context.get("freshness_policy") or {}
         if (process.get("created_thread_id") != thread
                 or policy.get("injected_files") != list(DOCUMENT_ORDER)
                 or process.get("resume_target_thread_id") is not None):
-            raise InvariantViolation("fresh Reviewer verdict lacks complete persistent bootstrap")
+            raise ControlFailure(
+                ControlErrorCode.REVIEW_BOOTSTRAP_INVALID,
+                "fresh Reviewer verdict lacks complete persistent bootstrap",
+            )
     else:
-        raise InvariantViolation("verdict requires a persistent/resumed Reviewer")
+        raise ControlFailure(
+            ControlErrorCode.REVIEW_PROCESS_AUTHORITY_INVALID,
+            "verdict requires a persistent/resumed Reviewer",
+        )
     if (process.get("reviewer_target_before") != target.metadata()
-            or process.get("reviewer_target_after") != target.metadata()
-            or value["reviewed_target"] != {
-                "repo": str(target.repo), "branch": target.branch, "head": target.head,
-            }):
-        raise InvariantViolation("reviewed target repository/branch/HEAD is stale")
+            or process.get("reviewer_target_after") != target.metadata()):
+        raise ControlFailure(
+            ControlErrorCode.REVIEW_TARGET_STATE_INVALID,
+            "Reviewer process target audit differs from current target state",
+        )
+    return value
+
+
+def validate_review_authority(
+    turn: TurnResult, args: argparse.Namespace, state: ReviewerState,
+    target: TargetState, governance: GovernanceSnapshot,
+) -> Dict[str, Any]:
+    value = validate_review_process_authority(turn, args, state, target, governance)
+    validate_verdict_relationships(value)
+    if value["reviewed_target"] != {
+        "repo": str(target.repo), "branch": target.branch, "head": target.head,
+    }:
+        raise correctable_failure(
+            ControlErrorCode.VERDICT_REVIEWED_TARGET_MISMATCH,
+            "Reviewer verdict target declaration differs from authoritative target state",
+        )
     if value["governance_hashes"] != governance.hashes():
-        raise InvariantViolation("verdict governance hashes are stale")
+        raise correctable_failure(
+            ControlErrorCode.VERDICT_GOVERNANCE_HASH_MISMATCH,
+            "Reviewer verdict governance declaration differs from authoritative hashes",
+        )
     if value["expected_runtime_sha256"] != governance.documents[WORKLOAD_RUNTIME].sha256:
-        raise InvariantViolation("verdict Runtime preimage hash is stale")
+        raise correctable_failure(
+            ControlErrorCode.VERDICT_RUNTIME_HASH_MISMATCH,
+            "Reviewer verdict Runtime declaration differs from authoritative preimage",
+        )
     return value
 
 
@@ -2000,28 +2595,164 @@ def validate_accept_evidence(
         locator = item["locator"]
         if item["kind"] == "commit":
             if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", locator) is None:
-                raise InvariantViolation("commit evidence must use a full object ID")
-            if git_text(target.repo, ["cat-file", "-t", locator]) != "commit":
-                raise InvariantViolation("commit evidence is not a commit")
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_COMMIT_LOCATOR_INVALID,
+                    "commit evidence must use a full object ID",
+                )
+            try:
+                object_type = git_text(target.repo, ["cat-file", "-t", locator])
+            except InvariantViolation as exc:
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_COMMIT_UNRESOLVABLE,
+                    "commit evidence object cannot be resolved",
+                ) from exc
+            if object_type != "commit":
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_COMMIT_NOT_COMMIT,
+                    "commit evidence object is not a commit",
+                )
             if not is_ancestor(target.repo, locator, target.head):
-                raise InvariantViolation("commit evidence is not reachable from target HEAD")
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_COMMIT_UNREACHABLE,
+                    "commit evidence is not reachable from target HEAD",
+                )
             content = git_bytes(target.repo, ["cat-file", "commit", locator])
             commits += 1
         else:
             path = Path(locator)
             if not path.is_absolute():
-                raise InvariantViolation("file/artifact evidence requires an absolute locator")
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_LOCATOR_NOT_ABSOLUTE,
+                    "file, artifact, and test evidence require an absolute file locator",
+                )
             resolved = path.resolve()
             if not (P4.path_is_within(resolved, target.repo)
                     or P4.path_is_within(resolved, run_root)):
-                raise InvariantViolation("file/artifact evidence escapes target/run boundary")
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY,
+                    "file, artifact, or test evidence is outside the target/run boundary",
+                )
             if not resolved.is_file():
-                raise InvariantViolation("file/artifact evidence is missing")
+                raise correctable_failure(
+                    ControlErrorCode.EVIDENCE_LOCATOR_MISSING,
+                    "file, artifact, or test evidence locator is not an existing file",
+                )
             content = resolved.read_bytes()
         if P4.sha256_bytes(content) != item["sha256"]:
-            raise InvariantViolation("evidence SHA-256 mismatch")
+            raise correctable_failure(
+                ControlErrorCode.EVIDENCE_HASH_MISMATCH,
+                "Reviewer evidence SHA-256 differs from the actual object bytes",
+            )
     if commits == 0:
-        raise InvariantViolation("ACCEPT requires at least one reachable commit evidence")
+        raise correctable_failure(
+            ControlErrorCode.EVIDENCE_COMMIT_REQUIRED,
+            "ACCEPT requires at least one reachable commit evidence",
+        )
+
+
+def capture_correction_evidence_guard(
+    value: Mapping[str, Any], target: TargetState, run_root: Path
+) -> List[Dict[str, Any]]:
+    """Snapshot resolvable declared objects without repairing their declarations."""
+    guarded: List[Dict[str, Any]] = []
+    for item in value.get("evidence", []):
+        kind = item.get("kind")
+        locator = item.get("locator")
+        record: Dict[str, Any] = {
+            "kind": kind,
+            "locator": locator,
+            "observed_sha256": None,
+            "status": "unresolved",
+        }
+        if not isinstance(locator, str):
+            guarded.append(record)
+            continue
+        if kind == "commit" and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", locator):
+            completed = subprocess.run(
+                ["git", "cat-file", "commit", locator],
+                cwd=str(target.repo),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode == 0:
+                record["observed_sha256"] = P4.sha256_bytes(completed.stdout)
+                record["status"] = "observed"
+        elif kind in {"file", "artifact", "test"}:
+            path = Path(locator)
+            if path.is_absolute():
+                resolved = path.resolve()
+                if (
+                    (P4.path_is_within(resolved, target.repo)
+                     or P4.path_is_within(resolved, run_root))
+                    and resolved.is_file()
+                ):
+                    record["resolved_locator"] = str(resolved)
+                    record["observed_sha256"] = P4.sha256_file(resolved)
+                    record["status"] = "observed"
+        guarded.append(record)
+    return guarded
+
+
+def validate_correction_evidence_guards(
+    correction: Mapping[str, Any], target: TargetState, run_root: Path
+) -> None:
+    guards = correction.get("evidence_guards")
+    if not isinstance(guards, list):
+        raise ControlFailure(
+            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+            "Reviewer correction evidence guard is missing",
+        )
+    for guarded_turn in guards:
+        if not isinstance(guarded_turn, dict) or not isinstance(
+            guarded_turn.get("entries"), list
+        ):
+            raise ControlFailure(
+                ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                "Reviewer correction evidence guard is invalid",
+            )
+        for entry in guarded_turn["entries"]:
+            if not isinstance(entry, dict):
+                raise ControlFailure(
+                    ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                    "Reviewer correction evidence-guard entry is invalid",
+                )
+            if entry.get("status") not in {"observed", "unresolved"}:
+                raise ControlFailure(
+                    ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                    "Reviewer correction evidence-guard status is invalid",
+                )
+            if entry.get("status") != "observed":
+                continue
+            expected = entry.get("observed_sha256")
+            if entry.get("kind") == "commit":
+                completed = subprocess.run(
+                    ["git", "cat-file", "commit", entry.get("locator", "")],
+                    cwd=str(target.repo),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                actual = (
+                    P4.sha256_bytes(completed.stdout)
+                    if completed.returncode == 0 else None
+                )
+            else:
+                locator = entry.get("resolved_locator")
+                path = Path(locator) if isinstance(locator, str) else Path("")
+                if not (
+                    path.is_absolute()
+                    and (P4.path_is_within(path, target.repo)
+                         or P4.path_is_within(path, run_root))
+                    and path.is_file()
+                ):
+                    actual = None
+                else:
+                    actual = P4.sha256_file(path)
+            if actual != expected:
+                raise InvariantViolation(
+                    "actual evidence bytes changed after Reviewer correction planning"
+                )
 
 
 def validate_accept(
@@ -2029,22 +2760,34 @@ def validate_accept(
     target: TargetState, governance: GovernanceSnapshot, run_root: Path,
 ) -> Dict[str, Any]:
     if not getattr(args, "enable_runtime_transition", False):
-        raise InvariantViolation("Runtime transition CLI capability is disabled")
+        raise ControlFailure(
+            ControlErrorCode.RUNTIME_CAPABILITY_DISABLED,
+            "Runtime transition CLI capability is disabled",
+        )
     path = validate_runtime_destination(args)
     value = validate_review_authority(turn, args, state, target, governance)
     if value["verdict"] != "ACCEPT":
         raise InvariantViolation("Runtime transition requires Reviewer ACCEPT")
     document = governance.documents[WORKLOAD_RUNTIME]
     if path != document.path:
-        raise InvariantViolation("Runtime destination differs from governance input")
+        raise ControlFailure(
+            ControlErrorCode.RUNTIME_DESTINATION_MISMATCH,
+            "Runtime destination differs from governance input",
+        )
     machine, _, _ = runtime_state(document.content)
     if (machine["workload_id"] != workload_id_for_args(args)
             or machine["transition_mode"] != "reviewer_accept_once"
             or machine["last_transition_id"] is not None
             or machine["active_step"]["status"] != "ACTIVE"):
-        raise InvariantViolation("Runtime machine block does not authorize one unused transition")
+        raise ControlFailure(
+            ControlErrorCode.RUNTIME_MACHINE_UNAUTHORIZED,
+            "Runtime machine block does not authorize one unused transition",
+        )
     if machine["active_step"]["id"] != value["active_step_id"]:
-        raise InvariantViolation("active_step_id differs from Runtime machine block")
+        raise correctable_failure(
+            ControlErrorCode.VERDICT_ACTIVE_STEP_MISMATCH,
+            "Reviewer active_step_id differs from the authoritative Runtime machine block",
+        )
     validate_accept_evidence(value, target, run_root)
     return value
 
@@ -2296,6 +3039,7 @@ def orchestrate(
         summary_progress = checkpoint.get("summary_progress", [])
         summary_pending = checkpoint.get("summary_pending")
         logical_outcome = checkpoint.get("logical_outcome")
+        verdict_correction = checkpoint.get("verdict_correction")
         framework_initial = checkpoint.get("framework_initial")
         framework_commit_plan = checkpoint.get("framework_commit_plan")
         framework_commit_id = checkpoint.get("framework_commit_id")
@@ -2355,6 +3099,7 @@ def orchestrate(
         summary_progress: List[Dict[str, Any]] = []
         summary_pending = None
         logical_outcome = None
+        verdict_correction = None
         runtime_transition_applied = False
         transition_plan = None
         initial_hashes = governance_initial.hashes()
@@ -2382,6 +3127,7 @@ def orchestrate(
                 else git_text(FRAMEWORK_ROOT, ["rev-parse", "HEAD"])
             ),
             "max_cycles": args.max_cycles,
+            "max_review_correction_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
             "reviewer_home": str(args.reviewer_home.resolve()),
             "reviewer_session_mode": "persistent-with-explicit-resume",
             "reviewer_sandbox": NO_CODEX_SANDBOX,
@@ -2394,6 +3140,46 @@ def orchestrate(
                 **framework_settings(args),
                 "summary_path": str(summary_path),
             }
+
+    def structured_final_result(
+        *, exit_code_override: Optional[int] = None
+    ) -> Dict[str, Any]:
+        if runtime_transition_applied:
+            runtime_status = "APPLIED"
+        elif state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}:
+            runtime_status = "PENDING"
+        else:
+            runtime_status = "NOT_APPLIED"
+        if framework_evidence_pushed:
+            publication = "PUSHED"
+        elif evidence_finalization_error is not None:
+            publication = "FAILED"
+        elif framework_evidence_committed:
+            publication = "COMMITTED"
+        elif evidence_finalization_enabled and isinstance(logical_outcome, dict):
+            publication = "PENDING"
+        else:
+            publication = "NOT_ENABLED" if not evidence_finalization_enabled else "NOT_STARTED"
+        outcome = logical_outcome if isinstance(logical_outcome, dict) else {}
+        exit_code = outcome.get("exit_code")
+        result_reason = outcome.get("reason")
+        result_error_code = outcome.get("error_code")
+        if evidence_finalization_error is not None:
+            exit_code = 1
+            result_reason = "evidence publication failed; resume retries finalization only"
+            result_error_code = "EVIDENCE_PUBLICATION_FAILED"
+        if exit_code_override is not None:
+            exit_code = exit_code_override
+        return {
+            "error_code": result_error_code,
+            "evidence_publication": publication,
+            "exit_code": exit_code,
+            "logical_outcome": outcome.get("state", "UNDETERMINED"),
+            "reason": result_reason,
+            "run_id": run_id,
+            "run_root": str(run_root.resolve()),
+            "runtime_transition": runtime_status,
+        }
 
     def persist(
         checkpoint_state: str,
@@ -2410,6 +3196,7 @@ def orchestrate(
             "cycle_number": cycle_number,
             "cycles": cycles,
             "executor_reference": executor_reference,
+            "final_result": structured_final_result(),
             "governance_initial_hashes": initial_hashes,
             "framework_evidence_committed": framework_evidence_committed,
             "framework_evidence_pushed": framework_evidence_pushed,
@@ -2439,6 +3226,7 @@ def orchestrate(
             "target_after": target_after_metadata,
             "target_before": target_before_metadata,
             "target_initial": target_initial.metadata(),
+            "verdict_correction": verdict_correction,
         }
         written = checkpoint_store.write(checkpoint_state, payload)
         write_manifest(
@@ -2465,6 +3253,7 @@ def orchestrate(
                 "summary_path": str(summary_path) if summary_path is not None else None,
             },
             logical_outcome=logical_outcome,
+            final_result=structured_final_result(),
         )
         if checkpoint_observer is not None:
             checkpoint_observer(checkpoint_state, written)
@@ -2583,6 +3372,15 @@ def orchestrate(
             f"run={run_id} summary_entry={plan['entry_id']} state=written"
         )
 
+    final_result_emitted = False
+
+    def finish_return(exit_code: int) -> Tuple[int, Path]:
+        nonlocal final_result_emitted
+        if not final_result_emitted:
+            emit_final_result(structured_final_result(exit_code_override=exit_code))
+            final_result_emitted = True
+        return exit_code, run_root
+
     def finish_evidence() -> Tuple[int, Path]:
         nonlocal framework_commit_plan, framework_commit_id
         nonlocal framework_evidence_committed, framework_evidence_pushed
@@ -2590,7 +3388,7 @@ def orchestrate(
         if not evidence_finalization_enabled:
             if not isinstance(logical_outcome, dict):
                 raise InvariantViolation("logical outcome is missing")
-            return int(logical_outcome["exit_code"]), run_root
+            return finish_return(int(logical_outcome["exit_code"]))
         if not isinstance(logical_outcome, dict) or not isinstance(framework_initial, dict):
             raise InvariantViolation("evidence finalization metadata is incomplete")
         evidence_finalization_error = None
@@ -2680,7 +3478,7 @@ def orchestrate(
                 raise InvariantViolation("final evidence checkpoint flags are incomplete")
             if P63.push_or_reconcile(framework_commit_plan, framework_commit_id) != "already-present":
                 raise InvariantViolation("final framework remote verification was not idempotent")
-            return int(logical_outcome["exit_code"]), run_root
+            return finish_return(int(logical_outcome["exit_code"]))
         raise InvariantViolation("unsupported evidence finalization state")
 
     def reach_logical_outcome(
@@ -2689,6 +3487,7 @@ def orchestrate(
         manifest_status: str,
         reason: str,
         exit_code: int,
+        error_code: str,
     ) -> Tuple[int, Path]:
         nonlocal logical_outcome
         logical_outcome = {
@@ -2696,6 +3495,7 @@ def orchestrate(
             "manifest_status": manifest_status,
             "reason": reason,
             "state": outcome_state,
+            "error_code": error_code,
         }
         persist(
             outcome_state,
@@ -2728,7 +3528,9 @@ def orchestrate(
             "reviewer_instruction_process": instruction.process,
             "instruction_freshness": None,
             "reviewer_pre_executor_refresh": None,
+            "reviewer_corrections": [],
             "reviewer_review": None,
+            "verdict_correction": None,
             "reviewer_state_before": copy.deepcopy(reviewer_state.metadata()),
             "target_triggered_instruction_refresh": False,
             "target_after": None,
@@ -2943,6 +3745,7 @@ def orchestrate(
                             manifest_status="STOPPED_FOR_HUMAN_REVIEW",
                             reason="executor_outcome_ambiguous_after_restart",
                             exit_code=0,
+                            error_code="EXECUTOR_OUTCOME_AMBIGUOUS_AFTER_RESTART",
                         )
                     if turn_dir.exists():
                         turn_dir = next_turn_attempt(cycle_dir / "executor")
@@ -3151,6 +3954,190 @@ def orchestrate(
                 cycle["reviewer_review"] = instruction.process
                 cycle["reviewer_state_after"] = reviewer_state.metadata()
                 instruction_reference = turn_reference(instruction, run_root)
+                verdict_correction = None
+                active_turn_relative = None
+                persist(REVIEW_COMPLETED)
+                continue
+
+            if state == REVIEW_CORRECTION_PENDING:
+                if instruction is None or not isinstance(verdict_correction, dict):
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                        "Reviewer correction pending state lacks its verdict context",
+                    )
+                validate_verdict_correction_record(verdict_correction, run_root)
+                pending = verdict_correction.get("pending")
+                if not isinstance(pending, dict):
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                        "Reviewer correction pending attempt is missing",
+                    )
+                current_target = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
+                )
+                current_governance = capture_governance(governance_paths)
+                validate_framework_for_correction(
+                    args=args,
+                    framework_initial=framework_initial,
+                    summary_path=summary_path,
+                )
+                validate_correction_evidence_guards(
+                    verdict_correction, current_target, run_root
+                )
+                validate_review_process_authority(
+                    instruction, args, reviewer_state, current_target, current_governance
+                )
+                validate_executor_for_correction(
+                    executor=executor,
+                    executor_reference=executor_reference,
+                    args=args,
+                    target=current_target,
+                    target_after_metadata=target_after_metadata,
+                    governance=current_governance,
+                    run_root=run_root,
+                )
+                base = cycle_dir / (
+                    f"reviewer-verdict-correction-{pending['attempt']:02d}"
+                )
+                if active_turn_relative is None:
+                    active_turn_relative = relative_evidence_path(base, run_root)
+                pending["turn_relative"] = active_turn_relative
+                verdict_correction["attempts_started"] = pending["attempt"]
+                persist(REVIEW_CORRECTION_RUNNING)
+                continue
+
+            if state == REVIEW_CORRECTION_RUNNING:
+                if instruction is None or not isinstance(verdict_correction, dict):
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                        "Reviewer correction running state lacks its verdict context",
+                    )
+                validate_verdict_correction_record(verdict_correction, run_root)
+                pending = verdict_correction.get("pending")
+                if not isinstance(pending, dict):
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                        "Reviewer correction running attempt is missing",
+                    )
+                turn_dir = active_turn_path(
+                    cycle_dir / f"reviewer-verdict-correction-{pending['attempt']:02d}"
+                )
+                if pending.get("turn_relative") != relative_evidence_path(turn_dir, run_root):
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                        "Reviewer correction turn locator differs from its checkpoint plan",
+                    )
+                current_target = capture_target_state(
+                    target_initial.repo, target_initial.branch, require_clean=True
+                )
+                current_governance = capture_governance(governance_paths)
+                validate_framework_for_correction(
+                    args=args,
+                    framework_initial=framework_initial,
+                    summary_path=summary_path,
+                )
+                validate_correction_evidence_guards(
+                    verdict_correction, current_target, run_root
+                )
+                validate_review_process_authority(
+                    instruction, args, reviewer_state, current_target, current_governance
+                )
+                validate_executor_for_correction(
+                    executor=executor,
+                    executor_reference=executor_reference,
+                    args=args,
+                    target=current_target,
+                    target_after_metadata=target_after_metadata,
+                    governance=current_governance,
+                    run_root=run_root,
+                )
+                recovered = completed_turn_from_dir(turn_dir, run_root)
+                reviewer_thread_before = reviewer_state.reviewer_thread_id
+                if recovered is None:
+                    if turn_dir.exists():
+                        raise ControlFailure(
+                            ControlErrorCode.VERDICT_CORRECTION_PROCESS_FAILED,
+                            "Reviewer correction process did not leave a complete recoverable turn",
+                        )
+                    context = correction_control_context(
+                        correction=verdict_correction,
+                        executor_reference=executor_reference,
+                        target=current_target,
+                        governance=current_governance,
+                        run_root=run_root,
+                    )
+                    emit_progress(
+                        f"run={run_id} cycle={cycle_number} role=reviewer "
+                        f"state=verdict_correction_running attempt={pending['attempt']} "
+                        f"error_code={pending['error_code']} target_head={current_target.head}"
+                    )
+                    recovered = invoke_reviewer(
+                        run_root=run_root,
+                        turn_dir=turn_dir,
+                        target=current_target,
+                        governance=current_governance,
+                        state=reviewer_state,
+                        cycle_number=cycle_number,
+                        role_prompt=reviewer_correction_prompt(context),
+                        peer_payload=None,
+                        peer_source=None,
+                        codex_bin=args.codex_bin,
+                        reviewer_home=args.reviewer_home.resolve(),
+                        timeout_seconds=args.timeout_seconds,
+                        progress_interval_seconds=progress_interval,
+                        review=True,
+                    )
+                else:
+                    reviewer_state = recover_reviewer_state_from_turn(recovered)
+                recovered.process["verdict_correction"] = {
+                    "attempt": pending["attempt"],
+                    "error_code": pending["error_code"],
+                    "maximum_attempts": verdict_correction["maximum_attempts"],
+                    "original_verdict_sha256": verdict_correction[
+                        "original_verdict_reference"
+                    ]["final_sha256"],
+                    "source_verdict_sha256": verdict_correction[
+                        "source_verdict_reference"
+                    ]["final_sha256"],
+                }
+                P4.write_json(recovered.turn_dir / "process.json", recovered.process)
+                record_turn_summary(
+                    recovered,
+                    fallback_before=current_target.metadata(),
+                    fallback_after=current_target.metadata(),
+                    fallback_hashes=current_governance.hashes(),
+                )
+                if not recovered.success:
+                    raise ControlFailure(
+                        ControlErrorCode.VERDICT_CORRECTION_PROCESS_FAILED,
+                        "Reviewer correction process/schema/relationship validation failed",
+                    )
+                if (
+                    recovered.process.get("session_mode") != RESUME
+                    or reviewer_thread_before is None
+                    or reviewer_state.reviewer_thread_id != reviewer_thread_before
+                ):
+                    raise ControlFailure(
+                        ControlErrorCode.REVIEW_RESUME_RELATIONSHIP_INVALID,
+                        "Reviewer correction did not resume the original Reviewer thread",
+                    )
+                correction_reference = turn_reference(recovered, run_root)
+                verdict_correction["attempts"].append({
+                    "attempt": pending["attempt"],
+                    "turn_reference": correction_reference,
+                })
+                verdict_correction["attempts_completed"] = len(
+                    verdict_correction["attempts"]
+                )
+                verdict_correction["source_verdict_reference"] = correction_reference
+                verdict_correction["pending"] = None
+                validate_verdict_correction_record(verdict_correction, run_root)
+                cycle = cycle_for(cycle_number, instruction)
+                cycle["reviewer_corrections"].append(recovered.process)
+                cycle["reviewer_state_after"] = reviewer_state.metadata()
+                instruction = recovered
+                processes.append(recovered.process)
+                instruction_reference = correction_reference
                 active_turn_relative = None
                 persist(REVIEW_COMPLETED)
                 continue
@@ -3162,10 +4149,97 @@ def orchestrate(
                     target_initial.repo, target_initial.branch, require_clean=True
                 )
                 current_governance = capture_governance(governance_paths)
-                value = validate_review_authority(
-                    instruction, args, reviewer_state, current_target, current_governance
-                )
+                if isinstance(verdict_correction, dict):
+                    validate_correction_evidence_guards(
+                        verdict_correction, current_target, run_root
+                    )
+                try:
+                    value = validate_review_authority(
+                        instruction, args, reviewer_state, current_target, current_governance
+                    )
+                    if value["verdict"] == "ACCEPT":
+                        validate_accept(
+                            args=args,
+                            turn=instruction,
+                            state=reviewer_state,
+                            target=current_target,
+                            governance=current_governance,
+                            run_root=run_root,
+                        )
+                except ControlFailure as exc:
+                    if not exc.correctable or exc.code not in CORRECTABLE_VERDICT_CODES:
+                        raise
+                    validate_executor_for_correction(
+                        executor=executor,
+                        executor_reference=executor_reference,
+                        args=args,
+                        target=current_target,
+                        target_after_metadata=target_after_metadata,
+                        governance=current_governance,
+                        run_root=run_root,
+                    )
+                    validate_framework_for_correction(
+                        args=args,
+                        framework_initial=framework_initial,
+                        summary_path=summary_path,
+                    )
+                    validate_review_process_authority(
+                        instruction,
+                        args,
+                        reviewer_state,
+                        current_target,
+                        current_governance,
+                    )
+                    if isinstance(verdict_correction, dict):
+                        validate_verdict_correction_record(verdict_correction, run_root)
+                        if verdict_correction["attempts"]:
+                            verdict_correction["attempts"][-1]["validation_error"] = {
+                                "code": exc.code.value,
+                                "reason": exc.public_reason,
+                            }
+                        if (
+                            verdict_correction["attempts_completed"]
+                            >= MAX_REVIEW_CORRECTION_ATTEMPTS
+                        ):
+                            raise ControlFailure(
+                                ControlErrorCode.VERDICT_CORRECTION_EXHAUSTED,
+                                "Reviewer verdict correction exhausted after 2 completed attempts",
+                            ) from exc
+                    if not isinstance(instruction_reference, dict):
+                        raise ControlFailure(
+                            ControlErrorCode.VERDICT_CORRECTION_CHECKPOINT_INVALID,
+                            "Reviewer verdict checkpoint reference is incomplete",
+                        )
+                    verdict_correction = plan_verdict_correction(
+                        current_reference=instruction_reference,
+                        error=exc,
+                        evidence_guard=capture_correction_evidence_guard(
+                            validate_turn_payload(
+                                instruction.final_message, REVIEWER_VERDICT
+                            ),
+                            current_target,
+                            run_root,
+                        ),
+                        existing=verdict_correction,
+                        run_root=run_root,
+                    )
+                    emit_progress(
+                        f"run={run_id} cycle={cycle_number} verdict_correction=pending "
+                        f"attempt={verdict_correction['pending']['attempt']} "
+                        f"error_code={exc.code.value}"
+                    )
+                    persist(REVIEW_CORRECTION_PENDING)
+                    continue
                 emit_progress(f"run={run_id} cycle={cycle_number} verdict={value['verdict']}")
+                if isinstance(verdict_correction, dict):
+                    verdict_correction["resolution"] = {
+                        "attempts_completed": verdict_correction["attempts_completed"],
+                        "verdict": value["verdict"],
+                        "verdict_reference": copy.deepcopy(instruction_reference),
+                    }
+                    cycle_for(cycle_number, instruction)["verdict_correction"] = copy.deepcopy(
+                        verdict_correction
+                    )
                 if value["verdict"] == "HUMAN_GATE":
                     emit_progress(
                         "waiting_for_human: reason recorded in the tracked evidence summary"
@@ -3175,11 +4249,9 @@ def orchestrate(
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
                         reason="reviewer_human_gate",
                         exit_code=0,
+                        error_code="REVIEWER_HUMAN_GATE",
                     )
                 if value["verdict"] == "ACCEPT":
-                    validate_accept(args=args, turn=instruction, state=reviewer_state,
-                                    target=current_target, governance=current_governance,
-                                    run_root=run_root)
                     transition_plan, _ = build_runtime_transition(
                         preimage=current_governance.documents[WORKLOAD_RUNTIME].content,
                         value=value, verdict_path=instruction.turn_dir / "final.txt",
@@ -3201,6 +4273,7 @@ def orchestrate(
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
                         reason="target_head_unchanged",
                         exit_code=0,
+                        error_code="TARGET_HEAD_UNCHANGED",
                     )
                 if cycle_number == args.max_cycles:
                     return reach_logical_outcome(
@@ -3208,8 +4281,10 @@ def orchestrate(
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
                         reason="max_cycles_reached",
                         exit_code=0,
+                        error_code="MAX_CYCLES_REACHED",
                     )
                 cycle_number += 1
+                verdict_correction = None
                 executor = None
                 executor_reference = None
                 target_before_metadata = None
@@ -3233,6 +4308,7 @@ def orchestrate(
                     manifest_status=RUNTIME_TRANSITION_COMMITTED,
                     reason="one_reviewer_accept_transition_completed",
                     exit_code=0,
+                    error_code="RUNTIME_TRANSITION_COMMITTED",
                 )
 
             raise InvariantViolation(f"unsupported checkpoint state: {state}")
@@ -3269,7 +4345,7 @@ def orchestrate(
                     emit_progress(
                         f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
                     )
-                return 1, run_root
+                return finish_return(1)
             if transition_interrupted and isinstance(exc, OSError):
                 try:
                     persist(
@@ -3281,7 +4357,7 @@ def orchestrate(
                     emit_progress(
                         f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
                     )
-                return 1, run_root
+                return finish_return(1)
             try:
                 return reach_logical_outcome(
                     failure_state,
@@ -3291,6 +4367,7 @@ def orchestrate(
                     ),
                     reason=reason,
                     exit_code=1,
+                    error_code=control_error_code(exc),
                 )
             except (OSError, RuntimeError, ValueError) as finalization_exc:
                 evidence_finalization_error = str(finalization_exc)
@@ -3309,18 +4386,23 @@ def orchestrate(
                     emit_progress(
                         f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
                     )
-                return 1, run_root
+                return finish_return(1)
         try:
-            persist(
+            return reach_logical_outcome(
                 failure_state,
-                manifest_status="STOPPED_FOR_HUMAN_REVIEW" if transition_interrupted else "FAILED_CLOSED",
-                manifest_reason=reason,
+                manifest_status=(
+                    "STOPPED_FOR_HUMAN_REVIEW"
+                    if transition_interrupted else "FAILED_CLOSED"
+                ),
+                reason=reason,
+                exit_code=1,
+                error_code=control_error_code(exc),
             )
         except (OSError, RuntimeError, ValueError) as checkpoint_exc:
             emit_progress(
                 f"run={run_id} state=FAILED_CLOSED checkpoint_error={checkpoint_exc}"
             )
-        return 1, run_root
+        return finish_return(1)
 
 
 def preflight_report(
@@ -3432,6 +4514,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target, governance = validate_preflight(args)
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"preflight failed: {exc}", file=sys.stderr)
+        emit_final_result(failure_result_for_main(args, exc, exit_code=2))
         return 2
 
     if args.preflight_only:
@@ -3446,15 +4529,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     try:
-        exit_code, run_root = orchestrate(
+        exit_code, _run_root = orchestrate(
             args=args,
             target_initial=target,
             governance_initial=governance,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"unable to start mutation loop: {exc}", file=sys.stderr)
+        emit_final_result(failure_result_for_main(args, exc))
         return 1
-    print(run_root)
+    # The bounded FINAL_RESULT emitted by orchestrate already includes run_root.
     return exit_code
 
 
