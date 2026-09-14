@@ -6,7 +6,7 @@
 P6 = ACCEPTED / PHASE CLOSED
 P7 = PAUSED BY HUMAN OWNER / NOT ACTIVE
 current engineering task = foundation_v1
-foundation_v1 status = ACTIVE / F1 IMPLEMENTED AND VALIDATED — AWAITING INDEPENDENT REVIEW
+foundation_v1 status = ACTIVE / F1 REPAIRED AND VALIDATED — AWAITING INDEPENDENT RE-REVIEW
 ```
 
 当前目标是把 P6 后的能力完善为可日常运行、可诊断、可恢复、状态可见且可维护的本地
@@ -15,11 +15,12 @@ engineering foundation。当前 task-local 治理入口：
 - `1PCloop/workloads/foundation_v1/workload_static.md`；
 - `1PCloop/workloads/foundation_v1/workload_runtime.md`。
 
-F1 已实现并完成 Executor deterministic validation，尚未获得独立 Reviewer verdict；不得据此
-宣称 F1 已接受或激活 F2。CLI/TUI、timer、structured progress events、中文 Prompt 模板规范化
-和 post-foundation smoke 仍未实现。P4–P6 技术说明继续作为已接受能力与 operator reference
-保留。Paper/research-driven experiment 当前暂停，`researchPlan.md` 是 frozen research map，
-不是工程执行入口。
+F1 原实现经独立 Reviewer 拒绝后已完成窄范围 public-result encoding repair 和 Executor
+deterministic validation，当前等待独立 re-review；不得据此宣称 F1 已接受或激活 F2。
+CLI/TUI、timer、structured progress events、中文 Prompt 模板规范化和 post-foundation smoke
+仍未实现。P4–P6 技术说明继续作为已接受能力与 operator reference 保留。
+Paper/research-driven experiment 当前暂停，`researchPlan.md` 是 frozen research map，不是工程
+执行入口。
 
 P4 已实现的基础 Codex CLI 文本路由为：
 
@@ -383,23 +384,37 @@ Reviewer 写入、实际 target/governance/checkpoint/Runtime/framework 漂移�
 commit/push 错误及未分类错误不进入 correction。它们保持 default-deny，并沿用现有 fail-closed
 或 Human Gate/finalization 恢复边界。
 
-每次非 preflight CLI invocation 返回前输出一个不含 peer payload 的 `FINAL_RESULT`：
+每次非 preflight CLI invocation 返回前输出一个不含 peer payload 的 `FINAL_RESULT`。字段名
+固定，等号右侧是单行 JSON scalar；因此字符串带引号，CR/LF、Unicode line separator 和其他
+控制字符只能显示为转义序列，不能创建额外物理输出行：
 
 ```text
-run_id=<id>
-logical_outcome=RUNTIME_TRANSITION_COMMITTED | HUMAN_GATE | FAILED_CLOSED
+run_id="<id>"
+logical_outcome="RUNTIME_TRANSITION_COMMITTED"
 exit_code=<integer>
-runtime_transition=APPLIED | NOT_APPLIED | PENDING
-evidence_publication=PUSHED | COMMITTED | FAILED | PENDING | NOT_ENABLED
-reason=<bounded reason>
-error_code=<stable code>
-run_root=<absolute path>
+runtime_transition="APPLIED"
+evidence_publication="PUSHED"
+reason="<bounded public reason>"
+error_code="<stable code>"
+run_root="<absolute path>"
 ```
 
-同样的 structured fields 写入 checkpoint 和 raw manifest。`PUSHED` 只表示 framework
-evidence publication 成功，绝不覆盖 `FAILED_CLOSED`；publication 失败也不会伪造已经确定的
-logical outcome。F1 没有实现 run/stage timer、status subcommand、last activity 或 structured
-event stream；这些仍属于 F2。F1 当前仅为 implemented/validated，等待独立 Reviewer。
+checkpoint 和 raw manifest 的 `final_result` 使用同一个中央 public-field builder，所有字符串
+也已移除原始控制字符。`reason` 最多 `512` 个 public characters；超出部分确定性替换为
+`...[truncated]`。未分类异常的 public reason 固定为
+`mutation loop stopped; inspect checkpoint and local evidence`，完整 exception type/reason 只保存
+在 Git-ignored checkpoint/raw manifest 的 `internal_diagnostic`，不进入公开结果或终端错误行。
+JSON duplicate-key 拒绝仍然严格，但不再回显由输入控制的 key 名。
+
+原始 Reviewer review prompt 与 correction prompt 使用同一 locator 规则：`file`、`artifact`、
+`test` 必须指向 target/run boundary 内实际存在文件的绝对路径；shell command、Git-status 描述
+和 prose 均不是 locator，没有真实输出文件时不得虚构 test/artifact evidence。这不替代任何
+本地 validator。
+
+`PUSHED` 只表示 framework evidence publication 成功，绝不覆盖 `FAILED_CLOSED`；publication
+失败也不会伪造已经确定的 logical outcome。F1 没有实现 run/stage timer、status subcommand、
+last activity 或 structured event stream；这些仍属于 F2。F1 当前仅为 repaired/validated，
+等待独立 Reviewer re-review。
 
 ## P6.4 当前支持的顺序生命周期边界
 

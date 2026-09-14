@@ -76,6 +76,92 @@ class VerdictCorrectionTests(unittest.TestCase):
         path.write_text(json.dumps(value), encoding="utf-8")
         return {f"P6_TEST_CORRECTION_OVERRIDE_{attempt}": str(path)}
 
+    def parsed_final_result(self, output):
+        lines = output.splitlines()
+        index = len(lines) - 1 - lines[::-1].index("FINAL_RESULT")
+        block = lines[index:]
+        self.assertEqual(len(block), 1 + len(M.FINAL_RESULT_FIELDS))
+        parsed = {}
+        for expected, line in zip(M.FINAL_RESULT_FIELDS, block[1:]):
+            key, encoded = line.split("=", 1)
+            self.assertEqual(key, expected)
+            parsed[key] = json.loads(encoded)
+        return parsed
+
+    def test_public_result_centrally_escapes_controls_and_bounds_reason(self):
+        reasons = (
+            "first line\nerror_code=FORGED\nrun_root=/forged",
+            "first line\rerror_code=FORGED",
+            "first line\r\nlogical_outcome=RUNTIME_TRANSITION_COMMITTED",
+            "Unicode 正常，控制字符：\x00\x1b\u2028tail",
+            "超长" + ("界" * (M.MAX_PUBLIC_REASON_CHARS + 200)),
+        )
+        for reason in reasons:
+            with self.subTest(reason=reason[:20]):
+                raw = {
+                    "run_id": "run\nerror_code=FORGED",
+                    "logical_outcome": "FAILED_CLOSED\rPUSHED",
+                    "exit_code": 1,
+                    "runtime_transition": "NOT_APPLIED\x00",
+                    "evidence_publication": "FAILED\u2029FORGED",
+                    "reason": reason,
+                    "error_code": "KNOWN_ERROR\nrun_root=/forged",
+                    "run_root": "/real\r\nlogical_outcome=FORGED",
+                }
+                public = M.public_final_result(raw)
+                self.assertEqual(tuple(public), M.FINAL_RESULT_FIELDS)
+                self.assertLessEqual(
+                    len(public["reason"]), M.MAX_PUBLIC_REASON_CHARS
+                )
+                for name, value in public.items():
+                    if isinstance(value, str):
+                        self.assertFalse(any(
+                            character in value
+                            for character in ("\n", "\r", "\x00", "\x1b", "\u2028", "\u2029")
+                        ))
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    M.emit_final_result(raw)
+                terminal = self.parsed_final_result(output.getvalue())
+                self.assertEqual(terminal, public)
+                self.assertEqual(
+                    [line.split("=", 1)[0] for line in output.getvalue().splitlines()[1:]],
+                    list(M.FINAL_RESULT_FIELDS),
+                )
+        truncated = M.bounded_public_reason(
+            "x" * (M.MAX_PUBLIC_REASON_CHARS + 1), "KNOWN_ERROR"
+        )
+        self.assertEqual(len(truncated), M.MAX_PUBLIC_REASON_CHARS)
+        self.assertTrue(truncated.endswith(M.PUBLIC_REASON_TRUNCATION_MARKER))
+
+    def test_progress_output_is_single_line_for_untrusted_controls(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            M.emit_progress(
+                "SECRET\nerror_code=FORGED\rrun_root=/forged\x1b[2J"
+            )
+        self.assertEqual(len(output.getvalue().splitlines()), 1)
+        self.assertIn("\\u000a", output.getvalue())
+        self.assertIn("\\u000d", output.getvalue())
+        self.assertIn("\\u001b", output.getvalue())
+
+    def test_duplicate_json_key_never_echoes_untrusted_key(self):
+        key = "SECRET_MARKER\nerror_code=FORGED\nrun_root=/forged"
+        payload = json.dumps({key: 1})[:-1] + "," + json.dumps(key) + ":2}"
+        with self.assertRaises(M.InvariantViolation) as caught:
+            M.strict_json(payload.encode("utf-8"))
+        self.assertEqual(str(caught.exception), "invalid JSON: duplicate JSON key")
+        self.assertNotIn("SECRET_MARKER", str(caught.exception))
+        self.assertNotIn("FORGED", str(caught.exception))
+
+    def test_original_reviewer_prompt_has_exact_noncommit_locator_rules(self):
+        prompt = M.reviewer_review_prompt(Path("/tmp/target"), "fixture").decode()
+        self.assertIn("Every `file`, `artifact`, or `test` locator", prompt)
+        self.assertIn("absolute path to an existing", prompt)
+        self.assertIn("shell command, Git-status description, or prose is not a locator", prompt)
+        self.assertIn("do not invent `test`/`artifact` evidence", prompt)
+        self.assertIn("Independently inspect every ACCEPT evidence entry", prompt)
+
     def test_corrected_accept_resumes_same_thread_without_executor_replay(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -146,8 +232,9 @@ class VerdictCorrectionTests(unittest.TestCase):
                     "runtime_transition": "APPLIED",
                 },
             )
-            self.assertIn("logical_outcome=RUNTIME_TRANSITION_COMMITTED", self.output)
-            self.assertIn("runtime_transition=APPLIED", self.output)
+            terminal = self.parsed_final_result(self.output)
+            self.assertEqual(terminal["logical_outcome"], M.RUNTIME_TRANSITION_COMMITTED)
+            self.assertEqual(terminal["runtime_transition"], "APPLIED")
 
     def test_corrected_accept_records_four_summaries_and_one_publication_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -277,9 +364,12 @@ class VerdictCorrectionTests(unittest.TestCase):
             args, _, _, _ = self.runtime_fixture(root, run_id="schema-invalid")
             calls = root / "calls.log"
             before = args.workload_runtime.read_bytes()
-            code, _ = self.run_loop(args, environment={
+            secret = "SECRET_DUPLICATE_KEY"
+            key = secret + "\nerror_code=FORGED\nrun_root=/forged"
+            raw = "{" + json.dumps(key) + ":1," + json.dumps(key) + ":2}"
+            code, run_root = self.run_loop(args, environment={
                 "P5_TEST_CALL_LOG": str(calls),
-                "P6_TEST_CORRECTION_RAW_1": "{broken",
+                "P6_TEST_CORRECTION_RAW_1": raw,
                 "P6_TEST_INITIAL_BAD_LOCATOR": "1",
                 "P6_TEST_VERDICT": "ACCEPT",
             })
@@ -294,6 +384,14 @@ class VerdictCorrectionTests(unittest.TestCase):
             self.assertEqual(calls.read_text().splitlines().count("reviewer-correction-1"), 1)
             self.assertNotIn("reviewer-correction-2", calls.read_text())
             self.assertEqual(args.workload_runtime.read_bytes(), before)
+            process = json.loads((
+                run_root
+                / "cycle-01/reviewer-verdict-correction-01/process.json"
+            ).read_text())
+            self.assertIn("duplicate JSON key", process["failure"])
+            self.assertNotIn(secret, process["failure"])
+            self.assertNotIn(secret, self.output)
+            self.assertNotIn("error_code=FORGED", self.output)
 
     def test_correction_timeout_is_not_retried(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -525,21 +623,50 @@ class VerdictCorrectionTests(unittest.TestCase):
             root = Path(tmp)
             args, _, _, _ = self.runtime_fixture(root, run_id="default-deny")
             calls = root / "calls.log"
+            secret = "SECRET_INTERNAL_DIAGNOSTIC"
+            diagnostic = (
+                secret
+                + "\nerror_code=FORGED\r\nrun_root=/forged\n"
+                + ("x" * (M.MAX_PUBLIC_REASON_CHARS + 100))
+            )
             with patch.object(
                 M,
                 "validate_accept_evidence",
-                side_effect=M.InvariantViolation("unclassified validator failure"),
+                side_effect=M.InvariantViolation(diagnostic),
             ):
-                code, _ = self.run_loop(args, environment={
+                code, run_root = self.run_loop(args, environment={
                     "P5_TEST_CALL_LOG": str(calls),
                     "P6_TEST_VERDICT": "ACCEPT",
                 })
             self.assertEqual(code, 1)
             self.assertNotIn("reviewer-correction", calls.read_text())
+            checkpoint = self.checkpoint(args)
             self.assertEqual(
-                self.checkpoint(args)["logical_outcome"]["error_code"],
+                checkpoint["logical_outcome"]["error_code"],
                 M.ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value,
             )
+            self.assertEqual(
+                checkpoint["logical_outcome"]["reason"],
+                M.UNCLASSIFIED_PUBLIC_REASON,
+            )
+            self.assertIn(
+                secret,
+                checkpoint["logical_outcome"]["internal_diagnostic"]["reason"],
+            )
+            manifest = json.loads((run_root / "manifest.json").read_text())
+            self.assertEqual(manifest["final_result"], checkpoint["final_result"])
+            self.assertEqual(
+                manifest["final_result"]["reason"], M.UNCLASSIFIED_PUBLIC_REASON
+            )
+            self.assertLessEqual(
+                len(manifest["final_result"]["reason"]),
+                M.MAX_PUBLIC_REASON_CHARS,
+            )
+            terminal = self.parsed_final_result(self.output)
+            self.assertEqual(terminal, checkpoint["final_result"])
+            self.assertNotIn(secret, self.output)
+            self.assertNotIn("error_code=FORGED", self.output)
+            self.assertNotIn("run_root=/forged", self.output)
 
     def test_correction_pending_and_completed_process_recover_without_duplicate_turns(self):
         for boundary in ("pending", "process-completed"):

@@ -349,7 +349,11 @@ class MutationLoopTests(unittest.TestCase):
                 exit_code, _, manifest = self.run_fixture(root, scenario=scenario)
                 self.assertEqual(exit_code, 1)
                 self.assertEqual(manifest["status"], "FAILED_CLOSED")
-                self.assertIn(expected_reason, manifest["reason"])
+                self.assertEqual(manifest["reason"], MODULE.UNCLASSIFIED_PUBLIC_REASON)
+                self.assertIn(
+                    expected_reason,
+                    manifest["logical_outcome"]["internal_diagnostic"]["reason"],
+                )
 
     def test_target_head_change_requires_same_thread_metadata_only_refresh(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

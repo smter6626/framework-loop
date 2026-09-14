@@ -21,6 +21,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -88,6 +89,21 @@ TERMINAL_CHECKPOINT_STATES = {
     FRAMEWORK_EVIDENCE_PUSHED,
 }
 MAX_REVIEW_CORRECTION_ATTEMPTS = 2
+MAX_PUBLIC_REASON_CHARS = 512
+PUBLIC_REASON_TRUNCATION_MARKER = "...[truncated]"
+UNCLASSIFIED_PUBLIC_REASON = (
+    "mutation loop stopped; inspect checkpoint and local evidence"
+)
+FINAL_RESULT_FIELDS = (
+    "run_id",
+    "logical_outcome",
+    "exit_code",
+    "runtime_transition",
+    "evidence_publication",
+    "reason",
+    "error_code",
+    "run_root",
+)
 
 
 def load_p4_helpers() -> ModuleType:
@@ -201,13 +217,65 @@ def control_error_code(exc: BaseException) -> str:
     return ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value
 
 
+def escape_public_text(value: str) -> str:
+    """Make a public string physically single-line and terminal inert."""
+    escaped: List[str] = []
+    for character in value:
+        category = unicodedata.category(character)
+        if category in {"Cc", "Cf", "Zl", "Zp"}:
+            codepoint = ord(character)
+            escaped.append(
+                f"\\u{codepoint:04x}"
+                if codepoint <= 0xFFFF
+                else f"\\U{codepoint:08x}"
+            )
+        else:
+            escaped.append(character)
+    return "".join(escaped)
+
+
+def bounded_public_reason(reason: Any, error_code: Any) -> Optional[str]:
+    if reason is None:
+        return None
+    if error_code == ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value:
+        rendered = UNCLASSIFIED_PUBLIC_REASON
+    else:
+        rendered = escape_public_text(str(reason))
+    if len(rendered) > MAX_PUBLIC_REASON_CHARS:
+        keep = MAX_PUBLIC_REASON_CHARS - len(PUBLIC_REASON_TRUNCATION_MARKER)
+        rendered = rendered[:keep] + PUBLIC_REASON_TRUNCATION_MARKER
+    return rendered
+
+
+def public_final_result(result: Mapping[str, Any]) -> Dict[str, Any]:
+    """Central checkpoint/manifest/terminal boundary for F1 public fields."""
+    error_code = result.get("error_code")
+    public: Dict[str, Any] = {}
+    for name in FINAL_RESULT_FIELDS:
+        value = result.get(name)
+        if name == "exit_code":
+            public[name] = value if type(value) is int else None
+        elif name == "reason":
+            public[name] = bounded_public_reason(value, error_code)
+        elif value is None:
+            public[name] = None
+        else:
+            public[name] = escape_public_text(str(value))
+    return public
+
+
+def terminal_scalar(value: Any) -> str:
+    """Encode one public value as a deterministic single-line JSON scalar."""
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"))
+
+
 def strict_json(data: bytes) -> Any:
     """Reject duplicate keys and non-JSON numbers, without touching peer bytes."""
     def pairs(items: Any) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
         for key, value in items:
             if key in result:
-                raise ValueError(f"duplicate JSON key: {key}")
+                raise ValueError("duplicate JSON key")
             result[key] = value
         return result
 
@@ -285,7 +353,7 @@ def validate_verdict_relationships(value: Mapping[str, Any]) -> None:
 
 def emit_progress(message: str) -> None:
     """Emit a concise, immediately visible control-plane progress line."""
-    print(f"[{P4.utc_now()}] {message}", flush=True)
+    print(f"[{P4.utc_now()}] {escape_public_text(str(message))}", flush=True)
 
 
 def atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -982,10 +1050,13 @@ Read active_step_id from the workload Runtime machine block. If no block exists 
 no step ID can be established, use "unavailable" and HUMAN_GATE; never invent ACCEPT.
 ACCEPT requires nonempty evidence, next_instruction=null, and runtime_transition=
 {{"new_status":"COMPLETED","next_active_step":null}}. Evidence includes at least one
-full reachable commit ID and actual file/test/artifact locators. Each evidence entry
-has kind, locator, sha256: for commits hash raw `git cat-file commit <full-id>` bytes;
-for files hash actual file bytes. File locators must be absolute paths inside the
-target repository or this run's evidence directory. Independently inspect evidence.
+full reachable commit ID and only mechanically valid evidence. Each evidence entry
+has kind, locator, sha256: for commits hash raw `git cat-file commit <full-id>` bytes.
+Every `file`, `artifact`, or `test` locator must be an absolute path to an existing
+file inside the target repository or this run's evidence directory, hashed from its
+actual bytes. A shell command, Git-status description, or prose is not a locator. If
+no real test/artifact output file exists, do not invent `test`/`artifact` evidence.
+Independently inspect every ACCEPT evidence entry before returning it.
 REJECT requires one nonempty next_instruction of at most 8000 characters and
 runtime_transition=null. HUMAN_GATE requires both fields null; explain the Human
 blocker in peer_message. Empty evidence is permitted only for REJECT/HUMAN_GATE.
@@ -1684,18 +1755,10 @@ def write_manifest(
 
 def emit_final_result(result: Mapping[str, Any]) -> None:
     """Print one bounded F1 terminal summary; never include raw peer content."""
+    public = public_final_result(result)
     print("FINAL_RESULT", flush=True)
-    for name in (
-        "run_id",
-        "logical_outcome",
-        "exit_code",
-        "runtime_transition",
-        "evidence_publication",
-        "reason",
-        "error_code",
-        "run_root",
-    ):
-        print(f"{name}={result.get(name)}", flush=True)
+    for name in FINAL_RESULT_FIELDS:
+        print(f"{name}={terminal_scalar(public[name])}", flush=True)
 
 
 def failure_result_for_main(
@@ -1733,7 +1796,7 @@ def failure_result_for_main(
         publication = "PENDING"
     else:
         publication = "NOT_STARTED" if p63_enabled(args) else "NOT_ENABLED"
-    return {
+    return public_final_result({
         "error_code": control_error_code(exc),
         "evidence_publication": publication,
         "exit_code": exit_code,
@@ -1746,7 +1809,7 @@ def failure_result_for_main(
         "run_id": run_id,
         "run_root": str(run_root),
         "runtime_transition": runtime_status,
-    }
+    })
 
 
 def workload_id_for_args(args: argparse.Namespace) -> str:
@@ -3170,7 +3233,7 @@ def orchestrate(
             result_error_code = "EVIDENCE_PUBLICATION_FAILED"
         if exit_code_override is not None:
             exit_code = exit_code_override
-        return {
+        return public_final_result({
             "error_code": result_error_code,
             "evidence_publication": publication,
             "exit_code": exit_code,
@@ -3179,7 +3242,7 @@ def orchestrate(
             "run_id": run_id,
             "run_root": str(run_root.resolve()),
             "runtime_transition": runtime_status,
-        }
+        })
 
     def persist(
         checkpoint_state: str,
@@ -3488,19 +3551,28 @@ def orchestrate(
         reason: str,
         exit_code: int,
         error_code: str,
+        diagnostic: Optional[BaseException] = None,
     ) -> Tuple[int, Path]:
         nonlocal logical_outcome
+        public_reason = bounded_public_reason(reason, error_code)
         logical_outcome = {
             "exit_code": exit_code,
             "manifest_status": manifest_status,
-            "reason": reason,
+            "reason": public_reason,
             "state": outcome_state,
             "error_code": error_code,
+            "internal_diagnostic": (
+                {
+                    "exception_type": type(diagnostic).__name__,
+                    "reason": str(diagnostic),
+                }
+                if diagnostic is not None else None
+            ),
         }
         persist(
             outcome_state,
             manifest_status=manifest_status,
-            manifest_reason=reason,
+            manifest_reason=public_reason,
         )
         return finish_evidence()
 
@@ -4314,7 +4386,11 @@ def orchestrate(
             raise InvariantViolation(f"unsupported checkpoint state: {state}")
     except (OSError, RuntimeError, ValueError) as exc:
         reason = str(exc)
-        emit_progress(f"run={run_id} stopped: {reason}")
+        error_code = control_error_code(exc)
+        public_reason = bounded_public_reason(reason, error_code)
+        emit_progress(
+            f"run={run_id} stopped error_code={error_code} reason={public_reason}"
+        )
         active_turn_relative = None
         transition_interrupted = state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}
         # An I/O failure can happen after os.replace (including checkpoint fsync).
@@ -4343,19 +4419,32 @@ def orchestrate(
                     )
                 except (OSError, RuntimeError, ValueError) as checkpoint_exc:
                     emit_progress(
-                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                        f"run={run_id} state={state} "
+                        f"checkpoint_error_code={control_error_code(checkpoint_exc)}"
                     )
                 return finish_return(1)
             if transition_interrupted and isinstance(exc, OSError):
+                logical_outcome = {
+                    "error_code": error_code,
+                    "exit_code": 1,
+                    "internal_diagnostic": {
+                        "exception_type": type(exc).__name__,
+                        "reason": reason,
+                    },
+                    "manifest_status": "STOPPED_FOR_HUMAN_REVIEW",
+                    "reason": public_reason,
+                    "state": "UNDETERMINED",
+                }
                 try:
                     persist(
                         state,
                         manifest_status="STOPPED_FOR_HUMAN_REVIEW",
-                        manifest_reason=reason,
+                        manifest_reason=public_reason,
                     )
                 except (OSError, RuntimeError, ValueError) as checkpoint_exc:
                     emit_progress(
-                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                        f"run={run_id} state={state} "
+                        f"checkpoint_error_code={control_error_code(checkpoint_exc)}"
                     )
                 return finish_return(1)
             try:
@@ -4367,7 +4456,8 @@ def orchestrate(
                     ),
                     reason=reason,
                     exit_code=1,
-                    error_code=control_error_code(exc),
+                    error_code=error_code,
+                    diagnostic=exc,
                 )
             except (OSError, RuntimeError, ValueError) as finalization_exc:
                 evidence_finalization_error = str(finalization_exc)
@@ -4384,7 +4474,8 @@ def orchestrate(
                     )
                 except (OSError, RuntimeError, ValueError) as checkpoint_exc:
                     emit_progress(
-                        f"run={run_id} state={state} checkpoint_error={checkpoint_exc}"
+                        f"run={run_id} state={state} "
+                        f"checkpoint_error_code={control_error_code(checkpoint_exc)}"
                     )
                 return finish_return(1)
         try:
@@ -4396,11 +4487,13 @@ def orchestrate(
                 ),
                 reason=reason,
                 exit_code=1,
-                error_code=control_error_code(exc),
+                error_code=error_code,
+                diagnostic=exc,
             )
         except (OSError, RuntimeError, ValueError) as checkpoint_exc:
             emit_progress(
-                f"run={run_id} state=FAILED_CLOSED checkpoint_error={checkpoint_exc}"
+                f"run={run_id} state=FAILED_CLOSED "
+                f"checkpoint_error_code={control_error_code(checkpoint_exc)}"
             )
         return finish_return(1)
 
@@ -4513,7 +4606,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         P4.validate_run_id(args.run_id)
         target, governance = validate_preflight(args)
     except (OSError, RuntimeError, ValueError) as exc:
-        print(f"preflight failed: {exc}", file=sys.stderr)
+        print(
+            "preflight failed; inspect checkpoint and local evidence",
+            file=sys.stderr,
+        )
         emit_final_result(failure_result_for_main(args, exc, exit_code=2))
         return 2
 
@@ -4535,7 +4631,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             governance_initial=governance,
         )
     except (OSError, RuntimeError, ValueError) as exc:
-        print(f"unable to start mutation loop: {exc}", file=sys.stderr)
+        print(
+            "unable to start mutation loop; inspect checkpoint and local evidence",
+            file=sys.stderr,
+        )
         emit_final_result(failure_result_for_main(args, exc))
         return 1
     # The bounded FINAL_RESULT emitted by orchestrate already includes run_root.
