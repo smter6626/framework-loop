@@ -6,7 +6,7 @@
 P6 = ACCEPTED / PHASE CLOSED
 P7 = PAUSED BY HUMAN OWNER / NOT ACTIVE
 current engineering task = foundation_v1
-foundation_v1 status = ACTIVE / F1 REPAIRED AND VALIDATED — AWAITING INDEPENDENT RE-REVIEW
+foundation_v1 status = ACTIVE / F1 ACCEPTED / F2 NOT EVALUATED
 ```
 
 当前目标是把 P6 后的能力完善为可日常运行、可诊断、可恢复、状态可见且可维护的本地
@@ -15,10 +15,11 @@ engineering foundation。当前 task-local 治理入口：
 - `1PCloop/workloads/foundation_v1/workload_static.md`；
 - `1PCloop/workloads/foundation_v1/workload_runtime.md`。
 
-F1 原实现经独立 Reviewer 拒绝后已完成窄范围 public-result encoding repair 和 Executor
-deterministic validation，当前等待独立 re-review；不得据此宣称 F1 已接受或激活 F2。
-CLI/TUI、timer、structured progress events、中文 Prompt 模板规范化和 post-foundation smoke
-仍未实现。P4–P6 技术说明继续作为已接受能力与 operator reference 保留。
+F1 原实现经独立 Reviewer 拒绝、窄范围 public-result encoding repair 和独立 re-review 后已
+接受；首次 REJECT 与 repair evidence 保留在 foundation task-local Runtime。F2 是当前唯一
+Active Step，尚未实现或验收。CLI subcommands、TUI、持续 timer/status、structured progress
+events、中文 Prompt 模板规范化和 post-foundation smoke 仍未完成。P4–P6 技术说明继续作为
+已接受能力与 operator reference 保留。
 Paper/research-driven experiment 当前暂停，`researchPlan.md` 是 frozen research map，不是工程
 执行入口。
 
@@ -412,9 +413,11 @@ JSON duplicate-key 拒绝仍然严格，但不再回显由输入控制的 key �
 本地 validator。
 
 `PUSHED` 只表示 framework evidence publication 成功，绝不覆盖 `FAILED_CLOSED`；publication
-失败也不会伪造已经确定的 logical outcome。F1 没有实现 run/stage timer、status subcommand、
-last activity 或 structured event stream；这些仍属于 F2。F1 当前仅为 repaired/validated，
-等待独立 Reviewer re-review。
+失败也不会伪造已经确定的 logical outcome。F1 没有实现 run/stage timer、live status、last
+activity 或 structured event stream；这些属于当前 F2。F1 implementation
+`d57c1c146be9ea998572e3d09c923c4e9a77c517` 经 Reviewer REJECT 后，由 repair commit
+`0adf4e083b002dad8ccff226afb96a9b20210bdb` 修复，并在 focused `20 / 20`、完整
+ResourceWarning-strict `90 / 90` 及恶意换行/duplicate-key 独立复核后 ACCEPTED。
 
 ## P6.4 当前支持的顺序生命周期边界
 
