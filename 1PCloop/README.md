@@ -48,6 +48,27 @@ Python orchestrator
 这些能力提高了 coding-agent 自我复核的独立性、可恢复性和可追溯性，但不保证 LLM 永远正确，
 也不构成操作系统级安全隔离。
 
+## 当前实现与可扩展边界
+
+当前成品已经具备 contract-backed context 和 context-compiled fresh Executor：Reviewer 获得完整、
+带 hash/freshness 的治理上下文，Executor 每轮使用 fresh session 和 bounded instruction，最终结果
+只通过 Git、artifact 和 evidence 回到 Reviewer。Reviewer/Executor 的模型配置可以不同，最终
+verdict authority 只属于 Reviewer。
+
+当前 runner 的实际 backend 是两个 Codex CLI profile，并且一次只运行一个 mutation Executor。
+以下能力属于仓库首页描述的扩展形态，不应被理解为当前已经接入：
+
+- 独立的 per-role local/cloud/third-party provider adapter；
+- Qwen/Ollama Executor 与云端 Reviewer 的正式端到端配置和验收 evidence；
+- Claude 或其他 Agent 产品 adapter；
+- 多个可按能力选择的 ephemeral worker；
+- image/vision input 的治理路由；
+- browser、MCP、plugin 和 Computer Use 的 capability/evidence/Human-Gate 集成；
+- 并行 mutation worker 或 multi-writer consistency。
+
+Codex CLI 或具体模型自身具备某项工具能力，不等于 mutation runner 已经把该能力纳入身份、权限、
+evidence 和恢复合同。目标扩展和已实现基础的对应关系见[仓库首页](../README.md)。
+
 ## 运行环境
 
 当前默认配置面向：

@@ -38,6 +38,127 @@ Framework Loop 是一个以 repository-backed governance 驱动的 Reviewer–Ex
 Human 预先授权的范围内推进 Runtime；Reviewer 拒绝时，修复指令会回到 Executor；需要主观决定、
 权限扩张或无法由证据解决的问题会自动停止在 Human Gate，并在终端和本地状态中留下明确提醒。
 
+## 已实现基础与可扩展形态
+
+1PCloop 已经实现四项核心能力的当前单 Reviewer/单 Executor 版本。后续工作是在不改变
+Static/Runtime/evidence 治理语义的前提下，把同一基础扩展到本地模型、其他 Agent、视觉工具和
+多个可替换 worker，而不是从零重新设计一个系统。
+
+```text
+                  Human Owner
+                       |
+          Static / Runtime / Git / Evidence       已实现
+                       |
+                       v
+        Authoritative Context Construction         已实现
+                       |
+                       v
+            persistent/resumable Reviewer          已实现
+                       |
+                       v
+              fresh bounded Executor               已实现
+                       |
+                 artifact / evidence
+                       |
+                       v
+               Reviewer final gate                 已实现
+
+      local / cloud / vision / GUI worker adapters 可扩展
+```
+
+### Cost–quality decoupling
+
+当前已经实现的基础是：Reviewer 与 Executor 使用独立 profile/session，可以选择不同模型和
+reasoning effort；Executor 负责高消耗实现，只有 Reviewer 基于实际 evidence 形成的 verdict 才能
+推进 Runtime。因此执行成本和最终 acceptance authority 已经不再绑定在同一个 Agent 上。
+
+可扩展形态是把高 token、高工具调用频率的工作交给本地或更便宜的 Executor，把任务编译、证据
+检查和最终 verdict 留给更强的云端 Reviewer。例如，在本机运行 Qwen 35B A3B MoE Q8 Executor，
+同时使用 GPT-5.6 Sol Reviewer。当前 Codex CLI 已支持 Ollama/LM Studio 本地 provider；1PCloop
+仍需为这种 mixed local/cloud 配置补充明确的 per-role provider 配置和端到端 evidence。
+
+这种组合不保证本地模型首次生成质量与云端强模型相同。较弱 Executor 可能增加 repair 次数和
+总耗时；优势是只有达到 Reviewer evidence gate 的结果才被接受，从而有机会降低云端成本而不必
+同比降低最终验收门槛。
+
+当前 Executor 已经是 fresh ephemeral session，不依赖前一轮 Executor conversation。未来接入本地
+模型时，CLI session 可以继续每轮退出，而 Ollama/LM Studio service 和模型权重保持常驻。已有运行
+也观察到稳定 prompt prefix 的高 cache hit；这与缩短 context window 是两个不同优化。Bounded
+instruction 允许在质量相近时减少实际输入或配置更小窗口，但必须通过真实 workload 验证。
+
+### Contract-backed context
+
+这项能力已经实现，而且不只是 external memory：
+
+```text
+Static       = 长期目标、硬约束和授权边界
+Runtime      = 当前有效状态、唯一 Active Step 和 Human decision
+Git/Evidence = 支持状态和 verdict 的可定位事实
+```
+
+Agent、模型和 session 可以替换，而任务不会随某段 conversation 一起丢失。新 Reviewer 可以从
+带 hash 的治理文件恢复当前权威状态；fresh Executor 可以从 bounded instruction 开始；Human
+可以按 commit、artifact 和 hash 随时复查。被 supersede 的旧结论不会因为仍存在于历史里就重新
+取得权威。
+
+后续 provider adapter 只需要服从同一 contract、identity、freshness 和 evidence boundary，不需要
+为每个 Agent 产品重新发明项目 memory。
+
+### Capability reuse
+
+当前 1PCloop 已经复用 Codex CLI 的 shell、文件、Git 和工具调用能力，并在外层增加角色、权限、
+evidence、Runtime transition 和 Human Gate，而不是由 orchestrator 重新实现 coding tools。
+
+同一原则可以扩展到 vision、browser、MCP、plugin 和 Computer Use。Codex CLI 当前提供本地
+Ollama/LM Studio provider 和 image input；Codex/ChatGPT 的 Computer Use 可以通过桌面端插件及
+系统授权操作 GUI。对应官方边界见 [Codex CLI 命令参考](https://learn.chatgpt.com/docs/developer-commands?surface=cli)
+和 [Computer Use](https://learn.chatgpt.com/docs/computer-use)。这些视觉/GUI 路径尚未接入当前
+1PCloop runner。
+
+今天接入 Codex、以后接入 Claude、其他云端 Agent 或本地视觉模型时，Static/Runtime 和
+evidence contract 可以保持不变；主要迁移面收敛到 invocation、structured output、tool
+capability、timeout/cancellation 和 identity adapter。换 Agent 的治理成本可以很低，但每个新
+adapter 仍需要兼容性和安全验证。
+
+GUI 操作可能影响 repository 外部状态。Computer Use 等能力接入后仍必须经过 app permission、
+action/screenshot evidence、敏感操作审批和 Human Gate，不能绕过现有 authority boundary。
+
+### Authoritative context-compiled workers
+
+这项能力的窄版本也已经实现：Reviewer 在 fresh bootstrap 时获得完整、带 hash 的 framework/
+workload Static 与 Runtime；Executor 每轮使用 fresh session，只获得角色约束、当前 bounded
+instruction、target identity 和必要 evidence context。Executor 完成后只留下 Git/artifact evidence，
+不需要把 conversation state传给下一轮。
+
+```text
+Tier 0  role、authority、Active Step、允许/禁止事项
+Tier 1  当前任务所需的完整 Static/Runtime 原始字节与 hash
+Tier 2  commit、artifact、test 和 evidence manifest
+Tier 3  按需读取的 repository 文件、历史 evidence 和日志
+```
+
+可扩展形态是让 Reviewer/orchestrator 按任务选择不同 provider、模型和工具能力的 fresh worker：
+local coding、cloud coding、test、vision 或 GUI worker。每个 worker 出生时获得机械编译的充分
+authoritative context，REJECT 后可以替换 Executor，而不丢失合同、当前状态或验收历史。
+
+当前只有一个固定、顺序运行的 Executor。未来 worker pool 仍应先保持 single writer：同一时刻
+只允许一个 mutation worker 操作一个 target。并行写入需要额外的 worktree/branch、commit
+attribution、冲突合并和 Runtime consistency 设计，不能从现有能力直接推断。
+
+### 能力边界
+
+| 能力 | 已实现 | 尚待扩展或验证 |
+| --- | --- | --- |
+| Role/model separation | 独立 Reviewer/Executor profile、session 和可不同模型配置 | 本地/云端 mixed-provider 的正式配置与 evidence |
+| Contract-backed context | Static/Runtime/Git/evidence、hash/freshness、fresh reconstruction | 将同一 contract 封装为通用 provider adapter |
+| Fresh worker | fresh bounded Executor，不依赖旧 Executor history | 多个可替换、按能力选择的 worker |
+| Tool reuse | Codex CLI shell、文件、Git 和现有工具调用 | image、vision、browser、MCP、Computer Use 的治理接入 |
+| Final authority | 一个 Reviewer 独立检查 evidence 并形成 verdict | Reviewer backend 可替换但仍保持唯一最终 authority |
+| Mutation concurrency | single writer | 并行写入尚未设计或验证 |
+
+当前可运行行为和命令以 [`1PCloop/README.md`](1PCloop/README.md) 为准。表中“尚待扩展”不是
+当前已交付能力，但它建立在已经实现的治理核心之上。
+
 ## 核心概念
 
 ### Static：稳定合同
