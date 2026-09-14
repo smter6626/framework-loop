@@ -1,505 +1,446 @@
-# 1PCloop active implementation
+# 1PCloop
 
-## 当前工程阶段
-
-```text
-P6 = ACCEPTED / PHASE CLOSED
-P7 = PAUSED BY HUMAN OWNER / NOT ACTIVE
-current engineering task = foundation_v1
-foundation_v1 status = ACTIVE / F1 ACCEPTED / F2 NOT EVALUATED
-```
-
-当前目标是把 P6 后的能力完善为可日常运行、可诊断、可恢复、状态可见且可维护的本地
-engineering foundation。当前 task-local 治理入口：
-
-- `1PCloop/workloads/foundation_v1/workload_static.md`；
-- `1PCloop/workloads/foundation_v1/workload_runtime.md`。
-
-F1 原实现经独立 Reviewer 拒绝、窄范围 public-result encoding repair 和独立 re-review 后已
-接受；首次 REJECT 与 repair evidence 保留在 foundation task-local Runtime。F2 是当前唯一
-Active Step，尚未实现或验收。CLI subcommands、TUI、持续 timer/status、structured progress
-events、中文 Prompt 模板规范化和 post-foundation smoke 仍未完成。P4–P6 技术说明继续作为
-已接受能力与 operator reference 保留。
-Paper/research-driven experiment 当前暂停，`researchPlan.md` 是 frozen research map，不是工程
-执行入口。
-
-P4 已实现的基础 Codex CLI 文本路由为：
+1PCloop 是运行在一台 macOS 机器上的 Reviewer–Executor 自动化闭环。它使用两个隔离的 Codex
+identity，把任务合同、当前状态、代码执行、独立审核、Human Gate 和证据保存连接成一个可以恢复
+和审计的顺序工作流。
 
 ```text
-Reviewer (.codex-B)
-  -> Executor (.codex-A)
-  -> Reviewer (.codex-B)
+Human Owner
+    |
+    | 定义目标、权限和必须由人决定的事项
+    v
+Static + Runtime
+    |
+    v
+Python orchestrator
+    |
+    +--> Reviewer：读取治理和 repository，形成 bounded instruction
+    |
+    +--> Executor：实现、测试、创建普通 descendant commit
+    |
+    +--> Reviewer：直接检查 commit、文件和测试 evidence
+             |
+             +--> ACCEPT：由 orchestrator 验证并推进获授权的 Runtime
+             +--> REJECT：生成 repair instruction，进入下一轮 Executor
+             +--> HUMAN_GATE：停止并提醒 Human Owner
 ```
 
-运行：
+## 最终交付能力
 
-```bash
-python3 1PCloop/scripts/run_text_loop.py
+当前实现已经具备：
+
+- 显式绑定两个独立 Codex profile；
+- 自动执行 Reviewer → Executor → Reviewer 路由，无需人工复制 peer message；
+- 给 Reviewer 注入完整、带 identity/hash 的 framework 和 workload 治理上下文；
+- 只向 Executor 提供当前任务所需的 bounded instruction；
+- 允许 Executor 在独立 target repository 中修改、测试并创建普通 Git commit；
+- 在每个关键边界检查 branch、HEAD、clean worktree、commit ancestry 和治理 hash；
+- 使用 Codex runtime-enforced output schema 和本地 schema validation；
+- 只有 Reviewer review turn 拥有 ACCEPT/REJECT/HUMAN_GATE 权限；
+- 对 commit、文件和测试 artifact 做 locator、边界、存在性和 SHA-256 验证；
+- 只有 Human CLI capability 和 workload Runtime 同时授权时才写 Runtime；
+- 原子 Runtime transition、checkpoint 和 crash/restart reconciliation；
+- Git-ignored raw evidence、逐 turn concise summary、一次 framework evidence commit/push；
+- 对可机械纠正的 Reviewer verdict 最多进行两次同线程 correction，不重跑已完成 Executor；
+- 明确区分 logical outcome、Runtime transition 和 evidence publication；
+- 在无法解释状态时 fail closed，而不是自动执行破坏性修复。
+
+这些能力提高了 coding-agent 自我复核的独立性、可恢复性和可追溯性，但不保证 LLM 永远正确，
+也不构成操作系统级安全隔离。
+
+## 运行环境
+
+当前默认配置面向：
+
+- Apple Silicon Mac；
+- macOS；
+- Python 3.9+；
+- 已安装的 Codex CLI；
+- 两个独立的 Codex identity/profile。
+
+默认角色绑定：
+
+```text
+Reviewer = CODEX_HOME=/Users/smterpro/.codex-B
+Executor = CODEX_HOME=/Users/smterpro/.codex-A
 ```
 
-默认 session mode 是 `ephemeral-control`，三个 turn 都使用 fresh `--ephemeral`。`reviewer-resume-treatment` 使用同一脚本，但 Reviewer Turn 1 创建持久化 thread、Executor Turn 2 仍为 fresh `--ephemeral`、Reviewer Turn 3 在治理 hash 未改变或仅 Runtime 改变时显式恢复 Turn 1 的 thread。该 mode 可以单独用于 P4-B 验证；复现 P4-A paired experiment 时仍应让 treatment 与 control 共用 repository 外部的 frozen experiment metadata，例如：
+角色由职责、权限和 session state 定义，不由模型名称定义。Reviewer 和 Executor 可以使用相同或
+不同模型。实际使用中建议 Reviewer 的模型能力和 reasoning effort 不低于 Executor，复杂或高风险
+任务可以给 Reviewer 更强配置；这只是运行建议，不能替代 evidence 和机械校验。
 
-```bash
-python3 1PCloop/scripts/run_text_loop.py \
-  --session-mode ephemeral-control \
-  --runs-root /tmp/1pcloop-p4a-example \
-  --run-id control \
-  --experiment-file /tmp/1pcloop-p4a-example/experiment.json \
-  --experiment-id p4a-example
+`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不参与 identity 判定。每次 CLI
+invocation 都显式设置目标 `CODEX_HOME`。
 
-python3 1PCloop/scripts/run_text_loop.py \
-  --session-mode reviewer-resume-treatment \
-  --runs-root /tmp/1pcloop-p4a-example \
-  --run-id treatment \
-  --experiment-file /tmp/1pcloop-p4a-example/experiment.json \
-  --experiment-id p4a-example
-```
+## 安装
 
-Experiment metadata 会锁定 Git HEAD、Codex version、Static/Runtime/role-prompt hashes、显式 `CODEX_HOME`、A/B `config.toml` hash，以及能从顶层非敏感配置字段机械确认的 model/reasoning effort。它不会复制 `auth.json` 或其他 profile state。运行顺序固定为 control 后 treatment；context 不一致、T1 缺少 thread ID、resume process 失败或 T3 事件无法证明恢复了目标 thread 时均 fail closed，不会退化为 fresh T3。
-
-P4-B 的 authoritative-context control layer 不依赖 Agent 自行读取治理文档：
-
-- 每个 fresh Reviewer thread 都由 orchestrator 注入完整当前 Static 和 Runtime bytes；
-- 每份治理输入记录 path、SHA-256、byte length、line count、Git HEAD 和 prompt byte offset，并在启动 Codex 前重新核对 source/prompt bytes；
-- persistent Reviewer resume 前比较 session-known 与 current governance hashes；
-- hashes 未变化时只注入机械 freshness metadata，不重复完整文档；
-- Runtime hash 变化时在同一 thread 注入完整当前 Runtime；
-- Static hash 变化时不 resume stale contract，而是创建新 thread 并完整 rebootstrap Static + Runtime；
-- file missing、source/prompt mismatch 或 resume relationship mismatch 都 fail closed。
-
-完整 governance bootstrap 只用于 Reviewer。Executor 仍保持 fresh `--ephemeral` 并接收 bounded Reviewer peer payload；repository task/evidence inspection 与 governance bootstrap 被 role prompt 明确区分。
-
-每次运行会在 `1PCloop/runs/<run-id>/` 下保存：
-
-- `manifest.json`：三个 process result、两次 transport 和汇总 usage/cache 的机械 metadata；
-- `transcript.md`：完整三回合 prompt、final response 和 process result；
-- 每个 turn 的 `prompt.txt`、`events.jsonl`、`stderr.txt`、`final.txt` 和 `process.json`；
-- 接收回合的 `peer-payload.txt`，用于与发送方 `final.txt` 做逐字节核对。
-
-Reviewer turn 的 `process.json` / `manifest.json` 还会包含 `authoritative_context`，记录 session-known/current hashes、bootstrap/refresh/rollover mode、注入文件、完整性 metadata、prompt offsets 与 launch 前 validation result。Executor turn 的该字段为 `null`。
-
-Orchestrator 只为每次调用设置角色、`CODEX_HOME`、sandbox、turn/run metadata 和文件路径。发送方 final response 以原始字节追加到接收方 prompt；Python 不解析其自然语言语义，也不根据其中的 `ACCEPT` / `REJECT` 等文字推进 Runtime。
-
-每个 `process.json` 还会从原始 `events.jsonl` 机械派生 `thread_id`、input/cached/uncached/output/reasoning token 和 cache hit ratio。缺失或类型不符合当前 machine-readable event schema 的 usage 字段记录为 `null`，不会被当成 `0`；原始 JSONL 保持不变。
-
-上述 `run_text_loop.py` 的两个 session mode 均显式使用 `read-only` sandbox，并且不会自动修改 Runtime。P5/P5.1 的 mutation runner 已进入允许 Executor 修改目标仓库的实验阶段，其隔离策略与文本路由实验不同。
-
-## P5/P5.1 的隔离定位
-
-当前 mutation loop 的隔离方式是 Human Owner 有意选择的实验设计，不是遗漏 sandbox 配置：
-
-- Reviewer 和 Executor 的 Codex CLI turn 均使用 `--dangerously-bypass-approvals-and-sandbox`。原因是 Executor 必须在目标仓库中修改文件、创建 `.git/index.lock` 并亲自提交 evidence；实测 `workspace-write` 会阻断这一闭环。由宿主 Python 代替 Executor 提交也会破坏“Executor 产出可审计 commit”的角色边界。
-- Reviewer 通过 role prompt 被限制为只检查 evidence，禁止修改目标仓库、Git 状态和治理文件。
-- Executor 只被授权修改指定目标分支的任务范围，运行测试，生成普通 descendant commit，并留下 clean worktree；不得 push、merge、reset、clean、stash、switch、改写历史、修改治理文件或扩大任务范围。
-- Python orchestrator 在关键边界机械检查目标 branch、HEAD、cleanliness、commit ancestry、merge commit、治理文件 hash、Reviewer turn 前后的目标仓库不变性、instruction freshness 和 thread relationship；不满足条件时 fail closed。
-- Static、Runtime、Reviewer 与 Executor 的 conversation state 仍然分离；Executor 只接收当前 bounded instruction 和必要的 peer payload，而不继承 Reviewer 的完整上下文。
-
-该方案提供的是“角色能力约定 + turn 后机械审计”，不是操作系统级安全隔离。同一 macOS 用户下运行的 Codex 仍具有广泛文件系统能力；审计能发现已覆盖的越权结果，但不能保证在所有情况下阻止恶意进程在审计前造成影响。因此它适合作为当前 Reviewer–Executor orchestration、上下文隔离和 evidence boundary 的研究原型，不应被描述为 production security boundary。
-
-若后续目标转为抵抗恶意或失控 Agent，需要另行引入更强的能力隔离，例如 Reviewer 专用只读 worktree、受约束的文件/Git capability proxy、独立用户或容器。那是下一层安全研究，不改变当前隔离方式属于有意设计这一事实。
-
-## P6.1 checkpoint 与终端进度
-
-mutation runner 从 P6.2 起显式依赖 `jsonschema`。首次运行、恢复或执行完整回归前，
-先创建 repo-local Python 环境并安装声明依赖：
+在仓库根目录执行：
 
 ```bash
 python3 -m venv 1PCloop/.local/venv
 1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
+codex --version
 ```
 
-`run_mutation_loop.py` 会为每个 workload key 维护一份可覆盖的本地 checkpoint：
+`.local/` 被 Git 忽略，用于 Python 环境、checkpoint 和未来 raw run evidence。
+
+## Static、Runtime 与 external context
+
+### Framework Static/Runtime
+
+- `docs/miniloop_static.md`：整个 1PCloop 的稳定目标、角色和安全边界；
+- `docs/miniloop_runtime.md`：全局里程碑和当前 task 指针，不保存每个 task 的详细流水。
+
+### Task-local Static/Runtime
+
+每个持续任务应在 `workloads/<workload-id>/` 下建立：
 
 ```text
-1PCloop/.local/state/<workload-id>/checkpoint.json
+workload_static.md
+workload_runtime.md
 ```
 
-`1PCloop/.local/` 被 Git 忽略。默认 workload ID 是 `--workload-static` 所在目录名，也可以用 `--workload-id` 显式指定。checkpoint 在每个控制面边界原子替换，不保存逐版本历史。P6.3 起，逻辑终态还必须完成 evidence commit/push；只有 `FRAMEWORK_EVIDENCE_PUSHED` 才允许后续新 run 覆盖 checkpoint。
+`workload_static.md` 保存长期稳定的目标、范围、禁止事项、权限和 acceptance criteria。
+`workload_runtime.md` 保存已验收结果、唯一 Active Step、blocker、pending task、Human decision 和
+evidence locator。
 
-恢复未完成 run 时，使用与原 run 相同的 target、governance、角色配置和 cycle 上限，并增加：
+Static 不记录当前进度；Runtime 不得静默修改 Static。已经关闭的任务默认冻结，新目标应建立新的
+task-local Static/Runtime。
 
-```bash
-1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
-  <原有参数> \
-  --resume
-```
-
-恢复前会重新核对配置、治理 hash、target branch/HEAD 和工作树。已完成并记录的 Executor commit 或 Reviewer turn 不会重跑；无法机械归因的中途 target mutation 会停止到 Human Gate。checkpoint 中的 Reviewer thread 不可安全复用时，Reviewer 可以从 repository-backed governance 和已保存的 peer evidence 重新 bootstrap。
-
-Codex 子进程输出现在边运行边写入原始 evidence，同时终端显示 turn 开始/结束、可公开的工具事件和定时 heartbeat。默认 heartbeat 间隔为 15 秒，可用 `--progress-interval-seconds` 调整。Ctrl-C 等可处理的父进程中断会先终止当前 Codex 子进程，避免它成为继续修改仓库的后台 Agent。
-
-运行完整 mutation 回归：
-
-```bash
-1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -v
-```
-
-## P6.2 structured verdict 与单次 Runtime transition
-
-P6 mutation runner 的每个 turn 都通过 Codex CLI `--output-schema` 请求 runtime-enforced
-JSON，并用同一份 JSON Schema 在本地再次验证。运行与测试统一使用上面安装了
-`1PCloop/requirements.txt` 的 repo-local Python 环境。
-
-三份 schema 分别是 `schemas/reviewer_instruction.schema.json`、
-`schemas/executor_receipt.schema.json` 和 `schemas/reviewer_verdict.schema.json`。
-所有对象禁止额外字段；所有 turn 都保留完整 `peer_message` 和至多 2000 字符的
-`evidence_summary`。只有 Reviewer review schema 包含 `verdict`。Python 校验 wrapper，
-仍将完整 final JSON 原始字节传给 peer，不重新编码、截取或改写自然语言。
-P4 文本 runner 与 `roles/*.md` 仍用于原来的纯文本实验；mutation runner 使用脚本中的 P6 role prompt。
-
-本机 `codex-cli 0.153.4` 的 `exec --help` 和 `exec resume --help` 均列出
-`--output-schema`。构造形式为：
+Reviewer 的 external context 由 orchestrator 从以下来源重建：
 
 ```text
-codex exec [--ephemeral] --json --color never ... --output-schema <file> -
-codex exec --json --color never ... --output-schema <file> resume <thread-id> -
+framework Static
++ framework Runtime
++ workload Static
++ workload Runtime
++ target Git identity
++ 当前 peer evidence
 ```
 
-schema 放在 `exec` 公共参数区；Executor 使用 ephemeral，Reviewer 创建 persistent thread
-并在 review 显式 resume。恢复过程中因不完整 Reviewer attempt 而创建 fresh persistent
-Reviewer 时，必须完整 bootstrap 四份治理文件。local schema validator 也拒绝重复 JSON key、
-非标准数值、未知字段及错误角色 wrapper。
-[Codex CLI 参数说明](https://learn.chatgpt.com/docs/developer-commands?surface=cli) 与
-[Structured Outputs 支持的 schema 子集](https://developers.openai.com/api/docs/guides/structured-outputs)
-可供核对。由于服务端 schema 子集不支持 `if/then/else`、`allOf`，verdict 与 nullable 字段的
-跨字段关系在本地机械验证；枚举、必填字段、长度和 nullability 在 schema 中声明。
+因此 conversation history 不是权威 memory。Reviewer thread 无法继续时，可以从 repository-backed
+state 重新 bootstrap。Executor 不继承 Reviewer 的完整历史，只接收当前 bounded instruction 和
+必要 peer payload。
 
-Runtime 写权限默认关闭。只有 Human 启动参数 `--enable-runtime-transition` 与 workload
-Runtime machine block 同时授权，合法 Reviewer ACCEPT 才能触发写入。示例 block：
+## 准备一个 workload
+
+### 1. 准备独立 target repository
+
+Mutation runner 要求 target 与 framework repository 互不重叠。启动前 target 必须：
+
+- 位于预期 branch；
+- HEAD 可解析；
+- working tree clean；
+- 不包含未授权治理文件修改。
+
+Executor 可以在该 branch 创建普通 descendant commit，但不得 push、merge、switch、reset、clean、
+stash 或改写历史。
+
+### 2. 编写 workload Static
+
+至少明确：
+
+- 目标和预期 artifact；
+- 允许及禁止修改的路径；
+- 必须运行的 self-check；
+- Reviewer 需要直接检查的 evidence；
+- Human Gate 条件；
+- target branch 和集成边界。
+
+### 3. 编写 workload Runtime
+
+需要允许自动 ACCEPT → Runtime transition 时，在 Runtime 中放置唯一 machine-owned block：
 
 ```markdown
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "schema_version": 1,
-  "workload_id": "disposable-workload",
+  "workload_id": "example-workload",
   "transition_mode": "reviewer_accept_once",
-  "active_step": {"id": "S1", "status": "ACTIVE"},
+  "active_step": {
+    "id": "S1",
+    "status": "ACTIVE"
+  },
   "last_transition_id": null
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 ```
 
-两个 marker 在文件中必须各出现一次，之间必须为合法 JSON。`workload_id` 必须与 CLI
-workload key 一致。配套 workload Static 必须由 Human 明确授权这一 orchestrator capability；
-Python 不解析周边 Markdown 的授权语义。不要把已关闭、Human-owned 的 `multiLanguage_v1`
-改成 fixture。P6 测试使用临时 Git repository 和独立 workload governance。
+两个 marker 必须各出现一次。Python 只理解 machine block，不解析周边 Markdown 的自然语言语义。
+首版 transition 只把当前 step 改成 `COMPLETED`、把 `transition_mode` 改成 `disabled`，然后停止；
+不会自动激活下一个 step。
+
+## Preflight
+
+先验证路径、branch、治理 identity、profile、schema、framework remote 和工作树，不调用 Agent：
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
-  --target-repo /absolute/disposable/target \
-  --target-branch p62-fixture \
-  --workload-static /absolute/disposable/governance/workload_static.md \
-  --workload-runtime /absolute/disposable/governance/workload_runtime.md \
-  --workload-id disposable-workload \
-  --enable-runtime-transition
+  --target-repo /absolute/path/to/target \
+  --target-branch feature-branch \
+  --workload-static /absolute/path/to/workload_static.md \
+  --workload-runtime /absolute/path/to/workload_runtime.md \
+  --workload-id example-workload \
+  --enable-runtime-transition \
+  --preflight-only
 ```
 
-Runtime 必须是 target/run/state/profile 目录之外的独立普通文件；拒绝符号链接、硬链接及
-protected governance alias。实际写入路径仅来自 `--workload-runtime`，绝不来自 Agent
-字段。Framework Static/Runtime 和关闭 workload 的两份治理文件始终拒绝作为写入目标。
-两个 Agent 仍禁止直接写任何治理文件；P5.1 的 prompt-defined role isolation 和 turn 后
-机械审计继续生效。
+Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executor。
 
-ACCEPT 会验证成功的 Reviewer profile、thread/bootstrap/resume 关系、四份 governance
-hash、target repo/branch/HEAD、clean worktree、Runtime preimage 和 active step。evidence
-至少包含一个完整、存在、从当前 HEAD 可达的 commit ID；不接受 `HEAD` 等浮动 revision。
-每条 evidence 都必须有 `kind`、`locator` 和 `sha256`。commit SHA-256 是
-`git cat-file commit <full-id>` 原始字节的 SHA-256。`file`、`artifact`、`test` 的 locator
-必须是 target 或当前 run root 内实际文件的绝对路径，SHA-256 必须与实际字节一致；symlink
-逃逸失败。`test` 指向已保存的测试输出文件，Python 校验其存在与 hash，测试语义由 Reviewer
-独立检查。ACCEPT 不得包含 repair instruction。
-
-REJECT 必须给出一个非空、至多 8000 字符的 `next_instruction`，Runtime 不变；在原有
-cycle/no-op 停止边界允许继续时，完整 Reviewer wrapper 传给下一 fresh Executor。
-HUMAN_GATE 不修改 Runtime，checkpoint 记录 `HUMAN_GATE` logical outcome；终端指向
-tracked summary 中的 Human 原因，不打印完整 peer payload。自由文本中的
-ACCEPT/REJECT/READY/BLOCKED 没有控制权限。
-
-一次合法 transition 的状态顺序是：
-
-```text
-REVIEW_COMPLETED -> RUNTIME_TRANSITION_PENDING
--> same-directory temp write + flush/fsync + os.replace + directory fsync
--> exact postimage/state verification -> RUNTIME_TRANSITION_COMMITTED -> stop
-```
-
-首版只把同一个 step 从 `ACTIVE` 改为 `COMPLETED`，`next_active_step` 必须是 null；同时
-将 `transition_mode` 改为 `disabled`，保存 `last_transition_id`，不启动下一个 Active Step。
-只替换 machine block 内容，其他现有字节保留，并在文件尾追加 deterministic JSON transition
-record，包含唯一 ID、旧/新状态、accepted preimage hash、Reviewer verdict locator/hash、
-target HEAD、evidence locator/hash 和 UTC 时间。
-
-PENDING checkpoint 复用 P6.1 恢复系统，保存原始 preimage、固定 transition record 和预期
-postimage hash。使用原参数加 `--resume`：写入前中断会重新校验全部 evidence 并应用一次；
-写入后、COMMITTED checkpoint 前中断会识别精确 postimage，只补记 COMMITTED；COMMITTED
-恢复只验证结果，不再写 Runtime。I/O 错误保留可恢复状态；无法解释的 Runtime 字节或过期
-evidence 会 fail closed/Human Gate，不猜测性修复。旧 P6.1 checkpoint 因缺少 schema/config
-绑定不能直接升级恢复，需要 Human 处理旧 run。checkpoint 与 Runtime 是可信的本地恢复
-输入，不提供同时回滚这两者之后的外部防篡改账本。
-
-验证：
+## 运行 mutation loop
 
 ```bash
-1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_runtime_transition.py -v
-1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -v
-1PCloop/.local/venv/bin/python -W error::ResourceWarning -m unittest discover -s 1PCloop/tests -v
+1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
+  --target-repo /absolute/path/to/target \
+  --target-branch feature-branch \
+  --workload-static /absolute/path/to/workload_static.md \
+  --workload-runtime /absolute/path/to/workload_runtime.md \
+  --workload-id example-workload \
+  --enable-runtime-transition \
+  --max-cycles 8 \
+  --timeout-seconds 900 \
+  --progress-interval-seconds 15
 ```
 
-P6.2 不迁移 raw evidence 默认目录、不实现 per-turn summary retention 或 commit/push
-automation；`evidence_summary` 仅提前提供给 P6.3。当前顺序生命周期和 external-mutation
-支持边界统一见下文 P6.4 章节。
-
-### P6.2 implementation validation observation — 2026-09-07
-
-The independent Reviewer accepted P6.2 from this implementation/test evidence. P6 remains
-active, with P6.3 as its next Active Step. No closed-workload governance was updated.
-
-Validation environment: Python 3.9, `jsonschema 4.25.1`, local Codex CLI `0.153.4`.
-The commands above were run with `/tmp/1pcloop-p62-venv/bin/python`:
-
-- P6.2 focused suite: **21 tests passed**, including parameterized invalid-output,
-  freshness, capability, evidence and restart cases.
-- Full P4/P5/P6.1/P6.2 regression: **53 tests passed**.
-- Full regression with `-W error::ResourceWarning`: **53 tests passed**, with no
-  ResourceWarning, unraisable exception or traceback in the captured log.
-- `git diff --check`: passed; the four protected governance files, P4 helper/tests,
-  P4 role files and `.gitignore` remain unchanged.
-
-Test logic: valid ACCEPT checks unchanged Markdown history, a single appended record,
-exact completed machine state, target cleanliness and unchanged peer payload bytes.
-Negative cases vary schema, role/profile, resume relationship, target/governance/Runtime
-freshness, active step, evidence existence/reachability/hash/boundary, and both capabilities.
-REJECT routing is exercised deterministically with ordinary disposable commits; HUMAN_GATE
-prints its reason and leaves Runtime untouched. Atomic replace failure verifies the full
-preimage and temporary-file cleanup. Stops at PENDING, after Runtime replace and at COMMITTED
-verify no repeated Executor/Reviewer calls or transition records. Recovery also checks changed
-file evidence, invalid checkpoint state, post-replace I/O failure and full fresh Reviewer bootstrap.
-These are deterministic boundary tests, not live kill-9 or P7 defect-injection experiments.
-
-A real Codex/real Git disposable smoke completed the persistent Reviewer → ephemeral Executor
-→ resumed Reviewer path, with **3/3 successful turns**, verified resume relationship and
-verbatim peer transport. Executor created only `P62_SMOKE.txt`, committed it, and left the
-fixture target clean. Reviewer independently inspected the commit/file and reran the byte
-assertion. The orchestrator applied one opted-in S1 completion and stopped at
-`RUNTIME_TRANSITION_COMMITTED`. A subsequent `--resume` using the final implementation
-verified the exact result without another Agent turn or Runtime write.
+常用可选参数：
 
 ```text
-local smoke root = /private/var/folders/10/81g7llps60j555m_0191lzsc0000gn/T/1pcloop-p62-real-smoke-_zmixrkj
-raw run          = <local smoke root>/runs/smoke/
-compact check    = <local smoke root>/validation-summary.json
-initial target   = 228e0d9d11f7067e2a60ef8750b1719ed95059ee
-final target     = 4e8a9f26715c7e7719b3067f4162fc3c5b69acdd
-Reviewer thread  = 01a07c98-2aca-79e1-a2d7-a538a61d4c87
-transition ID    = 7eb03f31dc67fa6bb6b66fea11e6453a6b42464cc4acbaa1cfd49bfc06d4d598
-Runtime preimage = 26add868b797042a19a4a00d7cbf4a17c60679ec0828937e1fcae47e24824799
-Runtime postimage= 455bc07c9c542e1260abb7cc343d5db4d2c73024521717a32db852d0e4d0bfd2
-verdict SHA-256  = 762893bae32cecfd97e7a9f24016885ef5901d5686afabdf573c2b3cccae75dd
+--reviewer-home
+--executor-home
+--framework-repo
+--framework-branch
+--framework-remote
+--framework-push-ref
+--run-id
+--runs-root
+--state-root
+--summary-root
 ```
 
-The smoke root is disposable local evidence, not retained Git provenance. The tests and this
-compact observation are tracked; no raw evidence migration or summary commit/push automation
-was introduced. Neither the real `multiLanguage_v1` workload nor its target was used for
-mutation/transition tests, and no target push or merge occurred.
+当前入口仍是显式参数 CLI；更高层的 workload config、doctor/status/inspect 命令和交互式界面
+尚未提供。
 
-## P6.3 local raw evidence 与 tracked summary
+## 自动循环语义
 
-mutation runner 的未来 raw evidence 默认写到：
+### Reviewer instruction
+
+Reviewer 创建 persistent thread，读取完整当前治理和 target state，产生一个 bounded instruction。
+Reviewer 不得修改 target、Git state 或治理文件。
+
+### Executor mutation
+
+Executor 使用 fresh ephemeral session，在 target 中实现任务、运行测试、创建 commit，并留下 clean
+worktree。Executor 的总结不能触发 acceptance。
+
+### Reviewer verdict
+
+原 Reviewer thread 被显式 resume。Reviewer 必须重新读取实际 target、commit、文件、测试和
+hash，并返回 runtime-enforced verdict。
+
+```text
+ACCEPT
+  -> 机械验证身份、target、governance、evidence 和 capability
+  -> 原子完成一次 workload Runtime transition
+
+REJECT
+  -> Runtime 不变
+  -> 完整 repair instruction 路由给下一 fresh Executor
+
+HUMAN_GATE
+  -> Runtime 不变
+  -> 自动停止，终端显示 Human Gate 状态和 evidence 位置
+```
+
+自由文本中出现 `ACCEPT`、`PASS`、`READY` 等词没有控制权限。
+
+## Reviewer verdict correction
+
+如果 Reviewer process、schema、profile、thread、read-only audit，以及实际 target/governance state
+均已验证，但 verdict 中的 evidence locator、hash 或其他声明存在明确可纠正的机械错误，runner
+会恢复同一个 Reviewer thread，要求重新检查并输出完整 verdict。
+
+- 最多两个 correction turn；
+- 不重跑已完成 Executor；
+- Python 不删除、补写、转换或猜测 Reviewer evidence；
+- correction 可以返回 ACCEPT、REJECT 或 HUMAN_GATE；
+- schema/process/profile/thread 错误以及实际 state/evidence 漂移不进入 correction；
+- 两次仍失败则 `VERDICT_CORRECTION_EXHAUSTED / FAILED_CLOSED`。
+
+`file`、`artifact`、`test` evidence 必须指向 target/run boundary 内实际存在文件的绝对路径。
+Shell command、Git-status 描述和 prose 不是 locator；没有实际输出文件时不应虚构 evidence。
+
+## 运行状态、checkpoint 与恢复
+
+默认 checkpoint：
+
+```text
+1PCloop/.local/state/<workload-id>/checkpoint.json
+```
+
+Checkpoint 在控制边界原子覆盖，保存当前 state、turn identity、Reviewer thread、target/governance
+identity、correction attempt、Runtime transition、summary 和 publication recovery 数据。它是当前
+恢复状态，不保存逐版本历史。
+
+运行期间终端会显示：
+
+- role、cycle、control state；
+- Codex process start/finish；
+- 有限的 machine-readable tool activity；
+- 当前 turn elapsed heartbeat；
+- summary、Runtime transition、framework commit/push 状态；
+- Human Gate、error 和最终结果。
+
+恢复未完成 run 时，使用完全相同的参数并增加：
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
+  <原运行的完整参数> \
+  --resume
+```
+
+恢复时重新验证配置、target、governance、turn、evidence 和 framework identity。已完成且可机械
+归因的 Agent turn、Executor commit、correction、Runtime transition、summary、framework commit
+或 push 不会重复。无法安全确定 Executor 是否已修改 target 时会进入 Human Gate，而不是盲目
+重跑。
+
+当前版本尚未提供 run-wide/stage-wide timer、独立 status subcommand 或交互式 TUI/GUI。
+
+## Evidence
+
+未来 mutation run 的 raw evidence 默认位于：
 
 ```text
 1PCloop/.local/runs/<run-id>/
 ```
 
-显式 `--runs-root` 仍可覆盖该位置。既有 `1PCloop/runs/` 历史不会移动或重写。
-默认 tracked artifact 是 `1PCloop/evidence-summaries/<run-id>.md`；每个完成的 turn
-对应一个 deterministic entry ID。条目只保存 target/governance metadata、schema 声明的
-`evidence_summary`、Reviewer verdict/evidence（如有）以及 raw 文件 locator、SHA-256 和
-byte length，不复制 prompt、peer message、events、stderr、hidden reasoning 或 process 正文。
+其中可以包含：
 
-`evidence_summary` 以 JSON string 写入固定 Markdown envelope；换行、heading、反引号和
-HTML angle bracket 都会被确定性转义，Unicode 保持可读。summary 的每次逻辑 append 先把
-entry bytes 与 preimage/postimage hash 写入 checkpoint，再通过同目录临时文件、fsync 和
-`os.replace` 替换。恢复只接受精确 preimage 或 postimage；额外字节、部分写入、hash 错误
-或缺失 entry 均 fail closed。
+- prompt；
+- raw Codex `events.jsonl`；
+- stderr；
+- final message；
+- peer payload；
+- process metadata；
+- manifest。
 
-逻辑结果与 evidence finalization 分开记录：
+这些内容默认 Git-ignored，不作为长期 Git 历史。
 
-```text
-RUNTIME_TRANSITION_COMMITTED | HUMAN_GATE | FAILED_CLOSED
--> EVIDENCE_FINALIZATION_PENDING
--> FRAMEWORK_EVIDENCE_COMMITTED
--> FRAMEWORK_EVIDENCE_PUSHED
-```
-
-一次 run 只创建一个 framework evidence commit。commit allowlist 仅包含该 run 的 summary，
-以及确实位于 framework repository 内且已由 P6.2 合法写入的 workload Runtime。提交前验证
-framework branch/HEAD、干净的起始状态、显式 path set、blob content hash、ordinary parent
-和 run-ID trailer；stage 只调用 `git add -- <explicit paths>`。Static、`.local`、target 文件、
-closed workload 和预先存在的修改不在 allowlist。
-
-默认 framework 配置是当前 repository、`main`、`origin` 和 `refs/heads/main`。disposable
-framework repository 可通过以下参数显式注入：
+每个完成 turn 会在以下 tracked summary 中生成一条 bounded entry：
 
 ```text
---framework-repo <repo-root>
---framework-branch <branch>
---framework-remote <remote>
---framework-push-ref refs/heads/<branch>
---summary-root <tracked-summary-directory>
+1PCloop/evidence-summaries/<run-id>.md
 ```
 
-framework 与 target 必须是不重叠的独立 Git repository；framework Static/Runtime 和 summary
-必须位于 framework repo 内。push 只在 framework repo 中执行非 force refspec，并在前后
-验证 remote ref。push 失败保留本地 commit 与 `FRAMEWORK_EVIDENCE_COMMITTED` checkpoint；
-`--resume` 只重试 push。若远端已收到 exact commit 但 checkpoint 尚未更新，恢复只补记
-`already-present`，不会重跑 Agent、重写 Runtime、追加 summary 或创建第二个 commit。
+Entry 保存 role/cycle、时间、target/governance identity、LLM `evidence_summary` 和 raw locator/hash，
+不复制完整 prompt、peer message、events、stderr 或 hidden reasoning。
 
-P6.3 configuration 将 summary 路径、framework repo/branch/remote/ref 与 schema hash 写入
-checkpoint。缺少这些字段的旧 checkpoint 不会自动升级；如需处理，必须由 Human 明确处置，
-不能让新 run 猜测性覆盖。实时终端只显示 summary/commit/push 的 pending、written、
-reconciled、succeeded 或 failed 控制事件，不输出完整 LLM summary 或 raw 内容。
+到达 logical terminal 后，runner 在 framework repository 中创建一次 allowlisted evidence commit，
+并 non-force push 到配置的 framework remote。它不会 push 或 merge target repository。
 
-专项验证：
+## FINAL_RESULT
 
-```bash
-1PCloop/.local/venv/bin/python -m unittest discover -s 1PCloop/tests -p test_evidence_summary.py -v
-```
-
-## foundation_v1 F1 Reviewer verdict 纠错与最终结果
-
-当 Reviewer process、runtime/local schema、profile、read-only audit、persistent thread/resume
-relationship，以及 checkpointed target/governance/Executor identity 均已通过，而 verdict 的
-wrapper/evidence 声明发生可机械定位的错误时，runner 会 checkpoint 一次纠错计划，并恢复形成
-原 verdict 的同一个 Reviewer thread。纠错只要求 Reviewer 重新检查实际 evidence 并重新输出
-完整 `reviewer_verdict`；它不会删除或改写 evidence，不会猜测 hash/commit，也不会重跑已完成的
-Executor。
-
-可纠正集合是代码中显式列举的 control error code，包括 verdict 跨字段关系、声明的
-target/governance/Runtime/active-step identity，以及 commit/file/artifact/test locator、对象、
-边界、可达性和 SHA-256。初始 verdict 之后最多执行两次 correction turn；次数、原 verdict、
-每次 correction locator/hash 和当前错误 code 均保存在同一 checkpoint。第二次仍为可纠正
-错误时以 `VERDICT_CORRECTION_EXHAUSTED` fail closed。
-
-process failure/timeout、schema-invalid JSON、schema 变化、错误 profile/role/thread/resume、
-Reviewer 写入、实际 target/governance/checkpoint/Runtime/framework 漂移、I/O/Git/summary/
-commit/push 错误及未分类错误不进入 correction。它们保持 default-deny，并沿用现有 fail-closed
-或 Human Gate/finalization 恢复边界。
-
-每次非 preflight CLI invocation 返回前输出一个不含 peer payload 的 `FINAL_RESULT`。字段名
-固定，等号右侧是单行 JSON scalar；因此字符串带引号，CR/LF、Unicode line separator 和其他
-控制字符只能显示为转义序列，不能创建额外物理输出行：
+每次非 preflight invocation 返回前都会输出固定字段：
 
 ```text
-run_id="<id>"
+FINAL_RESULT
+run_id="example"
 logical_outcome="RUNTIME_TRANSITION_COMMITTED"
-exit_code=<integer>
+exit_code=0
 runtime_transition="APPLIED"
 evidence_publication="PUSHED"
-reason="<bounded public reason>"
-error_code="<stable code>"
-run_root="<absolute path>"
+reason="one_reviewer_accept_transition_completed"
+error_code="RUNTIME_TRANSITION_COMMITTED"
+run_root="/absolute/path/to/run"
 ```
 
-checkpoint 和 raw manifest 的 `final_result` 使用同一个中央 public-field builder，所有字符串
-也已移除原始控制字符。`reason` 最多 `512` 个 public characters；超出部分确定性替换为
-`...[truncated]`。未分类异常的 public reason 固定为
-`mutation loop stopped; inspect checkpoint and local evidence`，完整 exception type/reason 只保存
-在 Git-ignored checkpoint/raw manifest 的 `internal_diagnostic`，不进入公开结果或终端错误行。
-JSON duplicate-key 拒绝仍然严格，但不再回显由输入控制的 key 名。
+等号右侧是单行 JSON scalar，不能通过换行伪造额外字段。Public reason 最长512字符；完整内部异常
+只保存在本地 `internal_diagnostic`。
 
-原始 Reviewer review prompt 与 correction prompt 使用同一 locator 规则：`file`、`artifact`、
-`test` 必须指向 target/run boundary 内实际存在文件的绝对路径；shell command、Git-status 描述
-和 prose 均不是 locator，没有真实输出文件时不得虚构 test/artifact evidence。这不替代任何
-本地 validator。
+必须同时查看三类结果：
 
-`PUSHED` 只表示 framework evidence publication 成功，绝不覆盖 `FAILED_CLOSED`；publication
-失败也不会伪造已经确定的 logical outcome。F1 没有实现 run/stage timer、live status、last
-activity 或 structured event stream；这些属于当前 F2。F1 implementation
-`d57c1c146be9ea998572e3d09c923c4e9a77c517` 经 Reviewer REJECT 后，由 repair commit
-`0adf4e083b002dad8ccff226afb96a9b20210bdb` 修复，并在 focused `20 / 20`、完整
-ResourceWarning-strict `90 / 90` 及恶意换行/duplicate-key 独立复核后 ACCEPTED。
+```text
+logical_outcome
+runtime_transition
+evidence_publication
+```
 
-## P6.4 当前支持的顺序生命周期边界
+例如 `evidence_publication="PUSHED"` 只表示失败或成功的 run evidence 已发布，不表示任务已经
+ACCEPT。Shell exit code 也不能替代 Human Gate/Runtime 语义。
 
-### 当前支持的运行模型
+## 隔离和安全边界
 
-当前支持的是 Human Owner 有意选择的顺序隔离和部署模型：
+Mutation runner 为了允许 Executor 创建真实 Git commit，Reviewer 和 Executor 当前使用
+`--dangerously-bypass-approvals-and-sandbox`。安全边界由以下组合提供：
 
-- 一个 Human contributor；
-- 同一个 target repository 同时只有一个 active loop；
-- Human 与该 loop 是正常运行时仅有的 repository writers；
-- Reviewer 与 Executor 由 orchestrator 依次调用，不并行推理或修改 repository；
-- 每个 Reviewer 或 Executor Codex CLI turn 完成后，对应的本地进程退出；
-- 已退出的 Agent process 不会继续访问或修改 repository；
-- Reviewer 的 persistent session 是由 orchestrator 保存 thread relationship、并在需要时
-  显式执行 `codex exec resume` 的会话状态，不是等待中或后台持续运行的 Agent；
-- 下一次 Reviewer 或 Executor 推理只会由 orchestrator 明确触发。
+- 独立 profile/session；
+- role prompt；
+- bounded instruction；
+- target/framework 路径分离；
+- Reviewer turn 前后 read-only audit；
+- target branch/HEAD/cleanliness/ancestry 检查；
+- governance/evidence hash；
+- explicit allowlist；
+- fail-closed 和 Human Gate。
 
-这个模型用于单 contributor、单 loop 的当前 1PCloop engineering artifact。它不宣称适用于
-多个 contributor 或多个 writer 同时修改同一 repository 的环境。
+这不是抵抗恶意本地进程的 production security boundary。同一 macOS 用户下的 Codex 仍有广泛
+文件访问能力。当前支持一个 Human contributor、一个 active loop、一个 target writer；不支持
+并行 Executor、多 writer reconciliation、repository lock、watcher 或分布式一致性。
 
-### 当前不支持的并发能力
+## 已验证结果
 
-当前版本不实现或保证：
+Repository-backed evidence 已覆盖：
 
-- awaiting/background Agent process；
-- daemon 或后台 repository access；
-- repository lock；
-- filesystem watcher；
-- 多个并行 Executor；
-- 多个 active loop 操作同一个 target；
-- multi-writer reconciliation；
-- distributed transaction；
-- 通用 concurrency consistency guarantee。
+- 两个 Codex identity 的独立串行调用；
+- Reviewer/Executor 消息的逐字节路由；
+- persistent Reviewer resume 和 fresh-session reconstruction；
+- governance unchanged/runtime-changed/static-changed freshness policy；
+- disposable Git target 的真实 mutation、test、commit 和 independent review；
+- 一个真实中等规模外部项目的多轮修改和 Human Gate；
+- schema-invalid、stale state、错误 role/thread、缺失或错误 evidence 的 fail-closed；
+- Runtime transition 与 summary/commit/push 的 crash-boundary recovery；
+- Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
+- public terminal result 的控制字符、长度和字段注入防护。
 
-这些能力不属于 P6.4 的实现范围。
+当前 deterministic regression suite 包含90项测试，并在 `ResourceWarning` 提升为错误时通过。
+历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
+`evidence-summaries/`、`runs/` 和 Git history；README 不复制这些进度记录。
 
-### External mutation 的含义
+## 测试
 
-`external mutation` 是无法归因于当前 orchestrator 已授权步骤的 repository 或 governance
-变化，例如：
+运行完整严格回归：
 
-- Human 或编辑器在 turn 边界之间修改文件；
-- 另一个 shell、Git 操作、进程或 loop 修改 branch、HEAD 或 working tree；
-- checkpoint 保存的 governance hash 与当前文件字节不一致；
-- 出现不属于当前 checkpoint plan 的 commit、Runtime 内容或 evidence 内容。
+```bash
+1PCloop/.local/venv/bin/python \
+  -W error::ResourceWarning \
+  -m unittest discover \
+  -s 1PCloop/tests \
+  -v
+```
 
-在受支持的 single-writer 模式中，这些情况通常不应发生。检测仍有必要，因为同一信号也可能
-来自 loop 自身的状态错误、恢复错误或意外副作用。
+专项测试：
 
-### 机械检查的作用和限制
+```text
+tests/test_run_text_loop.py          text transport/context reconstruction
+tests/test_run_mutation_loop.py      mutation state machine/restart
+tests/test_runtime_transition.py     structured verdict/Runtime transition
+tests/test_evidence_summary.py       summary/commit/push recovery
+tests/test_verdict_correction.py     verdict correction/public result
+```
 
-当前保留的低成本机械检查包括：
+## 代码和文档入口
 
-- target branch、HEAD 和 clean working tree；
-- descendant、non-rewriting history 以及 merge prohibition；
-- Reviewer read-only behavior；
-- framework/workload governance hashes；
-- checkpointed preimage/postimage；
-- evidence、summary、framework commit 和 push 的精确恢复状态。
+```text
+scripts/run_mutation_loop.py      当前 mutation orchestrator
+scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
+scripts/p63_evidence.py           summary、framework commit 和 push helper
+schemas/                          runtime-enforced Agent output schemas
+roles/                            text-routing role prompts
+workloads/                        task-local governance
+docs/miniloop_static.md           全局稳定合同
+docs/miniloop_runtime.md          全局历史和当前 task 指针
+evidence-summaries/               tracked compact evidence
+runs/                             已保留的历史运行 evidence
+history/                          已冻结的早期实现
+```
 
-这些检查用于验证当前顺序状态机、检测意外 mutation，并发现 loop/self-state 错误。状态能够
-与 checkpointed plan 精确对应时，orchestrator 只恢复下一个未完成动作；状态无法机械解释时，
-它会 fail closed 或进入 Human Gate。
-
-这些检查不是 repository locking、concurrency protocol、multi-writer conflict resolution，
-也不是已经验证的多 contributor coordination mechanism。遇到无法解释的状态时，runner 不会
-自动 reset、强制覆盖、rebase、force push 或执行其他破坏性修复。
-
-### Target-HEAD refresh 的准确边界
-
-Target-HEAD refresh 路径已有 deterministic validation。当 Executor 启动前观察到当前 target
-HEAD 与 Reviewer 已知 HEAD 不一致时，现有逻辑会让 Reviewer 基于新 HEAD 生成替代 instruction，
-从而保持 instruction freshness。refresh 完成后、Executor 实际启动前还会再次核对 branch、
-HEAD、cleanliness 和 governance；这一窗口再次变化会 fail closed。
-
-该路径尚未经过 live concurrent target-HEAD commit 实验，因此不能被描述为已验证的真实并发
-写入一致性或完整协调协议。P6 不为此增加新算法。Human Owner 的常用模式是唯一 contributor，
-加上 loop 作为唯一正常自动化 writer；P6.4 有意维持这一支持边界。
-
-### P7 边界（P6.4 阶段记录）
-
-P6.4 没有执行 controlled `REJECT -> REPAIR -> re-review` fault injection，也没有修改现有
-REJECT 路径。P6 关闭后 P7 曾短暂成为下一步骤，但 Human Owner 于 `2026-09-12` 将其暂停并
-激活 foundation_v1。当前状态以 foundation_v1 task-local Runtime 和全局 Runtime 的阶段指针
-为准；未经 Human Owner 明确重新激活，不得执行 P7。
+任务当前状态应读取对应 Runtime；README 只描述稳定架构、操作方式、已交付能力和已知边界。
