@@ -236,10 +236,12 @@ class EvidenceSummaryTests(unittest.TestCase):
                 "P6_TEST_VERDICT": "HUMAN_GATE",
                 "P6_TEST_SUMMARY": special,
             })[0], 0)
-            self.assertIn("summary_entry=", self.output)
-            self.assertIn("framework_commit=created", self.output)
-            self.assertIn("framework_push=succeeded", self.output)
-            self.assertIn("logical_outcome=HUMAN_GATE", self.output)
+            self.assertIn("PROGRESS run=", self.output)
+            self.assertIn('state="EVIDENCE_FINALIZATION_PENDING"', self.output)
+            self.assertIn('state="FRAMEWORK_EVIDENCE_COMMITTED"', self.output)
+            self.assertIn('state="FRAMEWORK_EVIDENCE_PUSHED"', self.output)
+            self.assertIn('last_activity="logical_outcome@', self.output)
+            self.assertIn('logical_outcome="HUMAN_GATE"', self.output)
             self.assertNotIn(special, self.output)
 
     def test_raw_manifest_remains_local_and_outside_commit(self):

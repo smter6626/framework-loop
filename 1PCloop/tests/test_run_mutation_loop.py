@@ -647,10 +647,11 @@ class MutationLoopTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             progress = output.getvalue()
-            self.assertIn("process_started", progress)
-            self.assertIn("running elapsed=", progress)
-            self.assertIn("process_finished", progress)
-            self.assertIn("checkpoint state=HUMAN_GATE", progress)
+            self.assertIn("PROGRESS run=", progress)
+            self.assertIn('last_activity="turn_started@', progress)
+            self.assertIn('last_activity="heartbeat@', progress)
+            self.assertIn('last_activity="turn_finished_success@', progress)
+            self.assertIn('state="HUMAN_GATE"', progress)
             self.assertIn("target_head=", progress)
 
 

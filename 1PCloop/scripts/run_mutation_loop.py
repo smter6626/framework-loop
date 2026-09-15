@@ -135,6 +135,33 @@ def load_p63_helpers() -> ModuleType:
 P63 = load_p63_helpers()
 
 
+def load_progress_helpers() -> ModuleType:
+    path = SCRIPT_PATH.with_name("progress_status.py")
+    spec = importlib.util.spec_from_file_location("_f2_progress_status", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load F2 progress helpers: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+PROGRESS = load_progress_helpers()
+_ACTIVE_PROGRESS: Optional[Any] = None
+
+
+def record_active_progress(method: str, *args: Any, **kwargs: Any) -> Optional[Any]:
+    reporter = _ACTIVE_PROGRESS
+    if reporter is None or not reporter.observation_available:
+        return None
+    try:
+        return getattr(reporter, method)(*args, **kwargs)
+    except PROGRESS.ProgressError:
+        reporter.observation_available = False
+        reporter.observation_error = "structured progress observation unavailable"
+        return None
+
+
 class InvariantViolation(RuntimeError):
     """A mechanical invariant failed and the loop must not continue."""
 
@@ -352,7 +379,9 @@ def validate_verdict_relationships(value: Mapping[str, Any]) -> None:
 
 
 def emit_progress(message: str) -> None:
-    """Emit a concise, immediately visible control-plane progress line."""
+    """Legacy fallback outside an active F2 structured progress reporter."""
+    if _ACTIVE_PROGRESS is not None:
+        return
     print(f"[{P4.utc_now()}] {escape_public_text(str(message))}", flush=True)
 
 
@@ -1203,6 +1232,16 @@ def relative_evidence_path(path: Path, run_root: Path) -> str:
 
 
 def describe_progress_event(line: bytes) -> Optional[str]:
+    classified = classify_progress_event(line)
+    if classified is None:
+        return None
+    category, kind = classified
+    return f"codex_event={kind}" if category == "codex" else (
+        f"codex_event=tool_activity item={kind}"
+    )
+
+
+def classify_progress_event(line: bytes) -> Optional[Tuple[str, str]]:
     try:
         event = json.loads(line)
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -1211,13 +1250,13 @@ def describe_progress_event(line: bytes) -> Optional[str]:
         return None
     event_type = event.get("type")
     if event_type in {"thread.started", "turn.started", "turn.completed", "error"}:
-        return f"codex_event={event_type}"
+        return "codex", event_type
     if event_type in {"item.started", "item.completed"}:
         item = event.get("item")
         if isinstance(item, dict):
             item_type = item.get("type")
             if item_type in {"command_execution", "mcp_tool_call", "web_search"}:
-                return f"codex_event={event_type} item={item_type}"
+                return "tool", item_type
     return None
 
 
@@ -1270,9 +1309,16 @@ def stream_subprocess(
                 handle.write(chunk)
                 handle.flush()
                 if report_events:
-                    description = describe_progress_event(chunk)
-                    if description is not None:
-                        emit_progress(f"{progress_label} {description}")
+                    classified = classify_progress_event(chunk)
+                    if classified is not None:
+                        category, kind = classified
+                        record_active_progress(
+                            "codex_activity" if category == "codex" else "tool_activity",
+                            kind,
+                        )
+                        description = describe_progress_event(chunk)
+                        if description is not None:
+                            emit_progress(f"{progress_label} {description}")
 
     stdout_thread = threading.Thread(
         target=pump,
@@ -1311,6 +1357,7 @@ def stream_subprocess(
                     process.kill()
                 break
             if now >= next_heartbeat:
+                record_active_progress("heartbeat")
                 emit_progress(
                     f"{progress_label} running elapsed={round(now - started, 1)}s"
                 )
@@ -1459,8 +1506,13 @@ def run_codex_turn(
         if validation_failure is not None
         else None
     )
+    progress_turn_started = False
 
     if validation_failure is None:
+        record_active_progress(
+            "turn_started", role=role, timeout_seconds=timeout_seconds
+        )
+        progress_turn_started = True
         exit_code, stdout, stderr, process_failure = stream_subprocess(
             command=command,
             workspace=workspace,
@@ -1498,7 +1550,10 @@ def run_codex_turn(
     resume_verified: Optional[bool] = None
     if session_mode == NEW_PERSISTENT and created_thread_id is None:
         success = False
-        failure = "persistent Reviewer did not provide a machine-readable thread id"
+        thread_failure = (
+            "persistent Reviewer did not provide a machine-readable thread id"
+        )
+        failure = f"{failure}; {thread_failure}" if failure else thread_failure
     if session_mode == RESUME:
         resume_verified = (
             observed_resume_thread_id is not None
@@ -1565,6 +1620,8 @@ def run_codex_turn(
         "uncached_input_tokens": event_metadata["uncached_input_tokens"],
     }
     P4.write_json(process_path, process)
+    if progress_turn_started:
+        record_active_progress("turn_finished", success=success)
     return TurnResult(turn_dir, final_message, process)
 
 
@@ -1727,6 +1784,7 @@ def write_manifest(
     evidence_finalization: Optional[Mapping[str, Any]] = None,
     logical_outcome: Optional[Mapping[str, Any]] = None,
     final_result: Optional[Mapping[str, Any]] = None,
+    progress: Optional[Mapping[str, Any]] = None,
 ) -> None:
     manifest = {
         "cycles": list(cycles),
@@ -1735,6 +1793,7 @@ def write_manifest(
         "finished_at": P4.utc_now() if status != "RUNNING" else None,
         "governance_initial": governance_initial.metadata(),
         "logical_outcome": dict(logical_outcome) if logical_outcome is not None else None,
+        "progress": dict(progress) if progress is not None else None,
         "reason": reason,
         "reviewer_state": reviewer_state.metadata(),
         "run_configuration": dict(run_configuration),
@@ -1861,6 +1920,9 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         "framework_static": str(args.framework_static.resolve()),
         "max_cycles": args.max_cycles,
         "max_review_correction_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
+        "progress_contract_version": PROGRESS.SCHEMA_VERSION,
+        "progress_events_filename": PROGRESS.EVENTS_FILENAME,
+        "progress_status_filename": PROGRESS.STATUS_FILENAME,
         "reviewer_home": str(args.reviewer_home.resolve()),
         "runs_root": str(args.runs_root.resolve()),
         "state_root": str(state_root.resolve()),
@@ -3108,6 +3170,7 @@ def orchestrate(
         framework_commit_id = checkpoint.get("framework_commit_id")
         framework_push_result = checkpoint.get("framework_push_result")
         evidence_finalization_error = checkpoint.get("evidence_finalization_error")
+        checkpoint_progress = checkpoint.get("progress")
         runtime_transition_applied = bool(
             checkpoint.get("runtime_transition_applied", False)
         )
@@ -3124,10 +3187,6 @@ def orchestrate(
                 raise InvariantViolation("checkpoint framework preimage is missing")
             if summary_path != Path(configuration["evidence_summary"]).resolve():
                 raise InvariantViolation("checkpoint summary path is inconsistent")
-        emit_progress(
-            f"run={run_id} resume state={state} cycle={cycle_number} "
-            f"target_head={target_initial.head}"
-        )
     else:
         if checkpoint_store.exists():
             previous = checkpoint_store.load()
@@ -3172,6 +3231,7 @@ def orchestrate(
         framework_commit_id = None
         framework_push_result = None
         evidence_finalization_error = None
+        checkpoint_progress = None
         framework_initial = (
             validate_framework_preflight(args)
             if evidence_finalization_enabled else None
@@ -3203,6 +3263,82 @@ def orchestrate(
                 **framework_settings(args),
                 "summary_path": str(summary_path),
             }
+
+    progress_options: Dict[str, Any] = {}
+    if getattr(args, "progress_status_writer", None) is not None:
+        progress_options["status_writer"] = args.progress_status_writer
+    if getattr(args, "progress_append_hook", None) is not None:
+        progress_options["append_hook"] = args.progress_append_hook
+    progress = PROGRESS.ProgressStatus(
+        run_root=run_root,
+        run_id=run_id,
+        public_text=escape_public_text,
+        terminal_scalar=terminal_scalar,
+        clock=getattr(args, "progress_clock", None),
+        output=getattr(args, "progress_output", sys.stdout),
+        is_tty=getattr(args, "progress_is_tty", None),
+        tool_throttle_seconds=progress_interval,
+        resume=resume_requested,
+        checkpoint_progress=checkpoint_progress,
+        checkpoint_state=state if resume_requested else None,
+        **progress_options,
+    )
+    global _ACTIVE_PROGRESS
+    _ACTIVE_PROGRESS = progress
+    run_configuration["progress"] = {
+        "contract_version": PROGRESS.SCHEMA_VERSION,
+        "events_path": str(progress.events_path),
+        "live_status_path": str(progress.status_path),
+        "run_elapsed_excludes_stopped_wall_time": True,
+        "terminal_mode": "line" if not progress.is_tty else "tty-line",
+    }
+
+    def progress_role(checkpoint_state: str) -> str:
+        if checkpoint_state in {
+            REVIEWER_INSTRUCTION_RUNNING,
+            REVIEW_PENDING,
+            REVIEW_CORRECTION_PENDING,
+            REVIEW_CORRECTION_RUNNING,
+        }:
+            return "reviewer"
+        if checkpoint_state == EXECUTOR_RUNNING:
+            return "executor"
+        return "orchestrator"
+
+    def progress_target_head() -> Optional[str]:
+        for metadata in (target_after_metadata, target_before_metadata):
+            if isinstance(metadata, dict) and isinstance(metadata.get("head"), str):
+                return metadata["head"]
+        if isinstance(reviewer_state.known_target_head, str):
+            return reviewer_state.known_target_head
+        return target_initial.head
+
+    def progress_projection() -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        outcome = (
+            logical_outcome.get("state")
+            if isinstance(logical_outcome, dict) else None
+        )
+        if runtime_transition_applied:
+            runtime_status: Optional[str] = "APPLIED"
+        elif state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}:
+            runtime_status = "PENDING"
+        elif outcome is not None:
+            runtime_status = "NOT_APPLIED"
+        else:
+            runtime_status = None
+        if framework_evidence_pushed:
+            publication: Optional[str] = "PUSHED"
+        elif evidence_finalization_error is not None:
+            publication = "FAILED"
+        elif framework_evidence_committed:
+            publication = "COMMITTED"
+        elif evidence_finalization_enabled and outcome is not None:
+            publication = "PENDING"
+        elif not evidence_finalization_enabled:
+            publication = "NOT_ENABLED"
+        else:
+            publication = None
+        return outcome, runtime_status, publication
 
     def structured_final_result(
         *, exit_code_override: Optional[int] = None
@@ -3253,6 +3389,18 @@ def orchestrate(
         nonlocal state
         prior_state = state
         state = checkpoint_state
+        projected_outcome, projected_runtime, projected_publication = (
+            progress_projection()
+        )
+        progress_checkpoint = progress.prepare_state(
+            control_state=checkpoint_state,
+            cycle=cycle_number,
+            role=progress_role(checkpoint_state),
+            target_head=progress_target_head(),
+            logical_outcome=projected_outcome,
+            runtime_transition=projected_runtime,
+            evidence_publication=projected_publication,
+        )
         payload = {
             "active_turn_relative": active_turn_relative,
             "configuration": configuration,
@@ -3277,6 +3425,7 @@ def orchestrate(
             "manifest_reason": manifest_reason,
             "manifest_status": manifest_status,
             "processes": processes,
+            "progress": progress_checkpoint,
             "reviewer_state": reviewer_state_record(reviewer_state),
             "runtime_transition_applied": runtime_transition_applied,
             "runtime_transition": transition_plan,
@@ -3292,6 +3441,7 @@ def orchestrate(
             "verdict_correction": verdict_correction,
         }
         written = checkpoint_store.write(checkpoint_state, payload)
+        record_active_progress("commit_state")
         write_manifest(
             run_root=run_root,
             run_id=run_id,
@@ -3317,6 +3467,7 @@ def orchestrate(
             },
             logical_outcome=logical_outcome,
             final_result=structured_final_result(),
+            progress=progress.checkpoint_record(),
         )
         if checkpoint_observer is not None:
             checkpoint_observer(checkpoint_state, written)
@@ -3439,9 +3590,26 @@ def orchestrate(
 
     def finish_return(exit_code: int) -> Tuple[int, Path]:
         nonlocal final_result_emitted
+        global _ACTIVE_PROGRESS
         if not final_result_emitted:
+            projected_outcome, projected_runtime, projected_publication = (
+                progress_projection()
+            )
+            progress.prepare_state(
+                control_state=state,
+                cycle=cycle_number,
+                role="orchestrator",
+                target_head=progress_target_head(),
+                logical_outcome=projected_outcome,
+                runtime_transition=projected_runtime,
+                evidence_publication=projected_publication,
+            )
+            record_active_progress(
+                "record", "run_finished", activity_kind="run_finished"
+            )
             emit_final_result(structured_final_result(exit_code_override=exit_code))
             final_result_emitted = True
+            _ACTIVE_PROGRESS = None
         return exit_code, run_root
 
     def finish_evidence() -> Tuple[int, Path]:
@@ -3476,6 +3644,10 @@ def orchestrate(
                 EVIDENCE_FINALIZATION_PENDING,
                 manifest_status=status,
                 manifest_reason=reason,
+            )
+            record_active_progress(
+                "record", "evidence_finalization",
+                activity_kind="evidence_finalization_pending",
             )
         if state == EVIDENCE_FINALIZATION_PENDING:
             settings = framework_settings(args)
@@ -3515,6 +3687,10 @@ def orchestrate(
                 manifest_status=status,
                 manifest_reason=reason,
             )
+            record_active_progress(
+                "record", "evidence_finalization",
+                activity_kind="framework_evidence_committed",
+            )
         if state == FRAMEWORK_EVIDENCE_COMMITTED:
             if not isinstance(framework_commit_plan, dict) or not isinstance(
                 framework_commit_id, str
@@ -3535,6 +3711,10 @@ def orchestrate(
                 FRAMEWORK_EVIDENCE_PUSHED,
                 manifest_status=status,
                 manifest_reason=reason,
+            )
+            record_active_progress(
+                "record", "evidence_finalization",
+                activity_kind="framework_evidence_pushed",
             )
         if state == FRAMEWORK_EVIDENCE_PUSHED:
             if not framework_evidence_committed or not framework_evidence_pushed:
@@ -3573,6 +3753,9 @@ def orchestrate(
             outcome_state,
             manifest_status=manifest_status,
             manifest_reason=public_reason,
+        )
+        record_active_progress(
+            "record", "logical_outcome", activity_kind="logical_outcome"
         )
         return finish_evidence()
 
@@ -4301,6 +4484,9 @@ def orchestrate(
                         f"error_code={exc.code.value}"
                     )
                     persist(REVIEW_CORRECTION_PENDING)
+                    record_active_progress(
+                        "record", "correction", activity_kind="correction_planned"
+                    )
                     continue
                 emit_progress(f"run={run_id} cycle={cycle_number} verdict={value['verdict']}")
                 if isinstance(verdict_correction, dict):
@@ -4391,6 +4577,7 @@ def orchestrate(
         emit_progress(
             f"run={run_id} stopped error_code={error_code} reason={public_reason}"
         )
+        record_active_progress("record", "error", activity_kind="error")
         active_turn_relative = None
         transition_interrupted = state in {RUNTIME_TRANSITION_PENDING, RUNTIME_TRANSITION_COMMITTED}
         # An I/O failure can happen after os.replace (including checkpoint fsync).
@@ -4595,6 +4782,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    global _ACTIVE_PROGRESS
     args = normalize_cli_args(parse_args(argv))
     if args.max_cycles <= 0:
         raise SystemExit("--max-cycles must be positive")
@@ -4606,6 +4794,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         P4.validate_run_id(args.run_id)
         target, governance = validate_preflight(args)
     except (OSError, RuntimeError, ValueError) as exc:
+        _ACTIVE_PROGRESS = None
         print(
             "preflight failed; inspect checkpoint and local evidence",
             file=sys.stderr,
@@ -4631,6 +4820,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             governance_initial=governance,
         )
     except (OSError, RuntimeError, ValueError) as exc:
+        _ACTIVE_PROGRESS = None
         print(
             "unable to start mutation loop; inspect checkpoint and local evidence",
             file=sys.stderr,

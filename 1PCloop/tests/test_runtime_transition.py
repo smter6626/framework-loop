@@ -203,7 +203,8 @@ class RuntimeTransitionTests(unittest.TestCase):
                 self.assertEqual(args.workload_runtime.read_bytes(), before)
                 self.assertEqual(self.checkpoint(args)["state"], M.HUMAN_GATE)
                 if verdict == "HUMAN_GATE":
-                    self.assertIn("waiting_for_human:", self.last_output)
+                    self.assertIn('state="HUMAN_GATE"', self.last_output)
+                    self.assertIn('last_activity="logical_outcome@', self.last_output)
 
     def test_reject_requires_one_bounded_instruction(self):
         for instruction in (None, "", "   ", "x" * 8001):

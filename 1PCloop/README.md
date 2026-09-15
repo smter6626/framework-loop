@@ -47,6 +47,8 @@ The current implementation provides:
 - up to two same-thread corrections for mechanically repairable Reviewer verdicts without
   replaying an already completed Executor;
 - separate logical-outcome, Runtime-transition, and evidence-publication results;
+- a versioned structured progress journal, atomic live-status snapshot, run/stage/timeout
+  timing, and bounded terminal projection;
 - fail-closed behavior for state that cannot be explained mechanically.
 
 These capabilities improve review independence, recoverability, and traceability. They do not
@@ -341,8 +343,66 @@ Mechanically attributable Agent turns, Executor commits, corrections, Runtime tr
 summaries, framework commits, and pushes are not repeated. If the runner cannot safely determine
 whether an Executor changed the target, it enters a Human Gate instead of replaying blindly.
 
-The current product does not yet provide a run-wide/stage-wide timer, standalone status command,
-or interactive TUI/GUI.
+The current product does not yet provide a standalone status command or interactive TUI/GUI.
+F2 supplies the underlying local status model; F3 and F6 own those interfaces.
+
+## Structured progress and live status
+
+Every non-preflight mutation run writes two observation artifacts under its existing Git-ignored
+run root:
+
+```text
+<run-root>/control-events.jsonl
+<run-root>/live-status.json
+```
+
+`control-events.jsonl` is an append-only, schema-versioned orchestrator event stream. Each event
+has a contiguous sequence number and a SHA-256 `event_id` over its canonical envelope. The fixed
+fields project run ID, cycle, role, checkpoint control state, target HEAD, run/stage elapsed time,
+active-turn timeout remaining, last machine activity, aggregated tool activity, logical outcome,
+Runtime transition, and evidence publication. Unavailable values are `null`; events never contain
+prompts, peer messages, evidence summaries, commands, command output, stderr, or hidden reasoning.
+Raw Codex `events.jsonl` remains separate and byte-preserved.
+
+`live-status.json` is an atomically replaced projection of the latest structured event. It is
+derived observation state, not another Runtime and not an authority for transition or recovery.
+The overwrite path uses a same-directory temporary file, fsync, and `os.replace`.
+
+Timing semantics are:
+
+- run elapsed accumulates only time during active orchestrator invocations; stopped wall time
+  between crash and resume is excluded;
+- stage elapsed resets only when the checkpoint control state changes; resuming the same state
+  continues the checkpointed/event-derived accumulated value;
+- elapsed values clamp monotonic-clock rollback and never decrease or become negative;
+- timeout remaining exists only during an active Codex subprocess turn, never increases, clamps
+  at zero, and becomes `null` when the turn ends;
+- last activity changes only for explicit state, resume, Codex machine, heartbeat, tool, logical,
+  evidence-finalization, error, or finish events—not from Agent natural language.
+
+On resume, the journal validates every complete JSONL line, event ID, contiguous sequence, run
+identity, checkpoint cursor, and any post-checkpoint event suffix. A partial final JSONL line is
+discarded as an incomplete observation write; complete conflicting lines fail closed. Existing
+events are never duplicated. Sequence and active elapsed time continue from the validated maximum,
+without treating an old heartbeat as new activity. `live-status.json` is safely regenerated from
+the next event.
+
+Tool activity records only the machine item category (`command_execution`, `mcp_tool_call`, or
+`web_search`) and an aggregate count. It emits immediately, then at most once per configured
+progress interval, with a final flush when necessary. State changes, errors, Human Gates, logical
+outcomes, evidence-finalization changes, and `run_finished` are never throttled.
+
+The terminal renderer consumes the same event object and emits fixed `PROGRESS` lines with JSON
+scalar values. TTY and non-TTY currently use the same durable line-oriented form. Control
+characters reuse the F1 public-string boundary. A live-status or terminal-render failure marks
+that projection unavailable but cannot apply, roll back, or block an otherwise valid Runtime
+transition; an event-append failure similarly degrades observation without changing authoritative
+control state. Event/checkpoint identity conflict at resume still fails closed.
+
+F1 `FINAL_RESULT` remains unchanged and is emitted after the final `run_finished` projection.
+There is intentionally no `status` subcommand in F2 (F3 scope) and no interactive TUI (F6 scope).
+F2 is implemented and deterministically validated, but remains awaiting independent review; this
+documentation does not constitute F2 acceptance or activate F3.
 
 ## Evidence
 
@@ -353,8 +413,8 @@ Raw evidence for future mutation runs defaults to:
 ```
 
 It may include prompts, raw Codex `events.jsonl`, stderr, final messages, peer payloads, process
-metadata, and the raw manifest. These files are Git-ignored by default and do not become
-long-lived Git history.
+metadata, the raw manifest, `control-events.jsonl`, and `live-status.json`. These files are
+Git-ignored by default and do not become long-lived Git history.
 
 Every completed turn creates one bounded entry in:
 
@@ -435,8 +495,10 @@ Repository-backed evidence covers:
 - crash-boundary recovery for Runtime transition and summary/commit/push;
 - same-thread Reviewer verdict correction with fixed limits and Executor idempotence;
 - terminal protection against control characters, unbounded reasons, and field injection.
+- structured progress sequence/identity recovery, monotonic active timing, live projection,
+  tool-activity throttling, and observation-failure isolation.
 
-The current deterministic regression suite contains 90 tests and passes with `ResourceWarning`
+The current deterministic regression suite contains 108 tests and passes with `ResourceWarning`
 promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
 in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
 not duplicate progress records.
@@ -461,6 +523,7 @@ tests/test_run_mutation_loop.py      mutation state machine and restart
 tests/test_runtime_transition.py     structured verdict and Runtime transition
 tests/test_evidence_summary.py       summary, commit, and push recovery
 tests/test_verdict_correction.py     verdict correction and public result
+tests/test_progress_status.py        structured progress, timing, status, and recovery
 ```
 
 ## Code and documentation map
@@ -469,6 +532,7 @@ tests/test_verdict_correction.py     verdict correction and public result
 scripts/run_mutation_loop.py      current mutation orchestrator
 scripts/run_text_loop.py          read-only text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary, framework commit, and push helper
+scripts/progress_status.py        F2 progress journal, live snapshot, and renderer
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance
