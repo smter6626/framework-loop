@@ -4,10 +4,10 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`REJECTED — NARROW REPAIR REQUIRED`
-- 最近接受：`F1 — ACCEPTED AFTER REJECT → NARROW REPAIR → RE-REVIEW`
-- 唯一 Active Step：`F2 — terminal timer、live status 与 structured progress event`
-- 当前顶层 Step：`Step 2`
+- 当前 verdict：`NOT EVALUATED`
+- 最近接受：`F2 — ACCEPTED AFTER REJECT → NARROW REPAIR → RE-REVIEW`
+- 唯一 Active Step：`F3 — workload config 与 doctor/preflight/run/resume/status/inspect CLI`
+- 当前顶层 Step：`Step 3`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
@@ -94,117 +94,154 @@ Durable evidence locator：
 evidence publication 的独立表达已满足。F2 继续完成持续计时、live status 和 structured event
 基础。F1 的首次 REJECT 与 repair 历史继续保留在 §8，不因最终 ACCEPT 被删除。
 
+### D. F2 — terminal timer、live status 与 structured progress event
+
+状态：`ACCEPTED AFTER REJECT → NARROW REPAIR → INDEPENDENT RE-REVIEW`
+
+结果：
+
+- implementation commit `69cb4c13e1313fd88b15de93781d65400c2b5e71` 建立 versioned
+  `control-events.jsonl`、atomic `live-status.json`、active-time run/stage/timeout/last-activity
+  semantics、tool aggregation 和 structured terminal renderer；
+- 独立 Reviewer 第一次审核发现 checkpoint cursor 后的完整 suffix 只验证部分 projection，且
+  raw pump 的 legacy 输出绕过 structured tool throttle，因此形成 `REJECTED — NARROW REPAIR
+  REQUIRED`；拒绝记录 commit 为 `a0776692a0507d238b3a2eb95a880f014db4844b`；
+- repair commit `54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` 对完整 suffix 固定验证
+  run/state/cycle/target/logical/runtime/publication projection，并为合法 state/turn/activity/finish
+  suffix 建立显式 lifecycle；raw pump 同时改为服从 structured recorder 的节流决策；
+- observation-disabled 路径保留 bounded、无 payload 的 `CODEX_FALLBACK`，F1 `FINAL_RESULT`
+  和 authoritative transition semantics 保持不变。
+
+独立 re-review evidence：
+
+- Executor repair F2 focused：`24 / 24`，`7.666s`；F1 regression：`20 / 20`，
+  `36.757s`；完整 ResourceWarning-strict regression：`114 / 114`，`141.310s`；
+- Reviewer 独立复跑 F2 focused：`24 / 24`，`7.109s`；F1 regression：`20 / 20`，
+  `35.739s`；完整 ResourceWarning-strict regression：`114 / 114`，`142.350s`；
+- Reviewer 使用与首次 REJECT 相同的 rehashed forged suffix 重跑，现于
+  `progress suffix cycle conflicts with checkpoint projection` fail closed；
+- runner pump integration 直接保存 `63` 行 raw event，其中 `60` 条 tool activity 只形成首次与
+  最终两条 structured tool event；正常 structured 路径不再重复 legacy machine/tool 输出；
+- Python 3.9 compilation/import、`git diff --check`、提交范围、远端同步和 clean worktree 均通过；
+- 未运行 real-service smoke；该验证仍属于 F7，不阻塞 F2 deterministic acceptance。
+
+当前语义：foundation_v1 的 AC-04、AC-05 已满足；F2 observation 是可重建投影而不是第二份
+Runtime。Event SHA-256 是 canonical byte identity，不是 keyed authority；checkpoint projection
+仍是 resume reconciliation anchor。F2 的首次 REJECT 与 repair 历史继续保留在 §8。
+
 ## 3. Active Step
 
-### F2 / Step 2 — terminal timer、live status 与 structured progress event
+### F3 / Step 3 — workload config 与 doctor/preflight/run/resume/status/inspect CLI
 
 #### Objective
 
-在不改变 Reviewer/Executor/Runtime/evidence 权威语义的前提下，为 mutation loop 建立同源的
-机器可读 progress event、当前 live status snapshot 和面向终端的持续计时显示。运行者必须能
-看到整次 run elapsed、当前 stage elapsed、Codex turn timeout remaining、last activity、cycle、
-role/state，以及 F1 已建立的最终三层结果；未来 CLI/TUI 必须能够消费同一 structured source，
-而不是解析自然语言或终端文本。
+在保留现有长参数 invocation 向后兼容的前提下，为 Human operator 提供一个版本化、可验证的
+workload config 和统一命令入口，使 doctor、preflight、run、resume、status、inspect 使用同一
+配置与状态 identity。Resume/status 不应要求用户重新拼接十多个参数；所有命令仍必须复用现有
+preflight、checkpoint、F1 final result 和 F2 structured status/event，而不是创建第二套控制逻辑。
 
 #### Inputs 及固定 identity
 
 - Static：`1PCloop/workloads/foundation_v1/workload_static.md`，SHA-256
   `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`；
-- F1 accepted implementation：commits `d57c1c146be9ea998572e3d09c923c4e9a77c517`、
-  `0adf4e083b002dad8ccff226afb96a9b20210bdb`；
-- runner：`1PCloop/scripts/run_mutation_loop.py`；
-- existing process/manifest/checkpoint/final-result formats and P4–F1 regression；
-- post-P6 timing observation：
-  `1PCloop/evidence-summaries/post-p6-foundation-smoke-20260912.md`。
+- F1 accepted final-result/correction contracts；
+- F2 accepted progress/status contracts：commits
+  `69cb4c13e1313fd88b15de93781d65400c2b5e71`、
+  `54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5`；
+- `1PCloop/scripts/run_mutation_loop.py`、`progress_status.py`、现有 README 和 test suites。
 
 #### Permitted changes
 
-- `1PCloop/scripts/run_mutation_loop.py`；
-- 与 progress event/status projection 直接相关的必要新 helper；
-- `1PCloop/tests/test_run_mutation_loop.py` 和必要的新 F2 专项 test；
-- F1/P6 regression test 只能为兼容性做最小调整；
-- `1PCloop/README.md` 中与 F2 operator behavior 直接相关的说明。
+- 现有 mutation runner 的 CLI/arg normalization；
+- 必要的新 CLI/config/status helper 和入口脚本；
+- workload config 示例或模板，但不得包含 credential；
+- 与 F3 直接相关的 tests；
+- F1/F2/P6 tests 只能做必要兼容调整；
+- `1PCloop/README.md`、对应中文 README 中与实际 F3 operator 命令直接相关的说明。
 
 #### Prohibited changes
 
 - 全局和 task-local Static/Runtime；
 - `1PCloop/schemas/**`、roles、requirements；
-- F1 correction/error taxonomy/public-result semantics；
-- P4 transport、Runtime transition、evidence finalization 与 Git push semantics；
+- F1 correction/public-result、F2 event/timing/reconciliation semantics；
+- P4 transport、Runtime transition、evidence finalization 和 Git push semantics；
 - closed workloads、历史 runs/evidence、外部 Tools 模板和 target history/remote；
-- F3–F8 implementation、P7、真实 Codex smoke、self-hosting 或 concurrency 功能。
+- F4–F8 implementation、P7、真实 Codex smoke、TUI/GUI、self-hosting 或 concurrency 功能。
 
 #### Required evidence
 
-- versioned structured progress-event contract 与实际 JSONL/fixture locator；
-- live status snapshot，能从 structured state 得到当前 run/stage/turn 信息；
-- deterministic fake-clock tests，覆盖 normal run、long turn、timeout、resume、clock anomaly 和终态；
-- terminal output 与 structured event/status 同源的 evidence；
-- no-payload/no-secret regression；
-- 完整 ResourceWarning-strict regression、README diff、implementation commit 和精确文件列表。
+- versioned workload config contract、canonical resolved identity/hash 和 strict validation tests；
+- doctor/preflight/run/resume/status/inspect 的 CLI integration evidence；
+- resume/status 使用已保存 config/checkpoint identity、不要求重拼全部原始参数的测试；
+- read-only command 无 Agent invocation、无 repository mutation 的 evidence；
+- backward-compatible legacy CLI tests；
+- privacy/path/unknown-field/duplicate-key/stale-config negative tests；
+- 完整 ResourceWarning-strict regression、双语 operator docs、commit 和精确文件列表。
 
 #### Acceptance criteria
 
-1. 每个 progress event 使用版本化、固定字段的 machine-readable envelope；事件内容不得来自
-   peer_message 自由文本语义。
-2. live status 至少包含 run ID、cycle、role、control state、run elapsed、stage elapsed、timeout
-   remaining、last activity 和最终三层状态；不可用字段显式为 `null`，不得伪造 `0`。
-3. active Codex turn 的 run/stage elapsed 单调不减，timeout remaining 不为负；非 Codex stage
-   不伪造 timeout remaining。
-4. crash/resume 后计时和 event sequence 可机械重建，不因进程重启倒退、重复已有事件或把旧
-   heartbeat 当成新 activity。
-5. terminal renderer 只消费 structured event/status；TTY 与非 TTY 输出都不得泄露 prompt、
-   peer payload、secret、完整命令输出或隐藏 reasoning。
-6. 高频 Codex tool event 必须有明确节流/聚合边界，关键 state transition、error 和 final result
-   不得丢失。
-7. F1 `FINAL_RESULT` 的字段、JSON-scalar 编码、public/internal reason 分离和 publication/logical
-   distinction 保持兼容。
-8. 本步只建立 status 数据与 live rendering；F3 才实现 `status`/`resume` 等用户子命令，F6 才
-   实现交互式 TUI。
-9. 现有合法 ACCEPT、REJECT、HUMAN_GATE、correction、restart 与 P4–F1 regression 不回归。
+1. Workload config 使用版本化、固定字段和 strict duplicate/unknown-field validation；相对路径
+   按 config 文件目录确定性解析，resolved config identity/hash 写入或绑定 checkpoint。
+2. Config 不包含或复制 auth、token、credential、完整 profile state；角色 profile 只记录获授权
+   路径，仍要求 Reviewer/Executor identity 不同。
+3. `doctor` 只读检查 Python dependency、Codex binary/version、profile、Git、framework remote、
+   schema 和本地 ignore/storage prerequisite，不创建 run 或调用 Agent。
+4. `preflight` 从 config 调用现有 preflight，输出 machine-readable 结果，不创建 mutation evidence。
+5. `run` 从 config 编译成现有 runner 参数并执行当前 orchestrator，不复制状态机。
+6. `resume` 通过 config/workload/run identity 定位 checkpoint，验证保存的 resolved configuration，
+   不要求重输 target/governance/profile 等全部参数；任何 drift/override 冲突 fail closed。
+7. `status` 只读投影 checkpoint、F2 live status/event 和 F1 final result，明确显示 control state、
+   timers、last activity、logical/runtime/publication、observation availability 和下一安全动作；不从
+   peer_message 推断语义。
+8. `inspect` 只读定位并机械验证 run manifest、event/status、summary/checkpoint/commit identity；
+   缺失 local raw evidence 必须明确报告 unavailable，不伪造成功。
+9. Legacy `run_mutation_loop.py` 参数入口继续工作；新入口不能改变原有 default-deny、Runtime
+   capability、correction、timing、event、transition 或 publication 语义。
+10. F3 不解决 Human Gate、不做交互式选择、不实现 TUI/GUI；这些仍属于后续阶段。
 
 #### Tests
 
-- injectable fake clock 验证 run/stage elapsed、timeout remaining 和 last activity；
-- state/role/cycle transition 事件顺序与稳定 sequence identity；
-- restart 前后 elapsed/sequence/status reconstruction；
-- timeout、process failure、Human Gate、corrected ACCEPT、publication failure/resume；
-- control-character、超长字段和 raw payload 不进入公开 event/terminal；
-- TTY/non-TTY renderer 的 bounded 输出；
-- F1 focused regression 与完整 ResourceWarning-strict regression。
+- config parse/canonicalization/hash、relative path、duplicate/unknown/missing/invalid field；
+- doctor success/failure matrix 且无 Agent/run side effect；
+- preflight/run 参数等价性和 legacy CLI compatibility；
+- resume 最小输入、config drift、错误 workload/run、缺失/旧 checkpoint；
+- status 在 running、Human Gate、FAILED_CLOSED、publication failure、terminal complete、observation
+  unavailable 和 raw-missing 情况下的 deterministic projection；
+- inspect 正常、tampered、partial-tail、缺失 local artifact 和远端 identity 情况；
+- stdout 使用稳定 JSON/安全文本，不泄露 auth、peer payload 或 internal diagnostic；
+- F1、F2 focused regression 与完整 ResourceWarning-strict regression。
 
-F2 不运行真实 Codex service；完整 post-foundation real-service smoke 留到 F7。
+F3 不运行真实 Codex service；完整 post-foundation real-service smoke 留到 F7。
 
 #### Stop conditions / Human Gate
 
-- 需要改变 Static、F1 public-result contract 或现有 authoritative state semantics；
-- 无法在 restart 后确定 elapsed/event identity 而只能猜测；
-- UI 需求迫使提前实现 F3 CLI 或 F6 TUI；
-- 需要记录 raw payload、credential 或 hidden reasoning；
-- 出现 framework/target overlap、自托管权限、并发或破坏性 Git 需求。
+- 需要改变 Static、Runtime、F1/F2 或 authoritative transition semantics；
+- 无法仅由 config/workload identity 安全定位唯一 checkpoint；
+- resume 需要猜测已保存配置或自动接受 drift；
+- 需要 credential、GUI/TUI、Human Gate decision、self-hosting、并发或破坏性 Git action；
+- 新入口无法复用现有 runner 而必须复制控制状态机。
 
 #### Executor report format
 
 ```text
-F2 implementation status: IMPLEMENTED / BLOCKED
+F3 implementation status: IMPLEMENTED / BLOCKED
 branch / implementation commit / parent / working-tree state
 changed files
-progress event schema and storage
-run/stage/timeout/last-activity semantics
-resume/sequence/idempotence evidence
-terminal/status projection evidence
-focused tests, F1 regression and full strict regression
+config schema/canonical identity and path semantics
+doctor/preflight/run/resume/status/inspect behavior
+read-only/no-Agent/no-mutation evidence
+legacy compatibility and F1/F2 regression
+focused tests and full strict regression
 known limitations
 recommended Runtime evidence summary
 ```
 
-Executor 不得宣告 F2 accepted，也不得推进本 Runtime。
+Executor 不得宣告 F3 accepted，也不得推进本 Runtime。
 
 ## 4. Queued
 
 | Step | Deliverable | 状态 |
 | --- | --- | --- |
-| F3 / Step 3 | config + doctor/preflight/run/resume/status/inspect CLI | `QUEUED` |
 | F4 / Step 4 | 默认中文 Static/Runtime Prompt 模板规范化 | `QUEUED` |
 | F5 / Step 5 | runner 模块化和 Human Gate UX | `QUEUED` |
 | F6 / Step 6 | 本地 TUI | `QUEUED` |
@@ -216,27 +253,26 @@ Executor 不得宣告 F2 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- F2 已实现但存在两个阻止 acceptance 的窄 repair blocker，详见 §8；无需 Human 决策，继续
-  由 Executor 在 F2 范围内修复。
+- 当前无阻止 F3 开始的 blocker。
 - 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
-  self-hosting limitation，不是 F2 blocker。
+  self-hosting limitation，不是 F3 blocker。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`2`
+当前顶层 Step：`3`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| PT-01 | 默认中文 Prompt 模板尚未规范化 | Step 1 | Step 5 | 2 | `OPEN_NON_BLOCKING` | F4 commit 记录两个固定 Tools hash、模板测试并获独立 Reviewer acceptance；进入 F5 前必须关闭 |
+| PT-01 | 默认中文 Prompt 模板尚未规范化 | Step 1 | Step 5 | 1 | `OPEN_NON_BLOCKING` | F4 commit 记录两个固定 Tools hash、模板测试并获独立 Reviewer acceptance；进入 F5 前必须关闭 |
 | PT-02 | raw evidence 长期清理/保留策略未确定 | Step 1 | +∞ | +∞ | `PERMANENTLY_NON_BLOCKING` | F8 或未来 Human decision 记录 retention policy 与实际使用 evidence |
 
 ### Pending Gate Check
 
-- 下一顶层 Step：`Step 3 / F3`
+- 下一顶层 Step：`Step 4 / F4`
 - 激活前必须关闭的 Pending Task：无
 - Gate verdict：`CLEAR`
 - Prompt 模板 deadline：必须在进入 `Step 5 / F5` 前由 F4 acceptance 关闭 PT-01。
-- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F2 blocker。
+- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F3 blocker。
 
 ## 7. State Transition
 
@@ -251,7 +287,7 @@ Foundation activation transition（`2026-09-12` 历史状态）：
   和维护工作。
 - Transition authorized by：Human Owner。
 
-Latest step transition：
+F1 → F2 transition（历史状态）：
 
 - Previous step state：F1 `REJECTED — NARROW REPAIR REQUIRED`；
 - Triggering evidence：repair commit `0adf4e083b002dad8ccff226afb96a9b20210bdb`、
@@ -260,6 +296,17 @@ Latest step transition：
 - Current step：F2 / Step 2 `ACTIVE / NOT EVALUATED`；
 - Pending countdown：PT-01 从 `3` 重算为 `2`，仍为 `OPEN_NON_BLOCKING`；PT-02 保持 `+∞`；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 本次收尾授权。
+
+Latest step transition：
+
+- Previous step state：F2 `REJECTED — NARROW REPAIR REQUIRED`；
+- Triggering evidence：repair commit `54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5`、
+  Reviewer independent re-review、F2 focused `24 / 24`、F1 `20 / 20` 与完整 strict
+  `114 / 114`；
+- Verdict：F2 `ACCEPTED AFTER RE-REVIEW`；
+- Current step：F3 / Step 3 `ACTIVE / NOT EVALUATED`；
+- Pending countdown：PT-01 从 `2` 重算为 `1`，仍为 `OPEN_NON_BLOCKING`；PT-02 保持 `+∞`；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
 
 ## 8. Independent Review
 
@@ -352,7 +399,7 @@ Acceptance mapping：
 本次自然发生的 REJECT → narrow repair → independent re-review → ACCEPT 是 1PCloop 核心治理
 方法用于实现自身的直接 evidence，但不是人为 defect injection，也不重新激活 P7。
 
-foundation_v1 整体状态仍为 `ACTIVE`；F1 已完成，F2 为唯一 Active Step。
+该次 F1 closure 后 foundation_v1 仍为 `ACTIVE`；当时 F1 已完成，F2 成为唯一 Active Step。
 
 ### 2026-09-15 F2 independent review：`REJECTED — NARROW REPAIR REQUIRED`
 
@@ -429,12 +476,42 @@ Independent review verdict：
 - 独立 verdict formation：`SATISFIED`；
 - 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
 - verdict：`REJECTED — NARROW REPAIR REQUIRED`；
-- 当前状态：F2 保持唯一 Active Step，F3 不激活，PT-01 倒计时保持 `2`，PT-02 保持 `+∞`；
+- 该次 REJECT 形成时的状态：F2 保持唯一 Active Step，F3 不激活，PT-01 倒计时保持 `2`，
+  PT-02 保持 `+∞`；该状态随后由下方 F2 re-review ACCEPT supersede；
 - 本次是 1PCloop 核心 Reviewer/Executor 治理思想用于实现自身的又一次自然 REJECT evidence，
   不是 P7 defect injection，也不重新激活 P7。
 
+### 2026-09-15 F2 independent re-review：`ACCEPTED`
+
+审核对象：repair commit `54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5`，parent 为保存 F2
+首次 REJECT 的 Runtime commit `a0776692a0507d238b3a2eb95a880f014db4844b`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| suffix immutable projection | `validate_checkpoint_suffix`、rehashed conflict tests及 Reviewer 原复现 | 七项 checkpoint projection 均固定验证，原 forged suffix 在 cycle mismatch 处 fail closed | PASS |
+| suffix lifecycle/recovery | state/heartbeat/Codex/tool/turn/append-crash/repeated-resume/partial-tail tests | 合法 suffix 保留，完整冲突行不删除、不接受 | PASS |
+| runner-level throttling | 63-line pump fixture，含60条 tool activity | raw bytes 全保留；structured tool event 仅首次与最终聚合，无正常路径 legacy duplication | PASS |
+| observation fallback/privacy | disabled-observation integration test | fallback 仅固定 category/kind/count，无命令、参数、输出、peer 或 secret | PASS |
+| F1/P6 compatibility | F1 focused 与完整 strict suite | FINAL_RESULT、correction、transition、summary和publication语义未回归 | PASS |
+
+- 独立 F2 focused：`24 / 24`，`7.109s`；
+- 独立 F1 regression：`20 / 20`，`35.739s`；
+- 独立完整 ResourceWarning-strict regression：`114 / 114`，`142.350s`；
+- Python 3.9 compilation/import、`git diff --check`、提交范围、远端和 clean worktree：通过；
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Reviewer verdict：`ACCEPTED`；
+- Review limitation：未运行真实 Codex smoke，按 Static 留至 F7；event SHA-256 只表示 canonical
+  byte identity，checkpoint projection 仍是 reconciliation anchor。两者均不阻塞 F2。
+
+本次 F2 的自然 REJECT → narrow repair → re-review → ACCEPT 继续构成 1PCloop 核心治理方法
+用于实现自身的 evidence，不是 P7 fault injection。
+
 ## 9. Next Direction
 
-只执行 F2 的上述两个窄范围 repair。不得重写已通过审核的 timing/event/status/F1 主体设计，
-不得把 repair 扩展成 F3 CLI 或 F6 TUI。F1 保持 accepted；F3–F8 保持 queued；P7 保持暂停。
-repair 完成后停止于 `AWAITING INDEPENDENT RE-REVIEW`。
+只执行 F3。F1、F2 已冻结为 accepted evidence；F4–F8 保持 queued。不得提前规范 Prompt
+模板、实现 Human Gate UX、TUI/GUI 或运行 real-service smoke；P7 保持暂停。F3 完成后停止于
+`AWAITING INDEPENDENT REVIEW`。

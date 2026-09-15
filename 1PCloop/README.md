@@ -413,10 +413,11 @@ transition; an event-append failure similarly degrades observation without chang
 control state. Event/checkpoint identity conflict at resume still fails closed.
 
 F1 `FINAL_RESULT` remains unchanged and is emitted after the final `run_finished` projection.
-There is intentionally no `status` subcommand in F2 (F3 scope) and no interactive TUI (F6 scope).
-F2 is repaired and deterministically validated after narrow independent-review findings, but
-remains awaiting independent re-review; this documentation does not constitute F2 acceptance or
-activate F3.
+F2 was independently accepted after its initial review rejected incomplete checkpoint-suffix
+validation and duplicate legacy tool output; repair commit
+`54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` closes both findings. F3 is now the sole Active Step
+and owns workload config plus `doctor`/`preflight`/`run`/`resume`/`status`/`inspect` commands; none
+of those new subcommands is implemented yet. Interactive TUI remains F6 scope.
 
 ## Evidence
 
