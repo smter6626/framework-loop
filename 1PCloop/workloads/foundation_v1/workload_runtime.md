@@ -4,7 +4,7 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
+- 当前 verdict：`REJECTED — NARROW REPAIR REQUIRED`
 - 最近接受：`F1 — ACCEPTED AFTER REJECT → NARROW REPAIR → RE-REVIEW`
 - 唯一 Active Step：`F2 — terminal timer、live status 与 structured progress event`
 - 当前顶层 Step：`Step 2`
@@ -12,7 +12,7 @@
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
 - 当前执行方式：Human-mediated Reviewer/Executor
-- 最后更新：`2026-09-14`
+- 最后更新：`2026-09-15`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
 transition。本文件不包含 `1PCLOOP_RUNTIME_STATE` machine block；现有 runner 禁止 framework
@@ -216,7 +216,8 @@ Executor 不得宣告 F2 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无阻止 F2 开始的 blocker。
+- F2 已实现但存在两个阻止 acceptance 的窄 repair blocker，详见 §8；无需 Human 决策，继续
+  由 Executor 在 F2 范围内修复。
 - 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
   self-hosting limitation，不是 F2 blocker。
 
@@ -353,8 +354,87 @@ Acceptance mapping：
 
 foundation_v1 整体状态仍为 `ACTIVE`；F1 已完成，F2 为唯一 Active Step。
 
+### 2026-09-15 F2 independent review：`REJECTED — NARROW REPAIR REQUIRED`
+
+审核对象：commit `69cb4c13e1313fd88b15de93781d65400c2b5e71` —
+`Add structured live progress status`，parent
+`330ebb6104d0512ad6cba8cb45ab8593c4141dee`。该 parent 与此前 F2 handoff 基线之间的
+README 系列提交 `f2d8948`、`c449fe5`、`330ebb6` 已由 Human Owner 明确授权，不构成本次
+F2 执行纪律或代码审核问题。
+
+Executor implementation/evidence：
+
+- 新增 `1PCloop/scripts/progress_status.py` 和 `1PCloop/tests/test_progress_status.py`，修改
+  mutation runner、README 及必要兼容测试；未修改 Static/Runtime/schema/role/requirements、
+  `p63_evidence.py`、closed workload 或历史 evidence；
+- 建立 schema version `1`、18 个固定字段、13 类事件、canonical SHA-256 event identity、
+  `control-events.jsonl`、atomic `live-status.json`、active-time timing、tool aggregation 和
+  `PROGRESS` renderer；
+- Executor F2 focused suite：`18 / 18`，`6.453s`；F1 regression：`20 / 20`，
+  `33.850s`；完整 ResourceWarning-strict regression：`108 / 108`，`129.377s`；
+- Reviewer 独立复跑 F2 focused suite：`18 / 18`，`7.041s`；完整
+  ResourceWarning-strict regression：`108 / 108`，`146.872s`；
+- 上述测试全绿，但未覆盖以下两项 acceptance-critical blind spot，因此不足以支持 F2 ACCEPT。
+
+#### Finding 1 — 完整 post-checkpoint suffix 未验证全部状态投影
+
+`ProgressStatus._resume` 对 checkpoint cursor 之后的完整、newline-terminated event 只检查
+`run_id` 和 `control_state`。Reviewer 构造了 sequence 连续、schema 合法且重新计算正确
+`event_id` 的完整 suffix；它保持 `control_state=REVIEW_PENDING`，但写入：
+
+```text
+cycle=99
+target_head=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+logical_outcome=RUNTIME_TRANSITION_COMMITTED
+runtime_transition=APPLIED
+evidence_publication=PUSHED
+```
+
+当前 resume 接受该完整行，并在其后追加恢复为 checkpoint projection 的 `run_resumed` event。
+因此同一 journal 会永久同时保存一条伪造成功记录和一条真实恢复记录。这与 README 和 F2
+合同中的“完整 event/checkpoint identity conflict 必须 fail closed”不符，也使未来 F3/F6
+consumer 不能把已 reconcile journal 当作一致观察源。
+
+Required repair：
+
+1. 即使 cursor 位于尾部，也验证 `checkpoint_progress.control_state == checkpoint_state`；
+2. 对 cursor 后 suffix 验证 immutable projection：至少 `run_id`、`control_state`、`cycle`、
+   `target_head`、`logical_outcome`、`runtime_transition`、`evidence_publication` 必须与 checkpoint
+   一致；
+3. 对 run/stage elapsed anchor、event type、role、timeout 和 activity 定义合法的 suffix 演进；
+4. 保留合法 state-entered、heartbeat、Codex/tool activity、turn start/finish 和 append-after-
+   checkpoint crash；
+5. 只有不以 newline 结束的 partial tail 可以截除，完整冲突行不得自动删除。
+
+#### Finding 2 — legacy terminal 输出绕过 tool-event throttle
+
+raw Codex pump 先调用 structured `tool_activity`，但无论该调用是否因 throttle 返回 `None`，
+随后仍对每个 raw tool item 执行 legacy `describe_progress_event` + `emit_progress`。因此 structured
+journal 虽然被节流，真实终端仍逐条刷屏，并同时存在 structured 与 legacy 两条显示路径；这与
+“terminal renderer 消费 structured event/status”和 README 的 tool activity 节流说明不符。
+
+Required repair：
+
+1. structured observation 正常时，只由 structured recorder 的 emit/throttle 决策产生
+   Codex/tool terminal projection；
+2. throttled `tool_activity` 返回 `None` 时不得输出 legacy tool line；
+3. structured event 已渲染时不得再输出重复 legacy line；
+4. observation layer 不可用时可保留 bounded、无 payload 且有节流的 legacy fallback；
+5. 增加通过实际 runner pump 输入大量 raw tool events 的 integration test，不能只直接测试
+   `ProgressStatus.tool_activity()`。
+
+Independent review verdict：
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- verdict：`REJECTED — NARROW REPAIR REQUIRED`；
+- 当前状态：F2 保持唯一 Active Step，F3 不激活，PT-01 倒计时保持 `2`，PT-02 保持 `+∞`；
+- 本次是 1PCloop 核心 Reviewer/Executor 治理思想用于实现自身的又一次自然 REJECT evidence，
+  不是 P7 defect injection，也不重新激活 P7。
+
 ## 9. Next Direction
 
-只执行 F2。F1 已冻结为 accepted evidence；F3–F8 保持 queued。不得提前实现 config/CLI
-subcommands、Prompt 模板、Human Gate UX、TUI、GUI 或 real-service smoke，也不得启动 P7。
-F2 实现完成后停止于 `AWAITING INDEPENDENT REVIEW`。
+只执行 F2 的上述两个窄范围 repair。不得重写已通过审核的 timing/event/status/F1 主体设计，
+不得把 repair 扩展成 F3 CLI 或 F6 TUI。F1 保持 accepted；F3–F8 保持 queued；P7 保持暂停。
+repair 完成后停止于 `AWAITING INDEPENDENT RE-REVIEW`。
