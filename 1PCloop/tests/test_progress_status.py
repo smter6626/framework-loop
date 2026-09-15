@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -107,6 +108,22 @@ class ProgressStatusTests(unittest.TestCase):
         events, recovered = P.scan_events(reporter.events_path)
         self.assertFalse(recovered)
         return events
+
+    def rewrite_events(self, reporter, events):
+        P.atomic_write_bytes(
+            reporter.events_path,
+            b"".join(P.canonical_json(event) + b"\n" for event in events),
+        )
+
+    def rehash(self, event):
+        updated = dict(event)
+        without_id = {
+            name: updated[name]
+            for name in P.EVENT_FIELDS if name != "event_id"
+        }
+        updated["event_id"] = P.event_identity(without_id)
+        P.validate_event(updated)
+        return updated
 
     def test_default_progress_artifacts_are_git_ignored(self):
         for relative in (
@@ -270,6 +287,109 @@ class ProgressStatusTests(unittest.TestCase):
                 2,
             )
 
+    def test_runner_pump_throttles_tools_and_uses_bounded_disabled_fallback(self):
+        fake_source = '''#!/usr/bin/env python3
+import json
+import sys
+
+sys.stdin.buffer.read()
+print(json.dumps({"type": "thread.started", "thread_id": "tool-flood"}))
+print(json.dumps({"type": "turn.started"}))
+for number in range(20):
+    for event_type in ("item.started", "item.completed"):
+        print(json.dumps({
+            "type": event_type,
+            "item": {
+                "type": "command_execution",
+                "command": "SECRET_COMMAND --token=SECRET",
+                "aggregated_output": "SECRET_OUTPUT",
+                "number": number,
+            },
+        }))
+for number in range(10):
+    print(json.dumps({
+        "type": "item.completed",
+        "item": {"type": "mcp_tool_call", "arguments": "SECRET", "number": number},
+    }))
+for number in range(10):
+    print(json.dumps({
+        "type": "item.completed",
+        "item": {"type": "web_search", "query": "SECRET", "number": number},
+    }))
+print(json.dumps({"type": "turn.completed", "usage": {}}))
+'''
+        for observation_available in (True, False):
+            with self.subTest(observation_available=observation_available), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                executable = root / "tool-flood"
+                executable.write_text(fake_source)
+                executable.chmod(0o755)
+                structured_terminal = io.StringIO()
+                reporter = self.reporter(
+                    root,
+                    run_id=("structured" if observation_available else "fallback"),
+                    clock=FakeClock(),
+                    output=structured_terminal,
+                )
+                self.enter(reporter, "EXECUTOR_RUNNING", role="executor")
+                reporter.turn_started(role="executor", timeout_seconds=10)
+                if not observation_available:
+                    reporter.observation_available = False
+                    structured_terminal.seek(0)
+                    structured_terminal.truncate(0)
+                raw_path = root / "raw-events.jsonl"
+                stderr_path = root / "raw-stderr.txt"
+                fallback_terminal = io.StringIO()
+                M._ACTIVE_PROGRESS = reporter
+                try:
+                    with redirect_stdout(fallback_terminal):
+                        _, stdout, _, failure = M.stream_subprocess(
+                            command=[str(executable)],
+                            workspace=root,
+                            environment=os.environ.copy(),
+                            prompt=b"fixture prompt",
+                            events_path=raw_path,
+                            stderr_path=stderr_path,
+                            timeout_seconds=10,
+                            progress_interval_seconds=1000.0,
+                            progress_label="tool-flood",
+                        )
+                    if observation_available:
+                        reporter.turn_finished(success=True)
+                finally:
+                    M._ACTIVE_PROGRESS = None
+
+                self.assertIsNone(failure)
+                self.assertEqual(raw_path.read_bytes(), stdout)
+                self.assertEqual(len(stdout.splitlines()), 63)
+                self.assertIn(b"SECRET_COMMAND", stdout)
+                event_bytes = reporter.events_path.read_bytes()
+                self.assertNotIn(b"SECRET_COMMAND", event_bytes)
+                self.assertNotIn(b"SECRET_OUTPUT", event_bytes)
+                self.assertNotIn("SECRET", structured_terminal.getvalue())
+                if observation_available:
+                    events = self.events(reporter)
+                    self.assertEqual(events[-1]["tool_activity"]["count"], 60)
+                    self.assertEqual(
+                        [event["event_type"] for event in events].count("tool_activity"),
+                        2,
+                    )
+                    self.assertEqual(fallback_terminal.getvalue(), "")
+                    self.assertNotIn("codex_event=", structured_terminal.getvalue())
+                else:
+                    fallback_lines = fallback_terminal.getvalue().splitlines()
+                    self.assertGreaterEqual(len(fallback_lines), 1)
+                    self.assertLessEqual(len(fallback_lines), 5)
+                    self.assertTrue(all("CODEX_FALLBACK" in line for line in fallback_lines))
+                    self.assertNotIn("SECRET", fallback_terminal.getvalue())
+                    self.assertNotIn("--token", fallback_terminal.getvalue())
+                    self.assertEqual(
+                        [event["event_type"] for event in self.events(reporter)].count(
+                            "tool_activity"
+                        ),
+                        0,
+                    )
+
     def test_incomplete_tail_is_truncated_and_sequence_resumes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -363,6 +483,167 @@ class ProgressStatusTests(unittest.TestCase):
                     checkpoint_progress=checkpoint,
                     checkpoint_state="S1",
                 )
+
+    def test_checkpoint_progress_state_conflict_fails_at_tail_cursor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = self.reporter(root, output=io.StringIO())
+            self.enter(first, "S1")
+            checkpoint = first.checkpoint_record()
+            self.assertEqual(checkpoint["sequence"], 1)
+            checkpoint["control_state"] = "S2"
+            with self.assertRaisesRegex(P.ProgressError, "progress state conflicts"):
+                self.reporter(
+                    root,
+                    output=io.StringIO(),
+                    resume=True,
+                    checkpoint_progress=checkpoint,
+                    checkpoint_state="S1",
+                )
+
+    def test_rehashed_suffix_authoritative_projection_conflicts_fail_closed(self):
+        mutations = {
+            "control_state": "REVIEW_COMPLETED",
+            "cycle": 99,
+            "target_head": "b" * 40,
+            "logical_outcome": "RUNTIME_TRANSITION_COMMITTED",
+            "runtime_transition": "APPLIED",
+            "evidence_publication": "PUSHED",
+        }
+        for field, replacement in mutations.items():
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                first = self.reporter(root, output=io.StringIO())
+                checkpoint, event = self.enter(
+                    first, "REVIEW_PENDING", role="reviewer"
+                )
+                forged = dict(event)
+                forged[field] = replacement
+                self.rewrite_events(first, [self.rehash(forged)])
+                with self.assertRaisesRegex(P.ProgressError, field):
+                    self.reporter(
+                        root,
+                        output=io.StringIO(),
+                        resume=True,
+                        checkpoint_progress=checkpoint,
+                        checkpoint_state="REVIEW_PENDING",
+                    )
+
+    def test_rehashed_suffix_forged_run_finished_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = self.reporter(root, output=io.StringIO())
+            checkpoint, event = self.enter(
+                first, "REVIEW_PENDING", role="reviewer"
+            )
+            forged = dict(event)
+            forged["event_type"] = "run_finished"
+            forged["role"] = "orchestrator"
+            forged["last_activity"] = {
+                "timestamp": forged["timestamp"], "kind": "run_finished"
+            }
+            self.rewrite_events(first, [self.rehash(forged)])
+            with self.assertRaisesRegex(P.ProgressError, "run_finished"):
+                self.reporter(
+                    root,
+                    output=io.StringIO(),
+                    resume=True,
+                    checkpoint_progress=checkpoint,
+                    checkpoint_state="REVIEW_PENDING",
+                )
+
+    def test_rehashed_suffix_elapsed_below_checkpoint_anchor_fails_closed(self):
+        for field in ("run_elapsed_seconds", "stage_elapsed_seconds"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                clock = FakeClock()
+                first = self.reporter(root, clock=clock, output=io.StringIO())
+                first.prepare_state(
+                    control_state="S1",
+                    cycle=1,
+                    role="orchestrator",
+                    target_head="a" * 40,
+                    logical_outcome=None,
+                    runtime_transition=None,
+                    evidence_publication=None,
+                )
+                clock.advance(5)
+                checkpoint = first.prepare_state(
+                    control_state="S1",
+                    cycle=1,
+                    role="orchestrator",
+                    target_head="a" * 40,
+                    logical_outcome=None,
+                    runtime_transition=None,
+                    evidence_publication=None,
+                )
+                event = first.commit_state()
+                forged = dict(event)
+                forged[field] = 4.0
+                self.rewrite_events(first, [self.rehash(forged)])
+                with self.assertRaisesRegex(P.ProgressError, "anchor"):
+                    self.reporter(
+                        root,
+                        clock=FakeClock(100, 100),
+                        output=io.StringIO(),
+                        resume=True,
+                        checkpoint_progress=checkpoint,
+                        checkpoint_state="S1",
+                    )
+
+    def test_legal_state_and_active_turn_suffixes_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = self.reporter(root, output=io.StringIO())
+            self.enter(first, "S1")
+            checkpoint = first.checkpoint_record()
+            first.prepare_state(
+                control_state="S1",
+                cycle=1,
+                role="orchestrator",
+                target_head="a" * 40,
+                logical_outcome=None,
+                runtime_transition=None,
+                evidence_publication=None,
+            )
+            first.commit_state()
+            resumed = self.reporter(
+                root,
+                clock=FakeClock(100, 100),
+                output=io.StringIO(),
+                resume=True,
+                checkpoint_progress=checkpoint,
+                checkpoint_state="S1",
+            )
+            self.assertEqual(self.events(resumed)[-1]["event_type"], "run_resumed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            clock = FakeClock()
+            first = self.reporter(root, clock=clock, output=io.StringIO())
+            self.enter(first, "REVIEW_PENDING", role="reviewer")
+            checkpoint = first.checkpoint_record()
+            first.turn_started(role="reviewer", timeout_seconds=10)
+            clock.advance(1)
+            first.heartbeat()
+            first.codex_activity("thread.started")
+            first.tool_activity("command_execution")
+            first.turn_finished(success=True)
+            resumed = self.reporter(
+                root,
+                clock=FakeClock(100, 100),
+                output=io.StringIO(),
+                resume=True,
+                checkpoint_progress=checkpoint,
+                checkpoint_state="REVIEW_PENDING",
+            )
+            events = self.events(resumed)
+            suffix_types = [event["event_type"] for event in events[1:-1]]
+            self.assertEqual(suffix_types, [
+                "turn_started", "heartbeat", "codex_activity", "tool_activity",
+                "turn_finished",
+            ])
+            self.assertEqual(events[-1]["event_type"], "run_resumed")
 
     def test_live_status_is_atomic_latest_projection(self):
         with tempfile.TemporaryDirectory() as tmp:

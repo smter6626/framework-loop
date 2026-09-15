@@ -70,6 +70,17 @@ TOOL_KINDS = frozenset({"command_execution", "mcp_tool_call", "web_search"})
 CODEX_ACTIVITY_KINDS = frozenset({
     "thread.started", "turn.started", "turn.completed", "error",
 })
+TURN_CONTROL_STATES = frozenset({
+    "REVIEWER_INSTRUCTION_RUNNING",
+    "EXECUTOR_RUNNING",
+    "REVIEW_PENDING",
+    "REVIEW_CORRECTION_RUNNING",
+})
+EVIDENCE_CONTROL_STATES = frozenset({
+    "EVIDENCE_FINALIZATION_PENDING",
+    "FRAMEWORK_EVIDENCE_COMMITTED",
+    "FRAMEWORK_EVIDENCE_PUSHED",
+})
 MAX_EVENT_STRING_CHARS = 256
 OBJECT_ID_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
@@ -298,6 +309,212 @@ def scan_events(path: Path) -> tuple[List[Dict[str, Any]], bool]:
     return events, recovered_tail
 
 
+def validate_checkpoint_suffix(
+    *,
+    events: Sequence[Mapping[str, Any]],
+    cursor: int,
+    checkpoint_progress: Mapping[str, Any],
+    checkpoint_state: str,
+    run_id: str,
+) -> None:
+    """Validate mutable observations against an immutable checkpoint projection."""
+    if any(event.get("run_id") != run_id for event in events):
+        raise ProgressError("progress event run identity mismatch")
+    if checkpoint_progress.get("control_state") != checkpoint_state:
+        raise ProgressError("checkpoint progress state conflicts with checkpoint state")
+    immutable = {
+        "run_id": run_id,
+        "control_state": checkpoint_state,
+        "cycle": checkpoint_progress.get("cycle"),
+        "target_head": checkpoint_progress.get("target_head"),
+        "logical_outcome": checkpoint_progress.get("logical_outcome"),
+        "runtime_transition": checkpoint_progress.get("runtime_transition"),
+        "evidence_publication": checkpoint_progress.get("evidence_publication"),
+    }
+    run_anchor = checkpoint_progress.get("run_elapsed_seconds")
+    stage_anchor = checkpoint_progress.get("stage_elapsed_seconds")
+    if (
+        not isinstance(run_anchor, (int, float))
+        or isinstance(run_anchor, bool)
+        or not math.isfinite(run_anchor)
+        or run_anchor < 0
+        or not isinstance(stage_anchor, (int, float))
+        or isinstance(stage_anchor, bool)
+        or not math.isfinite(stage_anchor)
+        or stage_anchor < 0
+    ):
+        raise ProgressError("checkpoint progress timing anchor is invalid")
+    checkpoint_role = checkpoint_progress.get("role")
+    if checkpoint_role not in ROLES:
+        raise ProgressError("checkpoint progress role is invalid")
+    anchor_activity = checkpoint_progress.get("last_activity")
+    anchor_timestamp = (
+        anchor_activity.get("timestamp")
+        if isinstance(anchor_activity, dict) else None
+    )
+    active_turn = False
+    active_role: Optional[str] = None
+    prior_remaining: Optional[float] = None
+    state_marker_seen = False
+    invocation_finished = False
+    tool_count = (
+        events[cursor - 1]["tool_activity"]["count"] if cursor > 0 else 0
+    )
+    suffix = events[cursor:]
+    for index, event in enumerate(suffix):
+        for name, expected in immutable.items():
+            if event.get(name) != expected:
+                raise ProgressError(
+                    f"progress suffix {name} conflicts with checkpoint projection"
+                )
+        if event["run_elapsed_seconds"] < run_anchor:
+            raise ProgressError("progress suffix run elapsed precedes checkpoint anchor")
+        if event["stage_elapsed_seconds"] < stage_anchor:
+            raise ProgressError("progress suffix stage elapsed precedes checkpoint anchor")
+        if anchor_timestamp is not None and event["timestamp"] < anchor_timestamp:
+            raise ProgressError("progress suffix timestamp precedes checkpoint activity")
+        if event["last_activity"]["timestamp"] != event["timestamp"]:
+            raise ProgressError("progress suffix activity timestamp is inconsistent")
+
+        event_type = event["event_type"]
+        if invocation_finished and event_type != "run_resumed":
+            raise ProgressError("progress suffix event follows run_finished without resume")
+        role = event["role"]
+        remaining = event["timeout_remaining_seconds"]
+        activity_kind = event["last_activity"]["kind"]
+        event_tool_count = event["tool_activity"]["count"]
+        if event_type == "turn_started":
+            if event_tool_count != 0:
+                raise ProgressError("progress suffix turn tool count did not reset")
+        elif active_turn:
+            if event_tool_count < tool_count:
+                raise ProgressError("progress suffix tool count moved backwards")
+        elif event_tool_count != tool_count:
+            raise ProgressError("progress suffix tool count changed outside a turn")
+        tool_count = event_tool_count
+        if event_type in {"run_started", "state_entered"}:
+            if active_turn or state_marker_seen or index != 0:
+                raise ProgressError("progress suffix state marker is out of order")
+            if event_type == "run_started" and (cursor != 0 or event["sequence"] != 1):
+                raise ProgressError("progress suffix run_started is not the first event")
+            if role != checkpoint_role or remaining is not None:
+                raise ProgressError("progress suffix state marker role/timeout is invalid")
+            if activity_kind != "state_transition":
+                raise ProgressError("progress suffix state marker activity is invalid")
+            state_marker_seen = True
+        elif event_type == "run_resumed":
+            if role != checkpoint_role or remaining is not None:
+                raise ProgressError("progress suffix run_resumed transition is invalid")
+            if activity_kind not in {
+                "run_resumed", "resume_after_incomplete_event_tail"
+            }:
+                raise ProgressError("progress suffix resume activity is invalid")
+            active_turn = False
+            active_role = None
+            prior_remaining = None
+            invocation_finished = False
+        elif event_type == "turn_started":
+            if (
+                active_turn
+                or checkpoint_state not in TURN_CONTROL_STATES
+                or role != checkpoint_role
+                or role not in {"reviewer", "executor"}
+                or remaining is None
+                or activity_kind != "turn_started"
+            ):
+                raise ProgressError("progress suffix turn_started transition is invalid")
+            active_turn = True
+            active_role = role
+            prior_remaining = remaining
+        elif event_type in {"heartbeat", "codex_activity", "tool_activity"}:
+            if not active_turn or role != active_role or remaining is None:
+                raise ProgressError("progress suffix active-turn observation is invalid")
+            if prior_remaining is not None and remaining > prior_remaining:
+                raise ProgressError("progress suffix timeout remaining increased")
+            prior_remaining = remaining
+            if event_type == "heartbeat" and activity_kind != "heartbeat":
+                raise ProgressError("progress suffix heartbeat activity is invalid")
+            if event_type == "codex_activity" and activity_kind not in {
+                f"codex:{kind}" for kind in CODEX_ACTIVITY_KINDS
+            }:
+                raise ProgressError("progress suffix Codex activity is invalid")
+            if event_type == "tool_activity":
+                last_kind = event["tool_activity"]["last_kind"]
+                if (
+                    last_kind is None
+                    or activity_kind != f"tool:{last_kind}"
+                    or event["tool_activity"]["count"] < 1
+                ):
+                    raise ProgressError("progress suffix tool activity is invalid")
+        elif event_type == "turn_finished":
+            if (
+                not active_turn
+                or role != "orchestrator"
+                or remaining is not None
+                or activity_kind not in {
+                    "turn_finished_success", "turn_finished_failure"
+                }
+            ):
+                raise ProgressError("progress suffix turn_finished transition is invalid")
+            active_turn = False
+            active_role = None
+            prior_remaining = None
+        elif event_type == "correction":
+            if (
+                active_turn
+                or checkpoint_state != "REVIEW_CORRECTION_PENDING"
+                or role != "reviewer"
+                or remaining is not None
+                or activity_kind != "correction_planned"
+            ):
+                raise ProgressError("progress suffix correction event is invalid")
+        elif event_type == "logical_outcome":
+            if (
+                active_turn
+                or immutable["logical_outcome"] is None
+                or role != "orchestrator"
+                or remaining is not None
+                or activity_kind != "logical_outcome"
+            ):
+                raise ProgressError("progress suffix logical-outcome event is invalid")
+        elif event_type == "evidence_finalization":
+            expected_activity = {
+                "EVIDENCE_FINALIZATION_PENDING": "evidence_finalization_pending",
+                "FRAMEWORK_EVIDENCE_COMMITTED": "framework_evidence_committed",
+                "FRAMEWORK_EVIDENCE_PUSHED": "framework_evidence_pushed",
+            }.get(checkpoint_state)
+            if (
+                active_turn
+                or checkpoint_state not in EVIDENCE_CONTROL_STATES
+                or role != "orchestrator"
+                or remaining is not None
+                or activity_kind != expected_activity
+            ):
+                raise ProgressError("progress suffix evidence-finalization event is invalid")
+        elif event_type == "error":
+            if (
+                active_turn
+                or role != "orchestrator"
+                or remaining is not None
+                or activity_kind != "error"
+            ):
+                raise ProgressError("progress suffix error event is invalid")
+        elif event_type == "run_finished":
+            if (
+                active_turn
+                or immutable["logical_outcome"] is None
+                or role != "orchestrator"
+                or remaining is not None
+                or activity_kind != "run_finished"
+            ):
+                raise ProgressError("progress suffix run_finished event is invalid")
+            invocation_finished = True
+        else:
+            raise ProgressError("progress suffix event type is not recoverable")
+    # An active-turn suffix is valid after a process crash. The subprocess is gone;
+    # and the next run_resumed event closes its timeout projection.
+
+
 class ProgressStatus:
     """One run's reconstructable observation stream and current projection."""
 
@@ -414,6 +631,8 @@ class ProgressStatus:
             raise ProgressError("resume checkpoint lacks F2 progress metadata")
         if checkpoint_progress.get("schema_version") != SCHEMA_VERSION:
             raise ProgressError("resume progress metadata version is unsupported")
+        if checkpoint_progress.get("run_id") != self.run_id:
+            raise ProgressError("resume checkpoint progress run identity mismatch")
         if (
             checkpoint_progress.get("events_path") != str(self.events_path)
             or checkpoint_progress.get("status_path") != str(self.status_path)
@@ -428,12 +647,13 @@ class ProgressStatus:
                 raise ProgressError("zero progress cursor has an event identity")
         elif events[cursor - 1].get("event_id") != expected_id:
             raise ProgressError("resume progress cursor identity mismatch")
-        for event in events:
-            if event.get("run_id") != self.run_id:
-                raise ProgressError("progress event run identity mismatch")
-        for event in events[cursor:]:
-            if event.get("control_state") != checkpoint_state:
-                raise ProgressError("event suffix conflicts with checkpoint control state")
+        validate_checkpoint_suffix(
+            events=events,
+            cursor=cursor,
+            checkpoint_progress=checkpoint_progress,
+            checkpoint_state=checkpoint_state,
+            run_id=self.run_id,
+        )
         self._sequence = len(events)
         self._last_event_id = events[-1]["event_id"] if events else None
         self._control_state = checkpoint_state
@@ -522,6 +742,7 @@ class ProgressStatus:
                 "observation_available": self.observation_available,
                 "observation_error": self.observation_error,
                 "role": self._role,
+                "run_id": self.run_id,
                 "run_elapsed_seconds": run_elapsed,
                 "runtime_transition": self._runtime_transition,
                 "schema_version": SCHEMA_VERSION,
@@ -582,8 +803,6 @@ class ProgressStatus:
                 return None
             kind = self._tool_last_kind
             now = self._now()
-            if self._last_tool_emit is not None and now == self._last_tool_emit:
-                return None
             self._last_tool_emit = now
             self._last_tool_emitted_count = self._tool_count
         return self.record("tool_activity", activity_kind=f"tool:{kind}")

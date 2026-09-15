@@ -381,16 +381,29 @@ Timing semantics are:
   evidence-finalization, error, or finish events—not from Agent natural language.
 
 On resume, the journal validates every complete JSONL line, event ID, contiguous sequence, run
-identity, checkpoint cursor, and any post-checkpoint event suffix. A partial final JSONL line is
-discarded as an incomplete observation write; complete conflicting lines fail closed. Existing
-events are never duplicated. Sequence and active elapsed time continue from the validated maximum,
-without treating an old heartbeat as new activity. `live-status.json` is safely regenerated from
-the next event.
+identity, checkpoint cursor, and any post-checkpoint event suffix. The checkpoint progress state
+must equal the outer checkpoint state. Every complete suffix event must preserve the checkpoint's
+run ID, control state, cycle, target HEAD, logical outcome, Runtime-transition projection, and
+evidence-publication projection. Sequence/ID/time/activity/tool fields may advance only through
+the declared state-marker, resume, turn-start, active Codex/heartbeat/tool, turn-finish,
+correction, logical, evidence, error, and finish transitions. Run/stage values cannot precede the
+checkpoint anchors, role/timeout changes must match turn lifecycle, and `run_finished` requires an
+already checkpointed logical outcome. A partial final JSONL line is discarded as an incomplete
+observation write; every complete conflicting line fails closed even when its unkeyed event hash
+is internally valid. Existing events are never duplicated. Sequence and active elapsed time
+continue from the validated maximum without treating an old heartbeat as new activity.
+`live-status.json` is safely regenerated from the next event.
 
 Tool activity records only the machine item category (`command_execution`, `mcp_tool_call`, or
 `web_search`) and an aggregate count. It emits immediately, then at most once per configured
 progress interval, with a final flush when necessary. State changes, errors, Human Gates, logical
 outcomes, evidence-finalization changes, and `run_finished` are never throttled.
+
+When structured observation is available, the raw Codex pump never emits a second legacy machine
+or tool line: terminal visibility follows the structured recorder's emit/throttle decision. If
+event append becomes unavailable, a separate fixed-category `CODEX_FALLBACK` path exposes
+low-frequency machine events and at most an initial plus final aggregated tool line. It never
+includes commands, arguments, output, peer content, or secrets.
 
 The terminal renderer consumes the same event object and emits fixed `PROGRESS` lines with JSON
 scalar values. TTY and non-TTY currently use the same durable line-oriented form. Control
@@ -401,8 +414,9 @@ control state. Event/checkpoint identity conflict at resume still fails closed.
 
 F1 `FINAL_RESULT` remains unchanged and is emitted after the final `run_finished` projection.
 There is intentionally no `status` subcommand in F2 (F3 scope) and no interactive TUI (F6 scope).
-F2 is implemented and deterministically validated, but remains awaiting independent review; this
-documentation does not constitute F2 acceptance or activate F3.
+F2 is repaired and deterministically validated after narrow independent-review findings, but
+remains awaiting independent re-review; this documentation does not constitute F2 acceptance or
+activate F3.
 
 ## Evidence
 
@@ -498,7 +512,7 @@ Repository-backed evidence covers:
 - structured progress sequence/identity recovery, monotonic active timing, live projection,
   tool-activity throttling, and observation-failure isolation.
 
-The current deterministic regression suite contains 108 tests and passes with `ResourceWarning`
+The current deterministic regression suite contains 114 tests and passes with `ResourceWarning`
 promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
 in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
 not duplicate progress records.

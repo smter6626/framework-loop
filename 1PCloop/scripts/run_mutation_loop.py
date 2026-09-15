@@ -385,6 +385,16 @@ def emit_progress(message: str) -> None:
     print(f"[{P4.utc_now()}] {escape_public_text(str(message))}", flush=True)
 
 
+def emit_machine_fallback(category: str, kind: str, count: int) -> None:
+    """Bounded fallback used only after structured observation is unavailable."""
+    print(
+        f"[{P4.utc_now()}] CODEX_FALLBACK "
+        f"category={terminal_scalar(category)} kind={terminal_scalar(kind)} "
+        f"count={count}",
+        flush=True,
+    )
+
+
 def atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
     """Atomically replace one JSON file without creating checkpoint history."""
     path = path.resolve()
@@ -1277,6 +1287,41 @@ def stream_subprocess(
     stdout_buffer = bytearray()
     stderr_buffer = bytearray()
     failure: Optional[str] = None
+    fallback_lock = threading.Lock()
+    fallback_tool_count = 0
+    fallback_last_tool_emit: Optional[float] = None
+    fallback_last_reported_count = 0
+
+    def record_machine_event(category: str, kind: str) -> None:
+        nonlocal fallback_tool_count, fallback_last_tool_emit
+        nonlocal fallback_last_reported_count
+        reporter = _ACTIVE_PROGRESS
+        if reporter is None:
+            description = (
+                f"codex_event={kind}" if category == "codex"
+                else f"codex_event=tool_activity item={kind}"
+            )
+            emit_progress(f"{progress_label} {description}")
+            return
+        if reporter.observation_available:
+            record_active_progress(
+                "codex_activity" if category == "codex" else "tool_activity",
+                kind,
+            )
+            return
+        with fallback_lock:
+            if category == "codex":
+                emit_machine_fallback("codex", kind, 1)
+                return
+            fallback_tool_count += 1
+            now = time.monotonic()
+            if (
+                fallback_last_tool_emit is None
+                or now - fallback_last_tool_emit >= progress_interval_seconds
+            ):
+                fallback_last_tool_emit = now
+                fallback_last_reported_count = fallback_tool_count
+                emit_machine_fallback("tool_activity", kind, fallback_tool_count)
     try:
         process = subprocess.Popen(
             list(command),
@@ -1312,13 +1357,7 @@ def stream_subprocess(
                     classified = classify_progress_event(chunk)
                     if classified is not None:
                         category, kind = classified
-                        record_active_progress(
-                            "codex_activity" if category == "codex" else "tool_activity",
-                            kind,
-                        )
-                        description = describe_progress_event(chunk)
-                        if description is not None:
-                            emit_progress(f"{progress_label} {description}")
+                        record_machine_event(category, kind)
 
     stdout_thread = threading.Thread(
         target=pump,
@@ -1389,6 +1428,14 @@ def stream_subprocess(
         process.stderr.close()
     if stdout_thread.is_alive() or stderr_thread.is_alive():
         failure = failure or "Codex output stream did not close cleanly"
+    if (
+        _ACTIVE_PROGRESS is not None
+        and not _ACTIVE_PROGRESS.observation_available
+        and fallback_tool_count > fallback_last_reported_count
+    ):
+        emit_machine_fallback(
+            "tool_activity", "aggregated", fallback_tool_count
+        )
     if timed_out:
         failure = f"timeout after {timeout_seconds} seconds"
     emit_progress(
