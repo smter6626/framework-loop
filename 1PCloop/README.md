@@ -1,101 +1,109 @@
 # 1PCloop
 
-1PCloop 是运行在一台 macOS 机器上的 Reviewer–Executor 自动化闭环。它使用两个隔离的 Codex
-identity，把任务合同、当前状态、代码执行、独立审核、Human Gate 和证据保存连接成一个可以恢复
-和审计的顺序工作流。
+English | [简体中文](README.zh-CN.md)
+
+1PCloop is a Reviewer–Executor automation loop that runs on one macOS machine. It uses two
+isolated Codex identities to connect task contracts, authoritative current state, implementation,
+independent review, Human Gates, and evidence retention into a sequential workflow that can be
+recovered and audited.
 
 ```text
 Human Owner
     |
-    | 定义目标、权限和必须由人决定的事项
+    | defines objectives, authority, and Human-only decisions
     v
 Static + Runtime
     |
     v
 Python orchestrator
     |
-    +--> Reviewer：读取治理和 repository，形成 bounded instruction
+    +--> Reviewer: reads governance/repository and compiles a bounded instruction
     |
-    +--> Executor：实现、测试、创建普通 descendant commit
+    +--> Executor: implements, tests, and creates an ordinary descendant commit
     |
-    +--> Reviewer：直接检查 commit、文件和测试 evidence
+    +--> Reviewer: directly inspects commit, file, and test evidence
              |
-             +--> ACCEPT：由 orchestrator 验证并推进获授权的 Runtime
-             +--> REJECT：生成 repair instruction，进入下一轮 Executor
-             +--> HUMAN_GATE：停止并提醒 Human Owner
+             +--> ACCEPT: orchestrator validates and advances an authorized Runtime
+             +--> REJECT: repair instruction goes to another Executor turn
+             +--> HUMAN_GATE: stop and notify the Human Owner
 ```
 
-## 最终交付能力
+## Delivered capabilities
 
-当前实现已经具备：
+The current implementation provides:
 
-- 显式绑定两个独立 Codex profile；
-- 自动执行 Reviewer → Executor → Reviewer 路由，无需人工复制 peer message；
-- 给 Reviewer 注入完整、带 identity/hash 的 framework 和 workload 治理上下文；
-- 只向 Executor 提供当前任务所需的 bounded instruction；
-- 允许 Executor 在独立 target repository 中修改、测试并创建普通 Git commit；
-- 在每个关键边界检查 branch、HEAD、clean worktree、commit ancestry 和治理 hash；
-- 使用 Codex runtime-enforced output schema 和本地 schema validation；
-- 只有 Reviewer review turn 拥有 ACCEPT/REJECT/HUMAN_GATE 权限；
-- 对 commit、文件和测试 artifact 做 locator、边界、存在性和 SHA-256 验证；
-- 只有 Human CLI capability 和 workload Runtime 同时授权时才写 Runtime；
-- 原子 Runtime transition、checkpoint 和 crash/restart reconciliation；
-- Git-ignored raw evidence、逐 turn concise summary、一次 framework evidence commit/push；
-- 对可机械纠正的 Reviewer verdict 最多进行两次同线程 correction，不重跑已完成 Executor；
-- 明确区分 logical outcome、Runtime transition 和 evidence publication；
-- 在无法解释状态时 fail closed，而不是自动执行破坏性修复。
+- explicit binding of two independent Codex profiles;
+- automatic Reviewer → Executor → Reviewer routing with no Human copy/paste;
+- complete identity/hash-bound framework and workload governance for the Reviewer;
+- a bounded current-step instruction for the Executor;
+- real changes, tests, and ordinary commits in an independent target repository;
+- branch, HEAD, clean-worktree, ancestry, and governance-hash checks at control boundaries;
+- Codex runtime-enforced output schemas plus local schema validation;
+- verdict authority restricted to Reviewer review turns;
+- locator, boundary, existence, reachability, and SHA-256 validation for evidence;
+- Runtime writes gated by both an explicit Human CLI capability and workload Runtime opt-in;
+- atomic Runtime transitions, overwrite-only checkpoints, and crash/restart reconciliation;
+- Git-ignored raw evidence, concise per-turn summaries, and one framework evidence commit/push;
+- up to two same-thread corrections for mechanically repairable Reviewer verdicts without
+  replaying an already completed Executor;
+- separate logical-outcome, Runtime-transition, and evidence-publication results;
+- fail-closed behavior for state that cannot be explained mechanically.
 
-这些能力提高了 coding-agent 自我复核的独立性、可恢复性和可追溯性，但不保证 LLM 永远正确，
-也不构成操作系统级安全隔离。
+These capabilities improve review independence, recoverability, and traceability. They do not
+guarantee that an LLM is always correct and do not form an operating-system security boundary.
 
-## 当前实现与可扩展边界
+## Current implementation and extension boundary
 
-当前成品已经具备 contract-backed context 和 context-compiled fresh Executor：Reviewer 获得完整、
-带 hash/freshness 的治理上下文，Executor 每轮使用 fresh session 和 bounded instruction，最终结果
-只通过 Git、artifact 和 evidence 回到 Reviewer。Reviewer/Executor 的模型配置可以不同，最终
-verdict authority 只属于 Reviewer。
+The product already implements contract-backed context and a context-compiled fresh Executor.
+The Reviewer receives complete governance with hashes and freshness metadata. Every Executor turn
+uses a fresh session with a bounded instruction, and results return to the Reviewer only through
+Git, artifacts, and evidence. Reviewer and Executor may use different model configurations; final
+verdict authority belongs only to the Reviewer.
 
-当前 runner 的实际 backend 是两个 Codex CLI profile，并且一次只运行一个 mutation Executor。
-以下能力属于仓库首页描述的扩展形态，不应被理解为当前已经接入：
+The current runner uses two Codex CLI profiles and runs one mutation Executor at a time. The
+following belong to the extensible architecture described in the
+[repository README](../README.md), not the current integrated product:
 
-- 独立的 per-role local/cloud/third-party provider adapter；
-- Qwen/Ollama Executor 与云端 Reviewer 的正式端到端配置和验收 evidence；
-- Claude 或其他 Agent 产品 adapter；
-- 多个可按能力选择的 ephemeral worker；
-- image/vision input 的治理路由；
-- browser、MCP、plugin 和 Computer Use 的 capability/evidence/Human-Gate 集成；
-- 并行 mutation worker 或 multi-writer consistency。
+- independent per-role local/cloud/third-party provider adapters;
+- formally validated Qwen/Ollama Executor plus cloud Reviewer deployment;
+- Claude or other Agent-product adapters;
+- multiple ephemeral workers selected by capability;
+- governed image/vision routing;
+- browser, MCP, plugin, and Computer Use capability/evidence/Human Gate integration;
+- parallel mutation workers or multi-writer consistency.
 
-Codex CLI 或具体模型自身具备某项工具能力，不等于 mutation runner 已经把该能力纳入身份、权限、
-evidence 和恢复合同。目标扩展和已实现基础的对应关系见[仓库首页](../README.md)。
+A capability exposed by Codex CLI or a model is not automatically part of 1PCloop until the runner
+places it inside identity, authority, evidence, and recovery contracts.
 
-## 运行环境
+## Runtime environment
 
-当前默认配置面向：
+The default configuration targets:
 
-- Apple Silicon Mac；
-- macOS；
-- Python 3.9+；
-- 已安装的 Codex CLI；
-- 两个独立的 Codex identity/profile。
+- Apple Silicon Mac;
+- macOS;
+- Python 3.9 or later;
+- an installed Codex CLI;
+- two independent Codex identities/profiles.
 
-默认角色绑定：
+Default role binding:
 
 ```text
 Reviewer = CODEX_HOME=/Users/smterpro/.codex-B
 Executor = CODEX_HOME=/Users/smterpro/.codex-A
 ```
 
-角色由职责、权限和 session state 定义，不由模型名称定义。Reviewer 和 Executor 可以使用相同或
-不同模型。实际使用中建议 Reviewer 的模型能力和 reasoning effort 不低于 Executor，复杂或高风险
-任务可以给 Reviewer 更强配置；这只是运行建议，不能替代 evidence 和机械校验。
+Roles are defined by responsibilities, authority, and session state—not by model names. Reviewer
+and Executor may use the same or different models. In practice, Reviewer capability and reasoning
+effort should normally be at least as strong as the Executor's, especially for complex or
+high-risk work. This is operational guidance, not a replacement for evidence and mechanical
+validation.
 
-`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不参与 identity 判定。每次 CLI
-invocation 都显式设置目标 `CODEX_HOME`。
+The `~/.codex` symlink, the foreground Codex GUI account, and open GUI windows do not select role
+identity. Every invocation binds the intended `CODEX_HOME` explicitly.
 
-## 安装
+## Installation
 
-在仓库根目录执行：
+From the repository root:
 
 ```bash
 python3 -m venv 1PCloop/.local/venv
@@ -103,32 +111,35 @@ python3 -m venv 1PCloop/.local/venv
 codex --version
 ```
 
-`.local/` 被 Git 忽略，用于 Python 环境、checkpoint 和未来 raw run evidence。
+`1PCloop/.local/` is Git-ignored and stores the Python environment, checkpoints, and future raw
+run evidence.
 
-## Static、Runtime 与 external context
+## Static, Runtime, and external context
 
-### Framework Static/Runtime
+### Framework governance
 
-- `docs/miniloop_static.md`：整个 1PCloop 的稳定目标、角色和安全边界；
-- `docs/miniloop_runtime.md`：全局里程碑和当前 task 指针，不保存每个 task 的详细流水。
+- `docs/miniloop_static.md`: stable objectives, roles, authority, and safety boundaries for
+  1PCloop as a whole.
+- `docs/miniloop_runtime.md`: global milestones and the current task pointer; detailed task
+  execution does not belong here.
 
-### Task-local Static/Runtime
+### Task-local governance
 
-每个持续任务应在 `workloads/<workload-id>/` 下建立：
+Each sustained task should define:
 
 ```text
-workload_static.md
-workload_runtime.md
+workloads/<workload-id>/workload_static.md
+workloads/<workload-id>/workload_runtime.md
 ```
 
-`workload_static.md` 保存长期稳定的目标、范围、禁止事项、权限和 acceptance criteria。
-`workload_runtime.md` 保存已验收结果、唯一 Active Step、blocker、pending task、Human decision 和
-evidence locator。
+`workload_static.md` contains long-lived objectives, scope, prohibited actions, authority, and
+acceptance criteria. `workload_runtime.md` contains accepted results, the one Active Step,
+blockers, pending tasks, Human decisions, and evidence locators.
 
-Static 不记录当前进度；Runtime 不得静默修改 Static。已经关闭的任务默认冻结，新目标应建立新的
-task-local Static/Runtime。
+Static does not record progress; Runtime cannot silently amend Static. A completed task is frozen
+by default, and a new objective should receive new task-local governance.
 
-Reviewer 的 external context 由 orchestrator 从以下来源重建：
+The orchestrator reconstructs Reviewer context from:
 
 ```text
 framework Static
@@ -136,41 +147,42 @@ framework Static
 + workload Static
 + workload Runtime
 + target Git identity
-+ 当前 peer evidence
++ current peer evidence
 ```
 
-因此 conversation history 不是权威 memory。Reviewer thread 无法继续时，可以从 repository-backed
-state 重新 bootstrap。Executor 不继承 Reviewer 的完整历史，只接收当前 bounded instruction 和
-必要 peer payload。
+Conversation history is not authoritative memory. If a Reviewer thread cannot continue, it can
+rebootstrap from repository-backed state. The Executor does not inherit the Reviewer's full
+history; it receives only the current bounded instruction and necessary peer payload.
 
-## 准备一个 workload
+## Preparing a workload
 
-### 1. 准备独立 target repository
+### 1. Prepare an independent target repository
 
-Mutation runner 要求 target 与 framework repository 互不重叠。启动前 target 必须：
+The mutation runner requires the target and framework repositories to be non-overlapping. Before
+launch, the target must:
 
-- 位于预期 branch；
-- HEAD 可解析；
-- working tree clean；
-- 不包含未授权治理文件修改。
+- be on the requested branch;
+- have a resolvable HEAD;
+- have a clean working tree;
+- contain no unauthorized governance changes.
 
-Executor 可以在该 branch 创建普通 descendant commit，但不得 push、merge、switch、reset、clean、
-stash 或改写历史。
+The Executor may create ordinary descendant commits on that branch. It must not push, merge,
+switch branches, reset, clean, stash, or rewrite history.
 
-### 2. 编写 workload Static
+### 2. Write workload Static
 
-至少明确：
+At minimum, define:
 
-- 目标和预期 artifact；
-- 允许及禁止修改的路径；
-- 必须运行的 self-check；
-- Reviewer 需要直接检查的 evidence；
-- Human Gate 条件；
-- target branch 和集成边界。
+- objective and expected artifact;
+- permitted and prohibited mutation paths;
+- required Executor self-checks;
+- evidence the Reviewer must inspect directly;
+- Human Gate conditions;
+- target branch and integration boundary.
 
-### 3. 编写 workload Runtime
+### 3. Write workload Runtime
 
-需要允许自动 ACCEPT → Runtime transition 时，在 Runtime 中放置唯一 machine-owned block：
+To permit an automatic ACCEPT → Runtime transition, include exactly one machine-owned block:
 
 ```markdown
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
@@ -187,13 +199,15 @@ stash 或改写历史。
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 ```
 
-两个 marker 必须各出现一次。Python 只理解 machine block，不解析周边 Markdown 的自然语言语义。
-首版 transition 只把当前 step 改成 `COMPLETED`、把 `transition_mode` 改成 `disabled`，然后停止；
-不会自动激活下一个 step。
+Each marker must appear exactly once. Python understands this machine block but does not interpret
+the surrounding Markdown. The initial transition completes the current step, changes
+`transition_mode` to `disabled`, records `last_transition_id`, and stops. It does not activate the
+next step automatically.
 
 ## Preflight
 
-先验证路径、branch、治理 identity、profile、schema、framework remote 和工作树，不调用 Agent：
+Validate paths, branch, governance identity, profiles, schemas, framework remote, and working
+trees without invoking an Agent:
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -206,9 +220,9 @@ stash 或改写历史。
   --preflight-only
 ```
 
-Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executor。
+A failed preflight does not create a run or launch Reviewer/Executor.
 
-## 运行 mutation loop
+## Running the mutation loop
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -223,7 +237,7 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
   --progress-interval-seconds 15
 ```
 
-常用可选参数：
+Common optional arguments:
 
 ```text
 --reviewer-home
@@ -238,129 +252,127 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 --summary-root
 ```
 
-当前入口仍是显式参数 CLI；更高层的 workload config、doctor/status/inspect 命令和交互式界面
-尚未提供。
+The current interface uses explicit CLI arguments. Higher-level workload configuration,
+doctor/status/inspect commands, and an interactive UI are not yet available.
 
-## 自动循环语义
+## Automatic loop semantics
 
 ### Reviewer instruction
 
-Reviewer 创建 persistent thread，读取完整当前治理和 target state，产生一个 bounded instruction。
-Reviewer 不得修改 target、Git state 或治理文件。
+The Reviewer creates a persistent thread, reads complete current governance and target state, and
+returns one bounded instruction. It must not modify the target, Git state, or governance.
 
 ### Executor mutation
 
-Executor 使用 fresh ephemeral session，在 target 中实现任务、运行测试、创建 commit，并留下 clean
-worktree。Executor 的总结不能触发 acceptance。
+The Executor uses a fresh ephemeral session to implement the task, run tests, create a commit, and
+leave a clean working tree. Its report cannot trigger acceptance.
 
 ### Reviewer verdict
 
-原 Reviewer thread 被显式 resume。Reviewer 必须重新读取实际 target、commit、文件、测试和
-hash，并返回 runtime-enforced verdict。
+The original Reviewer thread is explicitly resumed. It must inspect the actual target, commits,
+files, tests, and hashes before returning a runtime-enforced verdict.
 
 ```text
 ACCEPT
-  -> 机械验证身份、target、governance、evidence 和 capability
-  -> 原子完成一次 workload Runtime transition
+  -> mechanically validate identity, target, governance, evidence, and capability
+  -> atomically complete one authorized workload Runtime transition
 
 REJECT
-  -> Runtime 不变
-  -> 完整 repair instruction 路由给下一 fresh Executor
+  -> Runtime remains unchanged
+  -> route the complete repair instruction to the next fresh Executor
 
 HUMAN_GATE
-  -> Runtime 不变
-  -> 自动停止，终端显示 Human Gate 状态和 evidence 位置
+  -> Runtime remains unchanged
+  -> stop automatically and display Human Gate state and evidence location
 ```
 
-自由文本中出现 `ACCEPT`、`PASS`、`READY` 等词没有控制权限。
+Words such as `ACCEPT`, `PASS`, or `READY` in free text have no control authority.
 
 ## Reviewer verdict correction
 
-如果 Reviewer process、schema、profile、thread、read-only audit，以及实际 target/governance state
-均已验证，但 verdict 中的 evidence locator、hash 或其他声明存在明确可纠正的机械错误，runner
-会恢复同一个 Reviewer thread，要求重新检查并输出完整 verdict。
+If the Reviewer process, schema, profile, thread, read-only audit, and actual target/governance
+state are valid, but evidence locators, hashes, or other declarations contain a specifically
+classified mechanical error, the runner resumes the same Reviewer thread and requests a complete
+corrected verdict.
 
-- 最多两个 correction turn；
-- 不重跑已完成 Executor；
-- Python 不删除、补写、转换或猜测 Reviewer evidence；
-- correction 可以返回 ACCEPT、REJECT 或 HUMAN_GATE；
-- schema/process/profile/thread 错误以及实际 state/evidence 漂移不进入 correction；
-- 两次仍失败则 `VERDICT_CORRECTION_EXHAUSTED / FAILED_CLOSED`。
+- At most two correction turns are allowed.
+- An already completed Executor is not replayed.
+- Python never deletes, fills, converts, or guesses Reviewer evidence.
+- A correction may return ACCEPT, REJECT, or HUMAN_GATE.
+- Schema/process/profile/thread failures and actual state/evidence drift are not correctable.
+- Two failed corrections end in `VERDICT_CORRECTION_EXHAUSTED / FAILED_CLOSED`.
 
-`file`、`artifact`、`test` evidence 必须指向 target/run boundary 内实际存在文件的绝对路径。
-Shell command、Git-status 描述和 prose 不是 locator；没有实际输出文件时不应虚构 evidence。
+Every `file`, `artifact`, or `test` locator must be an absolute path to an existing file inside
+the target/run boundary. A shell command, Git-status description, or prose is not a locator. Do
+not invent evidence when no real output file exists.
 
-## 运行状态、checkpoint 与恢复
+## Checkpoints and recovery
 
-默认 checkpoint：
+Default checkpoint:
 
 ```text
 1PCloop/.local/state/<workload-id>/checkpoint.json
 ```
 
-Checkpoint 在控制边界原子覆盖，保存当前 state、turn identity、Reviewer thread、target/governance
-identity、correction attempt、Runtime transition、summary 和 publication recovery 数据。它是当前
-恢复状态，不保存逐版本历史。
+The checkpoint is atomically replaced at control boundaries. It records control state, turn
+identity, Reviewer thread, target/governance identity, correction attempts, Runtime transition,
+summary progress, and publication recovery. It is the current recovery state, not checkpoint
+history.
 
-运行期间终端会显示：
+During a run, the terminal reports:
 
-- role、cycle、control state；
-- Codex process start/finish；
-- 有限的 machine-readable tool activity；
-- 当前 turn elapsed heartbeat；
-- summary、Runtime transition、framework commit/push 状态；
-- Human Gate、error 和最终结果。
+- role, cycle, and control state;
+- Codex process start/finish;
+- bounded machine-readable tool activity;
+- current-turn elapsed heartbeats;
+- summary, Runtime-transition, framework commit/push state;
+- Human Gates, errors, and the final result.
 
-恢复未完成 run 时，使用完全相同的参数并增加：
+Resume an incomplete run with exactly the same arguments plus `--resume`:
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
-  <原运行的完整参数> \
+  <all arguments from the original run> \
   --resume
 ```
 
-恢复时重新验证配置、target、governance、turn、evidence 和 framework identity。已完成且可机械
-归因的 Agent turn、Executor commit、correction、Runtime transition、summary、framework commit
-或 push 不会重复。无法安全确定 Executor 是否已修改 target 时会进入 Human Gate，而不是盲目
-重跑。
+Resume revalidates configuration, target, governance, turns, evidence, and framework identity.
+Mechanically attributable Agent turns, Executor commits, corrections, Runtime transitions,
+summaries, framework commits, and pushes are not repeated. If the runner cannot safely determine
+whether an Executor changed the target, it enters a Human Gate instead of replaying blindly.
 
-当前版本尚未提供 run-wide/stage-wide timer、独立 status subcommand 或交互式 TUI/GUI。
+The current product does not yet provide a run-wide/stage-wide timer, standalone status command,
+or interactive TUI/GUI.
 
 ## Evidence
 
-未来 mutation run 的 raw evidence 默认位于：
+Raw evidence for future mutation runs defaults to:
 
 ```text
 1PCloop/.local/runs/<run-id>/
 ```
 
-其中可以包含：
+It may include prompts, raw Codex `events.jsonl`, stderr, final messages, peer payloads, process
+metadata, and the raw manifest. These files are Git-ignored by default and do not become
+long-lived Git history.
 
-- prompt；
-- raw Codex `events.jsonl`；
-- stderr；
-- final message；
-- peer payload；
-- process metadata；
-- manifest。
-
-这些内容默认 Git-ignored，不作为长期 Git 历史。
-
-每个完成 turn 会在以下 tracked summary 中生成一条 bounded entry：
+Every completed turn creates one bounded entry in:
 
 ```text
 1PCloop/evidence-summaries/<run-id>.md
 ```
 
-Entry 保存 role/cycle、时间、target/governance identity、LLM `evidence_summary` 和 raw locator/hash，
-不复制完整 prompt、peer message、events、stderr 或 hidden reasoning。
+The entry records role/cycle, time, target/governance identity, the LLM-authored
+`evidence_summary`, and raw locators/hashes without copying complete prompts, peer messages,
+events, stderr, or hidden reasoning.
 
-到达 logical terminal 后，runner 在 framework repository 中创建一次 allowlisted evidence commit，
-并 non-force push 到配置的 framework remote。它不会 push 或 merge target repository。
+At a logical terminal state, the runner creates one allowlisted evidence commit in the framework
+repository and pushes it non-force to the configured framework remote. It never pushes or merges
+the target repository.
 
 ## FINAL_RESULT
 
-每次非 preflight invocation 返回前都会输出固定字段：
+Every non-preflight invocation ends with fixed public fields:
 
 ```text
 FINAL_RESULT
@@ -374,10 +386,11 @@ error_code="RUNTIME_TRANSITION_COMMITTED"
 run_root="/absolute/path/to/run"
 ```
 
-等号右侧是单行 JSON scalar，不能通过换行伪造额外字段。Public reason 最长512字符；完整内部异常
-只保存在本地 `internal_diagnostic`。
+Values after `=` are single-line JSON scalars, so embedded line breaks cannot forge new fields.
+The public reason is limited to 512 characters. Full internal exceptions remain only in the local
+`internal_diagnostic`.
 
-必须同时查看三类结果：
+Always inspect all three result dimensions:
 
 ```text
 logical_outcome
@@ -385,50 +398,52 @@ runtime_transition
 evidence_publication
 ```
 
-例如 `evidence_publication="PUSHED"` 只表示失败或成功的 run evidence 已发布，不表示任务已经
-ACCEPT。Shell exit code 也不能替代 Human Gate/Runtime 语义。
+For example, `evidence_publication="PUSHED"` means that evidence for a failed or successful run
+was published; it does not mean that the task was accepted. The shell exit code is not a
+substitute for Human-Gate or Runtime semantics.
 
-## 隔离和安全边界
+## Isolation and safety boundary
 
-Mutation runner 为了允许 Executor 创建真实 Git commit，Reviewer 和 Executor 当前使用
-`--dangerously-bypass-approvals-and-sandbox`。安全边界由以下组合提供：
+To let the Executor create real Git commits, the mutation runner currently invokes both roles
+with `--dangerously-bypass-approvals-and-sandbox`. Its safety boundary combines:
 
-- 独立 profile/session；
-- role prompt；
-- bounded instruction；
-- target/framework 路径分离；
-- Reviewer turn 前后 read-only audit；
-- target branch/HEAD/cleanliness/ancestry 检查；
-- governance/evidence hash；
-- explicit allowlist；
-- fail-closed 和 Human Gate。
+- separate profiles and sessions;
+- role prompts and bounded instructions;
+- non-overlapping target/framework paths;
+- before/after read-only audits for Reviewer turns;
+- target branch/HEAD/cleanliness/ancestry validation;
+- governance and evidence hashes;
+- explicit commit allowlists;
+- fail-closed behavior and Human Gates.
 
-这不是抵抗恶意本地进程的 production security boundary。同一 macOS 用户下的 Codex 仍有广泛
-文件访问能力。当前支持一个 Human contributor、一个 active loop、一个 target writer；不支持
-并行 Executor、多 writer reconciliation、repository lock、watcher 或分布式一致性。
+This is not a production security boundary against a malicious local process. Codex running as
+the same macOS user still has broad file access. The supported deployment has one Human
+contributor, one active loop, and one target writer. Parallel Executors, multi-writer
+reconciliation, repository locks, watchers, and distributed consistency are not supported.
 
-## 已验证结果
+## Validated results
 
-Repository-backed evidence 已覆盖：
+Repository-backed evidence covers:
 
-- 两个 Codex identity 的独立串行调用；
-- Reviewer/Executor 消息的逐字节路由；
-- persistent Reviewer resume 和 fresh-session reconstruction；
-- governance unchanged/runtime-changed/static-changed freshness policy；
-- disposable Git target 的真实 mutation、test、commit 和 independent review；
-- 一个真实中等规模外部项目的多轮修改和 Human Gate；
-- schema-invalid、stale state、错误 role/thread、缺失或错误 evidence 的 fail-closed；
-- Runtime transition 与 summary/commit/push 的 crash-boundary recovery；
-- Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
-- public terminal result 的控制字符、长度和字段注入防护。
+- independent sequential invocation of two Codex identities;
+- byte-preserving Reviewer/Executor message routing;
+- persistent Reviewer resume and fresh-session reconstruction;
+- unchanged-governance, Runtime-change, and Static-change freshness policies;
+- real mutation, testing, commit, and independent review in disposable Git targets;
+- multi-cycle changes and a Human Gate on a real medium-scale external project;
+- fail-closed handling for invalid schemas, stale state, wrong roles/threads, and bad evidence;
+- crash-boundary recovery for Runtime transition and summary/commit/push;
+- same-thread Reviewer verdict correction with fixed limits and Executor idempotence;
+- terminal protection against control characters, unbounded reasons, and field injection.
 
-当前 deterministic regression suite 包含90项测试，并在 `ResourceWarning` 提升为错误时通过。
-历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
-`evidence-summaries/`、`runs/` 和 Git history；README 不复制这些进度记录。
+The current deterministic regression suite contains 90 tests and passes with `ResourceWarning`
+promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
+in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
+not duplicate progress records.
 
-## 测试
+## Tests
 
-运行完整严格回归：
+Run the complete strict regression:
 
 ```bash
 1PCloop/.local/venv/bin/python \
@@ -438,30 +453,31 @@ Repository-backed evidence 已覆盖：
   -v
 ```
 
-专项测试：
+Focused suites:
 
 ```text
-tests/test_run_text_loop.py          text transport/context reconstruction
-tests/test_run_mutation_loop.py      mutation state machine/restart
-tests/test_runtime_transition.py     structured verdict/Runtime transition
-tests/test_evidence_summary.py       summary/commit/push recovery
-tests/test_verdict_correction.py     verdict correction/public result
+tests/test_run_text_loop.py          text transport and context reconstruction
+tests/test_run_mutation_loop.py      mutation state machine and restart
+tests/test_runtime_transition.py     structured verdict and Runtime transition
+tests/test_evidence_summary.py       summary, commit, and push recovery
+tests/test_verdict_correction.py     verdict correction and public result
 ```
 
-## 代码和文档入口
+## Code and documentation map
 
 ```text
-scripts/run_mutation_loop.py      当前 mutation orchestrator
-scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
-scripts/p63_evidence.py           summary、framework commit 和 push helper
+scripts/run_mutation_loop.py      current mutation orchestrator
+scripts/run_text_loop.py          read-only text-routing/context diagnostic runner
+scripts/p63_evidence.py           summary, framework commit, and push helper
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance
-docs/miniloop_static.md           全局稳定合同
-docs/miniloop_runtime.md          全局历史和当前 task 指针
+docs/miniloop_static.md           global stable contract
+docs/miniloop_runtime.md          global history and current task pointer
 evidence-summaries/               tracked compact evidence
-runs/                             已保留的历史运行 evidence
-history/                          已冻结的早期实现
+runs/                             retained historical run evidence
+history/                          frozen early implementation
 ```
 
-任务当前状态应读取对应 Runtime；README 只描述稳定架构、操作方式、已交付能力和已知边界。
+Read the corresponding Runtime for current task state. This README documents stable architecture,
+operation, delivered behavior, and known boundaries—not task progress.
