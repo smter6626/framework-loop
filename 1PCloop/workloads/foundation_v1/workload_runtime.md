@@ -5,14 +5,14 @@
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
 - 当前 verdict：`NOT EVALUATED`
-- 最近接受：`F3 — ACCEPTED AFTER REJECT → NARROW REPAIR → RE-REVIEW`
-- 唯一 Active Step：`F4 — 默认中文 Static/Runtime Prompt 模板规范化`
-- 当前顶层 Step：`Step 4`
+- 最近接受：`F4 -- ACCEPTED AFTER INDEPENDENT REVIEW`
+- 唯一 Active Step：`F5 -- runner 模块化和 Human Gate UX`
+- 当前顶层 Step：`Step 5`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
 - 当前执行方式：Human-mediated Reviewer/Executor
-- 最后更新：`2026-09-15`
+- 最后更新：`2026-09-16`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
 transition。本文件不包含 `1PCLOOP_RUNTIME_STATE` machine block；现有 runner 禁止 framework
@@ -166,119 +166,159 @@ Runtime。Event SHA-256 是 canonical byte identity，不是 keyed authority；c
 稳定 CLI 基础。首次 REJECT、“Executor 自检并重跑全部测试后仍被独立 Reviewer 打回”及最终 repair
 历史继续保留在 §8，不因 ACCEPT 删除。
 
+### F. F4 -- 默认中文 Static/Runtime Prompt 模板规范化
+
+状态：`ACCEPTED AFTER INDEPENDENT REVIEW`
+
+结果：
+
+- implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97` 新增 tracked
+  `1PCloop/templates/static_prompt_zh.md` 和 `runtime_prompt_zh.md`，并同步双语 README 与
+  deterministic template tests；
+- 两份模板固定记录 Framework v1.2 外部只读来源路径、SHA-256、非自动同步与未来独立审核边界；
+- 除 provenance 第 3-10 行外，模板正文分别与固定来源逐字节一致，不引入 foundation 当前状态、
+  paper/research 默认目标、credential 或真实 profile state；
+- Static/Runtime 职责分离、Human Owner authority、Single Active Step、独立审核、Pending deadline、
+  Human Gate、Supersession Persistence、Task-Local Freeze 和 privacy boundary 均有 deterministic
+  coverage；常规 regression 只读取 tracked 模板，不依赖个人机器的 Tools 路径。
+
+独立 review evidence：
+
+- Executor F4 focused：`12 / 12`，`0.003s`；完整 ResourceWarning-strict regression：
+  `159 / 159`，`175.673s`；
+- Reviewer 独立复跑 F4 focused：`12 / 12`，`0.002s`；完整 ResourceWarning-strict regression：
+  `159 / 159`，`186.554s`；
+- Reviewer 重新验证两份 source hash、两份 target hash、普通 UTF-8 文件类型、非 symlink、README
+  链接和去 provenance 后的逐字节 source equivalence；
+- commit scope、`git diff --check`、non-force push、ref identity 和审核前 clean worktree 均通过；
+- 未运行 real-service smoke，按 Static 留至 F7，不阻塞 F4。
+
+当前语义：Static AC-06 已满足；PT-01 已以 commit
+`eeb75e11480ecc245e040862bd42a952ec008c97` 的模板、来源 identity 与独立审核 evidence
+关闭为 `RESOLVED`，因此 Step 5 gate 已解除。
+
 ## 3. Active Step
 
-### F4 / Step 4 — 默认中文 Static/Runtime Prompt 模板规范化
+### F5 / Step 5 -- runner 模块化和 Human Gate UX
 
 #### Objective
 
-把 Human Owner 指定的两份 Framework v1.2 Prompt 固定输入规范为 1PCloop 默认中文模板。模板
-必须能直接复制使用、可按任务风险裁剪，并保持 Static/Runtime 职责分离、Single Active Step、
-独立 evidence-backed review、Pending deadline、Human Gate、supersession persistence 与
-task-local freeze；不得把 foundation_v1 当前进度固化进模板，也不得复制成与来源语义漂移的第二套
-治理框架。
+在不重写 authoritative orchestrator 的前提下，提取可复用的 control contract 与 Human Gate
+projection，使 `run_mutation_loop.py` 不再同时承担全部协议、状态机和 operator UX 职责；同时为
+Human operator 提供一个只读、结构化、可定位 evidence 的 Human Gate 检查入口，明确原因、允许
+动作和恢复边界。F5 不替 Human 作决定、不自动修复 checkpoint/target/governance，也不实现 F6 TUI。
 
 #### Inputs 及固定 identity
 
 - Static：`1PCloop/workloads/foundation_v1/workload_static.md`，SHA-256
   `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`；
-- Static source（只读）：
-  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_static.md`，
-  SHA-256 `e3ff93b4136c0d3d87d7f1a319ca9c4513f831327daf18aea46f9f3d6659daf7`；
-- Runtime source（只读）：
-  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_runtime.md`，
-  SHA-256 `3cbc4c93adff6ac2b1fb351a8a81f4b65dbd73b4de28ee2d0d4141522258ab54`；
-- foundation_v1 Static 的 F4 scope、AC-06 与本 Runtime 的 PT-01 deadline；
-- 现有 `1PCloop/README.md`、`1PCloop/README.zh-CN.md` 和文档/test 组织方式。
+- F1 accepted control/output/correction contracts；
+- F2 accepted progress/event/recovery contracts；
+- F3 accepted operator config、status、inspect 与 safe-next-action contracts；
+- F4 accepted templates commit `eeb75e11480ecc245e040862bd42a952ec008c97`；
+- `1PCloop/scripts/run_mutation_loop.py`、`workload_operator.py`、`onepcloop.py`、现有 helper 和 test
+  suites；
+- Static AC-07、AC-08、AC-11。
 
 #### Permitted changes
 
-- 新建 `1PCloop/templates/static_prompt_zh.md`；
-- 新建 `1PCloop/templates/runtime_prompt_zh.md`；
-- 增加只验证模板结构、默认中文、来源 identity、必需 invariant、占位符与职责分离的 deterministic
-  tests；
-- 更新双语 README 中模板用途、来源 hash、使用方式和维护边界；
-- 为测试发现的纯机械问题调整模板正文，但不得扩大 F4 以外的工程范围。
+- 新建 `1PCloop/scripts/mutation_contracts.py`，提取无 orchestrator side effect 的 control state/error、
+  strict JSON/schema/verdict relationship 和 public final-result contract；
+- 新建 `1PCloop/scripts/human_gate.py`，以普通 mapping/artifact locator 为输入生成纯只读 Human Gate
+  projection，且不得反向 import `run_mutation_loop.py`；
+- 修改 `run_mutation_loop.py` 以单向 import 并兼容 re-export 已有公共名称，保持 `orchestrate()` 为
+  唯一 mutation control state machine；
+- 修改 `workload_operator.py`、`onepcloop.py`，增加 config-backed `human-gate` 只读命令，并让
+  `status`/`inspect` 复用同一 projection；
+- 增加 F5 module/Human Gate tests，并对既有 tests 做必要 import/output 兼容调整；
+- 更新双语 README 的模块边界、Human Gate 命令、允许动作和恢复语义。
 
 #### Prohibited changes
 
 - 全局和 task-local Static/Runtime；
-- 两份 `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/**` 固定输入；
-- `1PCloop/scripts/**`、schemas、roles、requirements 及其他 executable behavior；
-- F1–F3/P4–P6 已接受语义、历史 evidence、closed workload、target history/remote；
-- F5–F8 implementation、P7、真实 Codex smoke、TUI/GUI、self-hosting 或 concurrency 功能；
-- 把 foundation_v1、paper/research framing 或当前 Active Step 写成所有未来任务的默认合同。
+- F1-F4/P4-P6 authoritative semantics、schema、roles、requirements、templates 和历史 evidence；
+- 复制第二套 `orchestrate()`、Runtime transition、checkpoint recovery 或 publication state machine；
+- 自动接受/拒绝 Human Gate、从 peer_message 推断 gate、自动修改 checkpoint/target/governance、
+  删除 evidence 或替 Human 执行不可逆 repair；
+- interactive prompt、curses/TUI/GUI、F6-F8、P7、real-service smoke、self-hosting 或 concurrency；
+- closed workload、外部 Tools、target history/remote、force push 或 history rewrite。
 
 #### Required evidence
 
-- 两份来源文件在实现前后的路径与 SHA-256 重验；
-- 两份目标模板的完整 diff、SHA-256、UTF-8/中文默认内容与可复制 Prompt 结构；
-- Static 模板明确排除 current progress，Runtime 模板明确保存唯一 Active Step、independent review、
-  Pending countdown、Human Gate 与 supersession；
-- tests 证明关键 invariant 与来源 identity 存在、占位符不包含当前 foundation 实例值、模板链接有效；
-  常规 test suite 不得依赖 `/Users/smterpro/Workspace/Tools` 在其他机器存在；
-- README 双语说明与实际文件一致；
-- F4 focused tests、完整 ResourceWarning-strict regression、`git diff --check`、提交与精确文件列表。
+- module dependency/import evidence：新 helper 不反向加载 runner，runner 保持唯一 state machine；
+- extracted symbol equivalence 与 existing import compatibility tests；
+- Reviewer-requested Human Gate、target unchanged、max cycles、ambiguous Executor recovery、transition
+  interruption、publication pending/completed、non-gate、missing/conflicting evidence 的 projection tests；
+- `human-gate`、`status`、`inspect` 对同一 checkpoint 产生同一 gate classification/recovery boundary；
+- read-only byte snapshot 证明上述命令不修改 checkpoint、manifest、event/status、summary、Git state；
+- resume boundary tests 证明 terminal gate 不重放 Agent/Executor，publication 未完成时最多只恢复
+  evidence finalization；
+- privacy tests 证明不输出 peer payload、prompt、stderr、command output、internal diagnostic 或 secret；
+- F1-F4 focused regression 与完整 ResourceWarning-strict regression、commit 和精确文件列表。
 
 #### Acceptance criteria
 
-1. 两份目标模板分别对应 Static 合同整理/审查与 Runtime 恢复/审核/推进，默认中文且可直接复制。
-2. 模板保留来源中的 authority、职责分离、证据充分性、task-local freeze、Human Gate、
-   supersession 和隐私边界，不把 Executor self-check 当作最终 acceptance。
-3. Runtime 模板保留 Single Active Step、顶层正整数 Step/等价 gate、`deadline_step`、剩余安全迁移
-   公式、`OPEN_NON_BLOCKING/DUE_NEXT/BLOCKING/PERMANENTLY_NON_BLOCKING/RESOLVED/
-   SUPERSEDED` 与迁移前 gate check。
-4. Static 模板不得记录 current progress、临时 blocker、测试结果或阶段 verdict；Runtime 不得静默
-   修改/扩大 Static。
-5. 模板是可裁剪的推荐结构，不强迫低风险任务填写无价值章节，不允许通过补全未知项来发明事实。
-6. 两份模板记录固定来源路径/hash 和同步/变更规则；外部 Tools 文件保持只读，不建立自动漂移同步。
-7. 模板不包含 credential、secret、真实 profile state、当前 repo path 以外的个人信息或 foundation
-   当前状态；示例使用明确占位符。
-8. F4 acceptance 同时关闭 Static AC-06 与 PT-01；在 F4 未独立 ACCEPT 前不得激活 F5。
+1. `mutation_contracts.py` 是无 I/O side effect 的单一 control-contract implementation；runner 通过
+   单向 import 使用并兼容 re-export，现有 caller 不需要复制定义或改变 semantics。
+2. `human_gate.py` 是独立纯 projection，不 import runner、不修改文件、不解析自然语言；同一输入
+   始终得到同一 bounded machine-readable 结果。
+3. `human-gate` 命令只读输出一个 JSON object，区分 `ACTIVE`、`NOT_APPLICABLE`、`UNAVAILABLE`
+   和 `INVALID`，并显示 stable reason/error code、checkpoint/logical/publication state、evidence
+   locator、允许动作和 recovery mode。
+4. 允许动作必须来自固定枚举，至少区分 `INSPECT_EVIDENCE`、`FINALIZE_EVIDENCE`、
+   `REMEDIATE_EXTERNAL_STATE`、`START_NEW_RUN_AFTER_HUMAN_REVIEW`、`NO_AUTOMATIC_REPAIR`；不得根据
+   peer prose 发明动作。
+5. recovery mode 明确区分 `FINALIZATION_ONLY`、`HUMAN_REMEDIATION_REQUIRED`、
+   `NEW_RUN_AFTER_REVIEW` 和 `NO_ACTION`；terminal Human Gate 不得被显示为普通 Agent resume。
+6. `status`、`inspect`、`human-gate` 复用相同 projection；inspect package PASS 不等于 Human Gate
+   已解决，publication success 也不等于 logical success。
+7. 所有 Human Gate 查看路径只读且隐私安全；缺失 raw 为 UNAVAILABLE，identity 冲突为 INVALID，
+   不做自动修复、删除或猜测性升级。
+8. `orchestrate()`、checkpoint/transition/correction/progress/publication 的 accepted behavior 保持不变；
+   full strict regression 与 AC-11 继续通过。
 
 #### Tests
 
-- 实现时显式重验 source hash；常规测试只验证模板中固定 provenance，不把外部绝对路径变成
-  portable regression suite 的运行时依赖；
-- UTF-8、中文默认、可复制 Prompt、占位符与无未解释模板变量；
-- Static/Runtime 必需 invariant 与相互引用/职责分离；
-- Pending deadline 公式、状态枚举、Human Gate、supersession 和 independent-review 语义；
-- 禁止 foundation 当前状态、commit/test 数字或 research/paper framing 泄入默认模板；
-- README 链接与双语说明一致；
-- 完整 ResourceWarning-strict regression。
+- direct module import、无 runner back-import/circular import、symbol identity/equivalence；
+- gate classification/reason/action/recovery matrix；
+- status/inspect/human-gate consistency and one-object JSON output；
+- no-checkpoint、non-gate、active gate、terminal gate、raw unavailable、identity conflict；
+- repeated read-only command byte/Git invariance；
+- terminal resume call-count 与 finalization-only recovery；
+- malicious public reason/control/secret privacy regression；
+- legacy long-argument CLI、F1-F4 focused 和完整 strict regression。
 
-F4 不运行真实 Codex service；完整 post-foundation real-service smoke 留到 F7。
+F5 不运行 real-service smoke；完整 post-foundation real-service smoke 留到 F7。
 
 #### Stop conditions / Human Gate
 
-- 任一固定 Tools source hash 与本 Runtime 不一致；
-- 规范化需要修改外部 Tools、Static/Runtime 或改变既有工程语义；
-- 来源之间出现无法由现有 Static/Runtime 解决的合同冲突；
-- 需要加入真实 credential/profile、当前任务进度、F5+ 功能或 paper/research 默认目标；
-- 模板无法同时保持可裁剪性与关键 invariant，需要 Human Owner 做取舍。
+- 模块提取需要重写 orchestrate、改变 checkpoint/schema 或 accepted transition semantics；
+- safe action/recovery mode 不能仅由 structured checkpoint/final-result/evidence state 确定；
+- 处理 Human Gate 需要主观 Owner decision、自动 repair 或不可逆 Git/governance mutation；
+- 无法避免 circular import、第二套状态机或从 natural-language peer payload 推断控制状态；
+- 需要 F6 TUI、F7 service smoke、P7 fault injection 或 Static 变化。
 
 #### Executor report format
 
 ```text
-F4 implementation status: IMPLEMENTED / BLOCKED
+F5 implementation status: IMPLEMENTED / BLOCKED
 branch / implementation commit / parent / working-tree state
 changed files
-source paths and reverified SHA-256
-target template paths and SHA-256
-Static/Runtime responsibility split and preserved invariants
-template-focused tests and full strict regression
-README/documentation mapping
+module boundaries and dependency direction
+extracted symbols and compatibility behavior
+Human Gate states, fixed actions and recovery modes
+read-only/privacy/resume-boundary evidence
+focused regressions and full strict regression
 known limitations
 recommended Runtime evidence summary
 ```
 
-Executor 不得宣告 F4 accepted、不得关闭 PT-01，也不得推进本 Runtime。
+Executor 不得宣告 F5 accepted，也不得推进本 Runtime。
 
 ## 4. Queued
 
 | Step | Deliverable | 状态 |
 | --- | --- | --- |
-| F5 / Step 5 | runner 模块化和 Human Gate UX | `QUEUED` |
 | F6 / Step 6 | 本地 TUI | `QUEUED` |
 | F7 / Step 7 | post-foundation real-service smoke | `QUEUED` |
 | F8 / Step 8 | GUI/治理压缩/evidence lifecycle 的 evidence-driven 决策 | `QUEUED` |
@@ -288,27 +328,27 @@ Executor 不得宣告 F4 accepted、不得关闭 PT-01，也不得推进本 Runt
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无 blocker 或 Human Decision Gate；F4 是 PT-01 deadline 前的最后处理步骤。
+- 当前无 blocker 或 Human Decision Gate。
 - 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
-  self-hosting limitation，不是 F4 blocker。
+  self-hosting limitation，不是 F5 blocker。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`4`
+当前顶层 Step：`5`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| PT-01 | 默认中文 Prompt 模板尚未规范化 | Step 1 | Step 5 | 0 | `DUE_NEXT` | F4 commit 记录两个固定 Tools hash、模板测试并获独立 Reviewer acceptance；进入 F5 前必须关闭 |
+| PT-01 | 默认中文 Prompt 模板尚未规范化 | Step 1 | Step 5 | 0 | `RESOLVED` | F4 commit `eeb75e11480ecc245e040862bd42a952ec008c97` 记录固定来源 hash、tracked 模板、测试与独立 Reviewer acceptance |
 | PT-02 | raw evidence 长期清理/保留策略未确定 | Step 1 | +∞ | +∞ | `PERMANENTLY_NON_BLOCKING` | F8 或未来 Human decision 记录 retention policy 与实际使用 evidence |
 
 ### Pending Gate Check
 
-- 下一顶层 Step：`Step 5 / F5`
-- 激活前必须关闭的 Pending Task：`PT-01`
-- Gate verdict：`BLOCKED`（只阻止激活 F5，不阻止当前 F4 执行）
-- Gate 语义：F4 可以继续；在 PT-01 获独立 acceptance 并标记 `RESOLVED` 前，不得从 F4
-  迁移并激活 F5。若 F4 未关闭 PT-01，则下一次迁移 gate 为 `BLOCKED`。
-- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F4 blocker。
+- 下一顶层 Step：`Step 6 / F6`
+- 激活前必须关闭的 Pending Task：无；PT-01 已在其 Step 5 deadline gate 前关闭。
+- Gate verdict：`CLEAR`
+- 支持 evidence：F4 implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`
+  与本次独立 review；PT-02 保持 `+∞`。
+- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F5 blocker。
 
 ## 7. State Transition
 
@@ -344,7 +384,7 @@ F2 → F3 transition（历史状态）：
 - Pending countdown：PT-01 从 `2` 重算为 `1`，仍为 `OPEN_NON_BLOCKING`；PT-02 保持 `+∞`；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
 
-Latest step transition：
+F3 -> F4 transition（历史状态）：
 
 - Previous step state：F3 `REJECTED — NARROW REPAIR REQUIRED`；
 - Triggering evidence：repair commit `a2379712b9e187a345c0694e1165fc4c4270ff64`、
@@ -355,6 +395,20 @@ Latest step transition：
   Active Step，在 PT-01 `RESOLVED` 前禁止激活 F5；PT-02 保持 `+∞`；
 - Supersession：F3 首次 REJECT 及其 self-audit 元信息继续作为 provenance；repair/re-review
   ACCEPT 只 supersede 当时的“当前拒绝状态”，不删除 rejection evidence；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
+
+Latest step transition：
+
+- Previous step state：F4 `ACTIVE / NOT EVALUATED`，PT-01 `DUE_NEXT`；
+- Triggering evidence：implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`、
+  fixed source/target hashes、逐字节正文 equivalence、Reviewer F4 focused `12 / 12` 与完整 strict
+  `159 / 159`；
+- Verdict：F4 `ACCEPTED AFTER INDEPENDENT REVIEW`；
+- Current step：F5 / Step 5 `ACTIVE / NOT EVALUATED`；
+- Pending update：PT-01 在 Step 5 activation gate 前以 F4 commit 与独立 review evidence 关闭为
+  `RESOLVED`；PT-02 保持 `+∞ / PERMANENTLY_NON_BLOCKING`；
+- Meaning：默认中文治理模板成为 tracked、provenance-bound 的稳定输入；F5 可以开始，F4 文件
+  默认冻结；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
 
 ## 8. Independent Review
@@ -682,9 +736,41 @@ Acceptance mapping：
 测试全绿后仍被独立 Reviewer 打回及最终 repair 的完整语义链。它继续构成 self-application
 evidence，不是 P7 fault injection。
 
+### 2026-09-16 F4 independent review：`ACCEPTED`
+
+审核对象：commit `eeb75e11480ecc245e040862bd42a952ec008c97`，parent
+`4191024c5eef9c1d5332a3b2c76f70a252be9e6f`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| fixed provenance | template headers、Tools source hashes、target hashes | 来源路径/hash、Framework v1.2、只读与非自动同步边界完整一致 | PASS |
+| source fidelity | 去除 target 第 3-10 行 provenance 后的独立 `cmp` | 两份 target body 分别与 fixed source 逐字节一致，无实质改写 | PASS |
+| Static/Runtime separation | 模板正文、focused tests、双语 README | Static 不记录进度，Runtime 不静默改合同，复制使用方式明确 | PASS |
+| governance invariants | Human Owner、Single Active Step、independent review、Pending、Human Gate、supersession tests | Static AC-06 所需 invariant 均有直接文本与 deterministic coverage | PASS |
+| portability/privacy | test source inspection、UTF-8/regular-file checks、forbidden-state tests | regression 只读 tracked template，不要求外部 Tools 存在，不嵌入当前状态或 secret | PASS |
+| compatibility | 159-test ResourceWarning-strict suite | 新文档/templates/tests 未改变 F1-F3/P4-P6 executable behavior | PASS |
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Reviewer F4 focused：`12 / 12`，`0.002s`；
+- Reviewer 完整 ResourceWarning-strict regression：`159 / 159`，`186.554s`；
+- 两份 target template SHA-256：
+  - Static：`880908226afbbd1c39262852586a4f87edab3d0d0994a758968188afd18ca8fd`；
+  - Runtime：`7e9d7bccb10890f34b211235bdd585245d61e6aa6e3a75a6b87a7910193d94ea`；
+- `git diff --check`、commit scope、non-force push、local/origin/GitHub ref 与审核前 clean worktree：
+  通过；
+- Reviewer verdict：`ACCEPTED`；
+- Review limitation：模板不会自动同步未来 source 变化，且 real-service smoke 仍留至 F7；两者均为
+  已声明边界，不阻塞 F4。
+
+PT-01 由 `DUE_NEXT` 关闭为 `RESOLVED`，其历史 deadline 与 evidence 保留，不通过删除记录掩盖。
+
 ## 9. Next Direction
 
-只执行 F4：从两个固定 hash 的只读 Tools source 规范化默认中文 Static/Runtime Prompt 模板，
-增加结构/invariant/source-identity tests 并同步双语 README。F1–F3 保持 accepted；不得修改外部
-Tools、治理文件、runner/operator 或提前实现 F5–F8。F4 完成后停止于
-`AWAITING INDEPENDENT REVIEW`；只有 F4 独立 ACCEPT 并关闭 PT-01 后才能激活 F5。
+只执行 F5：提取 mutation control contracts 与纯 Human Gate projection，增加 config-backed
+`human-gate` 只读命令，并使 status/inspect 共用相同分类、允许动作与恢复边界。F1-F4 保持
+accepted；不得重写 orchestrate、自动处理 Human decision、修改治理或提前实现 F6-F8。F5 完成后
+停止于 `AWAITING INDEPENDENT REVIEW`。
