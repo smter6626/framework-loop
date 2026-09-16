@@ -4,7 +4,7 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
+- 当前 verdict：`REJECTED — NARROW REPAIR REQUIRED`
 - 最近接受：`F2 — ACCEPTED AFTER REJECT → NARROW REPAIR → RE-REVIEW`
 - 唯一 Active Step：`F3 — workload config 与 doctor/preflight/run/resume/status/inspect CLI`
 - 当前顶层 Step：`Step 3`
@@ -253,7 +253,8 @@ Executor 不得宣告 F3 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无阻止 F3 开始的 blocker。
+- F3 已实现但存在一个阻止 acceptance 的跨阶段 evidence-supersession blocker，详见 §8；无需
+  Human 决策，继续由 Executor 在 F3 inspect 范围内修复。
 - 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
   self-hosting limitation，不是 F3 blocker。
 
@@ -510,8 +511,99 @@ Acceptance mapping：
 本次 F2 的自然 REJECT → narrow repair → re-review → ACCEPT 继续构成 1PCloop 核心治理方法
 用于实现自身的 evidence，不是 P7 fault injection。
 
+### 2026-09-15 F3 independent review：`REJECTED — NARROW REPAIR REQUIRED`
+
+审核对象：commit `fdb86b26b0d5fffde59673c015ddf642c0df5820` —
+`Add workload operator CLI`，parent `ac3696812a9e5eef2f3b3db6bb873b8aee226463`。
+
+#### Executor implementation 与 self-audit 元信息
+
+Executor 没有在第一轮测试全绿后立即发布，而是在实现过程中两次主动发现不足、补实现并重新跑
+完整严格回归：
+
+1. 第一版 F3 focused suite 达到 `23 / 23`；Executor 随后扩充 doctor dependency/Git/target/
+   remote/storage、status、manifest/framework commit conflict 等负向矩阵，达到 `26 / 26`；
+2. 第一次完整 ResourceWarning-strict regression 达到 `140 / 140`，`164.356s`；发布前 self-audit
+   发现 inspect 虽验证 summary/raw identity，但还应重验 summary 公开的 target commit/file
+   evidence locator，因此补充该实现与测试；
+3. 后续 self-audit 又发现 pre-F3 legacy checkpoint 缺少 `operator_config_identity` 的兼容边界
+   需要限定：只有 legacy 长参数 invocation 可把缺失解释为明确 legacy `null`，config-backed
+   resume 必须拒绝猜测升级；补齐后重新运行 F3/F2/F1 和完整回归；
+4. 最终 Executor evidence：F3 focused `26 / 26`，`24.394s`；F2 `24 / 24`，`7.233s`；
+   F1 `20 / 20`，`35.718s`；完整 strict `140 / 140`，`168.175s`；Python 3.9
+   compilation/import 与 `git diff --check` 通过。
+
+该过程证明 Executor self-check 有效并实际改变了最终实现，但 self-check 与全部既有测试通过仍不
+足以替代独立 Reviewer 的跨阶段 evidence-sufficiency 检查。
+
+#### Reviewer independent validation
+
+- Reviewer 独立复跑 F3 focused：`26 / 26`，`23.845s`；
+- Reviewer 独立复跑完整 ResourceWarning-strict regression：`140 / 140`，`168.763s`；
+- config identity、doctor/preflight/run/resume/status、read-only inspect、legacy checkpoint 限定、
+  双语文档和授权文件范围未发现其他阻塞；
+- 测试全绿仍未覆盖一个 F1 correction 与 F3 inspect 交叉场景。
+
+#### Reject finding — inspect 恢复了已 supersede verdict 的 evidence authority
+
+`inspect_run.target_evidence_check` 遍历 tracked summary 中所有历史 Reviewer
+`structured_evidence`，并要求每条 evidence 当前都通过语义验证。F1 correction 的设计会有意
+同时保留：
+
+```text
+initial schema-valid ACCEPT with invalid locator
+→ same-thread correction
+→ corrected ACCEPT with valid evidence
+→ Runtime transition applied
+```
+
+最初 invalid verdict 是不可删除的 provenance，但已被 corrected verdict supersede，不再具有当前
+acceptance authority。当前 F3 inspect 没有绑定最终 Runtime transition/verdict identity，而是把该
+旧 invalid locator 恢复成当前验收要求。
+
+Reviewer 使用 config-backed、transition-enabled disposable fixture 复现：
+
+```text
+corrected ACCEPT run exit code = 0
+Runtime transition = applied
+framework evidence commit/push = success
+
+inspect overall_status = FAIL
+target_evidence = FAIL
+other checks = PASS
+```
+
+该结果违反 `Supersession Persistence`：历史错误必须保留并验证 provenance 完整性，但不能因为
+仍存在于 summary 而自动恢复为当前 authoritative verdict。
+
+Required narrow repair：
+
+1. 从 Runtime transition record、最终 verdict locator/hash、checkpoint instruction reference、
+   correction resolution 和 summary entry 建立 exact authoritative evidence binding；
+2. 只对最终真正授权 transition 的 evidence 做当前语义验证；
+3. 原 invalid/superseded evidence 继续由 summary bytes、entry hash、raw identity 和 correction
+   reference 验证，不能删除或静默忽略 provenance；
+4. commit evidence 还必须重验 object type、raw hash 和从 authoritative target HEAD 的可达性；
+5. HUMAN_GATE、FAILED_CLOSED、REJECT/correction exhausted 等没有 ACCEPT transition 的终态不应
+   因缺少 authoritative target evidence 自动 FAIL，应明确区分 `NOT_APPLICABLE`、
+   `UNAVAILABLE`、`INVALID` 与 `VALID`；
+6. 增加 corrected ACCEPT inspect PASS、最终 evidence tamper FAIL、历史 invalid evidence 保留、
+   non-ACCEPT terminal、raw missing 和只读重复 inspect 测试。
+
+Independent review verdict：
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- verdict：`REJECTED — NARROW REPAIR REQUIRED`；
+- 当前状态：F3 保持唯一 Active Step，F4 不激活，PT-01 倒计时保持 `1`，PT-02 保持 `+∞`；
+- 本次“Executor 主动发现问题并重写、所有测试全绿、独立 Reviewer 仍因新 blind spot 打回”是
+  1PCloop 区分 self-check 与 independent review 的直接 self-application evidence，不是 P7
+  defect injection。
+
 ## 9. Next Direction
 
-只执行 F3。F1、F2 已冻结为 accepted evidence；F4–F8 保持 queued。不得提前规范 Prompt
-模板、实现 Human Gate UX、TUI/GUI 或运行 real-service smoke；P7 保持暂停。F3 完成后停止于
-`AWAITING INDEPENDENT REVIEW`。
+只执行 F3 的上述 inspect authoritative-evidence binding 窄 repair。不得重写已经通过审核的
+config、doctor/preflight/run/resume/status 或 legacy checkpoint 主体。F1、F2 保持 accepted；
+F4–F8 保持 queued；P7 保持暂停。Repair 完成后停止于
+`AWAITING INDEPENDENT RE-REVIEW`。
