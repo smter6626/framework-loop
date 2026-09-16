@@ -4,7 +4,7 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
+- 当前 verdict：`REJECTED -- NARROW REPAIR REQUIRED`
 - 最近接受：`F4 -- ACCEPTED AFTER INDEPENDENT REVIEW`
 - 唯一 Active Step：`F5 -- runner 模块化和 Human Gate UX`
 - 当前顶层 Step：`Step 5`
@@ -328,7 +328,10 @@ Executor 不得宣告 F5 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无 blocker 或 Human Decision Gate。
+- F5 acceptance 当前被 Human Gate projection 的 identity/default-deny 缺口阻塞：target 或
+  framework authoritative identity 已失败时，projection 仍可能允许
+  `START_NEW_RUN_AFTER_HUMAN_REVIEW`，与同一 checkpoint 的 `inspect` 结果矛盾。
+- 该 blocker 需要窄代码修复和独立 re-review，不需要 Human Owner 作新的产品或合同决定。
 - 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
   self-hosting limitation，不是 F5 blocker。
 
@@ -768,9 +771,101 @@ Acceptance mapping：
 
 PT-01 由 `DUE_NEXT` 关闭为 `RESOLVED`，其历史 deadline 与 evidence 保留，不通过删除记录掩盖。
 
+### 2026-09-16 F5 independent review：`REJECTED -- NARROW REPAIR REQUIRED`
+
+审核对象：commit `3f3bba9d94b5446008d6773792af00ded566a5ae`，parent
+`5dfbfcdc8ce20fcfea2d7aaa34de51f6413e71ca`。
+
+#### Executor implementation 与 validation evidence
+
+- 新增 pure `mutation_contracts.py` 与 `human_gate.py`，runner 通过 object-identity-preserving alias
+  保持旧 import compatibility，且 `orchestrate()` 仍是唯一 mutation state machine；
+- 新增 config-backed `human-gate`，并让 `status`、`inspect`、`human-gate` 调用同一纯 projection；
+- Executor focused：`12 / 12`，`6.951s`；点名 F1-F4 regression：`139 / 139`，
+  `193.946s`；完整 ResourceWarning-strict regression：`171 / 171`，`181.381s`；
+- Python 3.9 compilation/import、dependency direction、privacy/read-only、allowlist、protected-path、
+  `git diff --check`、non-force push、最终 refs 和 clean worktree 均由 Executor 报告通过；
+- Reviewer 独立复跑 F5 focused：`12 / 12`，其中 contract `5 / 5`、Human Gate `7 / 7`；
+- Reviewer 独立完整 ResourceWarning-strict regression：`171 / 171`，`195.553s`。
+
+上述全绿结果证明 module extraction 与既有 regression 没有普遍破坏，但没有覆盖下述
+acceptance-critical 交叉状态，因此不足以支持 F5 ACCEPT。
+
+#### Reject finding -- Human Gate 动作未绑定完整 authoritative identity
+
+`_gate_evidence_availability()` 只验证 local run root、manifest、event/live status、summary/raw
+artifact 和 config identity。它没有验证 `inspect_run()` 已经要求的 authoritative target
+branch/HEAD/cleanliness、framework evidence commit/remote push identity，以及适用时的最终 target
+evidence authority。结果是 projection 可以在这些 identity 已冲突时继续报告 `AVAILABLE`，并允许
+开始新 run。
+
+Reviewer 使用 disposable config-backed Human Gate fixture 直接复现：先完成一个合法
+`REVIEWER_HUMAN_GATE` run，再仅在 target 创建一个未跟踪文件。外部 mutation 前后的关键结果为：
+
+```text
+before mutation:
+human-gate gate_status=ACTIVE
+human-gate recovery_mode=NEW_RUN_AFTER_REVIEW
+inspect overall_status=PASS
+inspect safe_next_action=HUMAN_REVIEW_REQUIRED
+
+after target becomes dirty:
+human-gate gate_status=ACTIVE
+human-gate evidence_availability=AVAILABLE
+human-gate recovery_mode=NEW_RUN_AFTER_REVIEW
+human-gate allowed_actions contains START_NEW_RUN_AFTER_HUMAN_REVIEW
+inspect target check=FAIL
+inspect overall_status=FAIL
+inspect safe_next_action=STATE_UNAVAILABLE
+```
+
+同一 authoritative state 因而产生互相矛盾的 operator guidance。该结果违反 F5 acceptance：
+
+- identity 冲突必须为 `INVALID` 并 default-deny；
+- `status`、`inspect`、`human-gate` 必须共享相同 gate classification/recovery boundary；
+- AC-07 要求 Human Gate 的允许动作和恢复边界可安全定位，不能在 target state 已失配时建议开始
+  新 run。
+
+实现中 `status`/`inspect` 还通过 flat `**gate` merge 覆盖同名的
+`checkpoint_state`、`logical_outcome`、`runtime_transition` 和 `evidence_publication` 字段。正常完整
+checkpoint 中这些值目前通常相同，但 repair 必须消除该 collision risk，保证 F3 已接受的顶层字段
+继续来自原 authoritative projection，而不是被 Human Gate 的 fallback/synthesized value 替换。
+
+#### Required narrow repair
+
+1. 让 Human Gate identity/evidence classification 覆盖或复用 `inspect` 的 authoritative target、
+   framework commit/push 和适用的 authoritative target-evidence 检查，不复制第二套 mutation state
+   machine；
+2. 任一 authoritative identity conflict 必须统一得到 `gate_status=INVALID`、
+   `recovery_mode=HUMAN_REMEDIATION_REQUIRED`，且不得包含 `FINALIZE_EVIDENCE` 或
+   `START_NEW_RUN_AFTER_HUMAN_REVIEW`；缺失而非冲突的 local raw evidence 继续为 `UNAVAILABLE`；
+3. 同一 checkpoint 下，`status`、`inspect` 和 `human-gate` 的 gate status/reason/actions/recovery
+   必须一致；任何 `inspect overall_status=FAIL` 的 authoritative conflict 不得同时生成允许开始新 run
+   的 gate guidance；
+4. 消除 `**gate` 对 F3 既有顶层字段的覆盖风险。可以使用清晰命名的 nested projection，或使用不冲突
+   字段名，但必须保持现有 F3 field semantics 和已记录的 F5 usability fields；
+5. 增加至少 target dirty、wrong branch/HEAD、framework commit/remote mismatch、authoritative evidence
+   conflict、raw unavailable，以及重复只读调用的 integration tests；断言三个命令一致、默认拒绝且
+   bytes/Git state 不变；
+6. 保持 contract extraction、runner re-export identity、唯一 `orchestrate()`、terminal
+   finalization-only no-Agent-replay、privacy 和 F1-F4 behavior 不变；重跑 F5 focused、F1-F4 点名
+   regression 与完整 ResourceWarning-strict suite。
+
+Independent review verdict：
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- verdict：`REJECTED -- NARROW REPAIR REQUIRED`；
+- 当前状态：F5 保持唯一 Active Step，F6 不激活，PT-01 保持 `RESOLVED`，PT-02 保持
+  `+∞ / PERMANENTLY_NON_BLOCKING`；
+- 本次再次形成“Executor 测试全绿但独立 Reviewer 发现跨模块状态盲点”的 self-application
+  evidence；不是 P7 fault injection，也不运行 real-service smoke。
+
 ## 9. Next Direction
 
-只执行 F5：提取 mutation control contracts 与纯 Human Gate projection，增加 config-backed
-`human-gate` 只读命令，并使 status/inspect 共用相同分类、允许动作与恢复边界。F1-F4 保持
-accepted；不得重写 orchestrate、自动处理 Human decision、修改治理或提前实现 F6-F8。F5 完成后
-停止于 `AWAITING INDEPENDENT REVIEW`。
+只执行 F5 narrow repair：把 Human Gate projection 绑定到完整 authoritative identity，统一
+`status`/`inspect`/`human-gate` 的 default-deny classification 与动作边界，并消除 gate flat merge
+覆盖 F3 顶层字段的风险。F1-F4 保持 accepted；不得重写 orchestrate、扩大产品范围、修改 Static、
+运行 real-service smoke 或提前实现 F6-F8。修复完成后停止于
+`AWAITING INDEPENDENT RE-REVIEW`。
