@@ -314,9 +314,15 @@ resume，不会被猜测升级。
   observation availability，以及 `RESUME_ALLOWED`、`HUMAN_REVIEW_REQUIRED`、
   `TERMINAL_SUCCESS`、`TERMINAL_FAILURE`、`START_NEW_RUN_ALLOWED` 或 `STATE_UNAVAILABLE`。
 - `inspect` 只读验证 config/checkpoint/manifest、F2 sequence/hash/suffix/live projection、tracked
-  summary 与现存 raw artifact、framework evidence commit/push 和 target Git identity。缺失
-  Git-ignored raw evidence 或 incomplete JSONL tail 为 `UNAVAILABLE`；完整冲突 evidence 为
-  `FAIL`。Inspect 不截断 journal，也不修复 artifact。
+  summary 与现存 raw artifact、framework evidence commit/push 和 target Git identity。对于
+  ACCEPT transition，它把 transition record 精确绑定到 routed Reviewer verdict、correction
+  resolution、唯一 summary entry、target HEAD 和 evidence list；已 supersede verdict 仅保留
+  provenance，不恢复 authority。HUMAN_GATE、FAILED_CLOSED、REJECT/correction exhausted 和
+  capability-disabled run 的 target evidence 为 `NOT_APPLICABLE`。缺失 Git-ignored raw evidence
+  或 incomplete JSONL tail 为 `UNAVAILABLE`；完整冲突 evidence 为 `FAIL`。Overall `PASS` 只表示
+  evidence package 内部一致，不表示任务已 ACCEPT。Inspect 不截断 journal，也不修复 artifact。
+  Result 另外把 authoritative target evidence 分类为 `VALID`、`INVALID`、`UNAVAILABLE` 或
+  `NOT_APPLICABLE`。
 
 `doctor`、`preflight`、`status`、`inspect` 各只输出一个 compact JSON object，包含版本、命令、
 config identity、overall status、checks/result 与公开 artifact locator。`PASS`/`UNAVAILABLE` 返回
@@ -507,7 +513,7 @@ Repository-backed evidence 已覆盖：
 - Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
 - public terminal result 的控制字符、长度和字段注入防护。
 
-当前 deterministic regression suite 包含140项测试，并在 `ResourceWarning` 提升为错误时通过。
+当前 deterministic regression suite 包含147项测试，并在 `ResourceWarning` 提升为错误时通过。
 历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
 `evidence-summaries/`、`runs/` 和 Git history；README 不复制这些进度记录。
 

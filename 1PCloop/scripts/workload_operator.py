@@ -38,7 +38,7 @@ SAFE_ACTIONS = frozenset({
 PROHIBITED_KEY = re.compile(
     r"(?:auth|credential|password|secret|token|prompt|peer|reasoning)", re.IGNORECASE
 )
-OBJECT_ID = re.compile(r"^[0-9a-f]{40}$")
+OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 SHA256_ID = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -378,6 +378,276 @@ def _overall(checks: Sequence[Mapping[str, Any]]) -> str:
     if any(item.get("status") == "UNAVAILABLE" for item in checks):
         return "UNAVAILABLE"
     return "PASS"
+
+
+def _not_applicable_check(name: str, detail: str) -> Dict[str, Any]:
+    return {
+        "name": name,
+        "status": "NOT_APPLICABLE",
+        "code": f"{name.upper()}_NOT_APPLICABLE",
+        "detail": detail,
+    }
+
+
+def _authoritative_accept_applies(checkpoint: Mapping[str, Any]) -> bool:
+    logical = checkpoint.get("logical_outcome")
+    logical_state = logical.get("state") if isinstance(logical, dict) else None
+    if logical_state in {RUNNER.HUMAN_GATE, RUNNER.FAILED_CLOSED}:
+        return False
+    return bool(checkpoint.get("runtime_transition_applied")) or (
+        checkpoint.get("state")
+        in {RUNNER.RUNTIME_TRANSITION_PENDING, RUNNER.RUNTIME_TRANSITION_COMMITTED}
+        or logical_state == RUNNER.RUNTIME_TRANSITION_COMMITTED
+    )
+
+
+def _reference_paths(reference: Mapping[str, Any], run_root: Path) -> Tuple[Path, Path]:
+    if set(reference) != {
+        "final_path", "final_sha256", "process_path", "process_sha256"
+    }:
+        raise OperatorError("verdict reference field set is invalid")
+    final_relative = reference.get("final_path")
+    process_relative = reference.get("process_path")
+    if (
+        not isinstance(final_relative, str)
+        or not isinstance(process_relative, str)
+        or not isinstance(reference.get("final_sha256"), str)
+        or not isinstance(reference.get("process_sha256"), str)
+        or SHA256_ID.fullmatch(reference["final_sha256"]) is None
+        or SHA256_ID.fullmatch(reference["process_sha256"]) is None
+    ):
+        raise OperatorError("verdict reference identity is invalid")
+    final_path = (run_root / final_relative).resolve()
+    process_path = (run_root / process_relative).resolve()
+    if (
+        not RUNNER.P4.path_is_within(final_path, run_root)
+        or not RUNNER.P4.path_is_within(process_path, run_root)
+        or final_path.name != "final.txt"
+        or process_path.name != "process.json"
+        or final_path.parent != process_path.parent
+    ):
+        raise OperatorError("verdict reference escapes its turn boundary")
+    return final_path, process_path
+
+
+def _summary_entry_for_reference(
+    reference: Mapping[str, Any],
+    entries: Sequence[Mapping[str, Any]],
+    run_root: Path,
+) -> Mapping[str, Any]:
+    final_path, process_path = _reference_paths(reference, run_root)
+    turn = final_path.parent.relative_to(run_root.resolve()).as_posix()
+    candidates = [entry for entry in entries if entry.get("turn") == turn]
+    if len(candidates) != 1:
+        raise OperatorError("verdict reference does not identify one summary entry")
+    entry = candidates[0]
+    artifacts = entry.get("raw_artifacts")
+    if not isinstance(artifacts, list):
+        raise OperatorError("verdict summary raw artifacts are invalid")
+    by_name: Dict[str, Mapping[str, Any]] = {}
+    for artifact in artifacts:
+        if not isinstance(artifact, dict) or not isinstance(artifact.get("name"), str):
+            raise OperatorError("verdict summary artifact metadata is invalid")
+        if artifact["name"] in by_name:
+            raise OperatorError("verdict summary repeats an artifact name")
+        by_name[artifact["name"]] = artifact
+    final = by_name.get("final.txt")
+    process = by_name.get("process.json")
+    if (
+        final is None
+        or process is None
+        or final.get("locator") != str(final_path)
+        or process.get("locator") != str(process_path)
+        or final.get("sha256") != reference.get("final_sha256")
+        or process.get("sha256") != reference.get("process_sha256")
+    ):
+        raise OperatorError("verdict reference differs from its summary identity")
+    return entry
+
+
+def validate_target_evidence_items(
+    evidence_items: Any,
+    *,
+    target_repo: Path,
+    run_root: Path,
+    authoritative_head: str,
+) -> int:
+    """Validate only evidence selected by the authoritative ACCEPT transition."""
+    if not isinstance(evidence_items, list) or not evidence_items:
+        raise OperatorError("authoritative evidence list is invalid")
+    commits = 0
+    for item in evidence_items:
+        if not isinstance(item, dict) or set(item) != {"kind", "locator", "sha256"}:
+            raise OperatorError("authoritative evidence item is invalid")
+        kind = item.get("kind")
+        locator = item.get("locator")
+        expected_sha = item.get("sha256")
+        if (
+            kind not in {"commit", "file", "artifact", "test"}
+            or not isinstance(locator, str)
+            or not isinstance(expected_sha, str)
+            or SHA256_ID.fullmatch(expected_sha) is None
+        ):
+            raise OperatorError("authoritative evidence declaration is invalid")
+        if kind == "commit":
+            if OBJECT_ID.fullmatch(locator) is None:
+                raise OperatorError("commit evidence locator is not a full object ID")
+            try:
+                object_type = RUNNER.git_text(target_repo, ["cat-file", "-t", locator])
+            except RUNNER.InvariantViolation as exc:
+                raise OperatorError("commit evidence object is unavailable") from exc
+            if object_type != "commit":
+                raise OperatorError("commit evidence object is not a commit")
+            if not RUNNER.is_ancestor(target_repo, locator, authoritative_head):
+                raise OperatorError("commit evidence is unreachable from target HEAD")
+            content = RUNNER.git_bytes(target_repo, ["cat-file", "commit", locator])
+            commits += 1
+        else:
+            path = Path(locator)
+            if not path.is_absolute() or path.is_symlink():
+                raise OperatorError("file evidence locator is not an absolute regular file")
+            resolved = path.resolve()
+            if not (
+                RUNNER.P4.path_is_within(resolved, target_repo)
+                or RUNNER.P4.path_is_within(resolved, run_root)
+            ):
+                raise OperatorError("file evidence locator escapes its boundary")
+            if not resolved.is_file():
+                raise OperatorError("file evidence locator is unavailable")
+            content = resolved.read_bytes()
+        if sha256_bytes(content) != expected_sha:
+            raise OperatorError("authoritative evidence hash differs from actual bytes")
+    if commits == 0:
+        raise OperatorError("authoritative ACCEPT lacks reachable commit evidence")
+    return len(evidence_items)
+
+
+def validate_correction_provenance(
+    correction: Mapping[str, Any],
+    *,
+    entries: Sequence[Mapping[str, Any]],
+    run_root: Path,
+) -> None:
+    """Validate the complete historical correction chain without re-authorizing it."""
+    original = correction.get("original_verdict_reference")
+    attempts = correction.get("attempts")
+    if not isinstance(original, dict) or not isinstance(attempts, list):
+        raise OperatorError("correction provenance is incomplete")
+    references: List[Mapping[str, Any]] = [original]
+    for attempt in attempts:
+        reference = attempt.get("turn_reference") if isinstance(attempt, dict) else None
+        if not isinstance(reference, dict):
+            raise OperatorError("correction attempt reference is incomplete")
+        references.append(reference)
+    for reference in references:
+        _summary_entry_for_reference(reference, entries, run_root)
+        final_path, process_path = _reference_paths(reference, run_root)
+        if not final_path.is_file() or not process_path.is_file():
+            raise FileNotFoundError("correction provenance raw evidence is unavailable")
+    RUNNER.validate_verdict_correction_record(correction, run_root)
+    if correction.get("source_verdict_reference") != references[-1]:
+        raise OperatorError("correction source is not the latest historical verdict")
+    resolution = correction.get("resolution")
+    if resolution is not None:
+        if (
+            not isinstance(resolution, dict)
+            or resolution.get("verdict") not in {"ACCEPT", "REJECT", "HUMAN_GATE"}
+            or resolution.get("verdict_reference") != references[-1]
+            or resolution.get("attempts_completed") != correction.get("attempts_completed")
+        ):
+            raise OperatorError("correction resolution identity is invalid")
+
+
+def validate_authoritative_target_evidence(
+    checkpoint: Mapping[str, Any], *, run_root: Path, target_repo: Path,
+) -> int:
+    """Bind one applied/pending transition to its exact final Reviewer verdict."""
+    plan = checkpoint.get("runtime_transition")
+    record = plan.get("record") if isinstance(plan, dict) else None
+    reference = checkpoint.get("instruction_reference")
+    progress = checkpoint.get("summary_progress")
+    if not isinstance(plan, dict) or not isinstance(record, dict):
+        raise OperatorError("authoritative Runtime transition record is missing")
+    if not isinstance(reference, dict) or not isinstance(progress, list):
+        raise OperatorError("authoritative verdict reference is missing")
+    entries = [RUNNER.P63._entry_from_record(item) for item in progress]
+    authoritative_entry = _summary_entry_for_reference(reference, entries, run_root)
+    final_path, process_path = _reference_paths(reference, run_root)
+    if not final_path.is_file() or not process_path.is_file():
+        raise FileNotFoundError("authoritative raw verdict is unavailable")
+
+    correction = checkpoint.get("verdict_correction")
+    if correction is not None:
+        if not isinstance(correction, dict):
+            raise OperatorError("correction record is invalid")
+        validate_correction_provenance(
+            correction, entries=entries, run_root=run_root
+        )
+        attempts = correction.get("attempts")
+        resolution = correction.get("resolution")
+        if (
+            not isinstance(resolution, dict)
+            or resolution.get("verdict") != "ACCEPT"
+            or resolution.get("verdict_reference") != reference
+            or correction.get("source_verdict_reference") != reference
+            or not attempts
+            or attempts[-1].get("turn_reference") != reference
+        ):
+            raise OperatorError("correction resolution is not bound to the transition verdict")
+
+    try:
+        turn = RUNNER.load_turn_reference(reference, run_root)
+        value = RUNNER.validate_turn_payload(turn.final_message, RUNNER.REVIEWER_VERDICT)
+    except RUNNER.InvariantViolation as exc:
+        raise OperatorError("authoritative verdict raw identity is invalid") from exc
+    if value.get("verdict") != "ACCEPT":
+        raise OperatorError("transition verdict is not ACCEPT")
+    try:
+        preimage = bytes.fromhex(plan["preimage_hex"])
+        timestamp = record["timestamp"]
+        configuration = checkpoint["configuration"]
+        runtime_path_value = configuration["workload_runtime"]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise OperatorError("transition plan identity is incomplete") from exc
+    if not isinstance(configuration, dict) or not isinstance(runtime_path_value, str):
+        raise OperatorError("transition Runtime locator is invalid")
+    expected_plan, _postimage = RUNNER.build_runtime_transition(
+        preimage=preimage,
+        value=value,
+        verdict_path=final_path,
+        verdict_sha256=sha256_bytes(turn.final_message),
+        runtime_path=Path(runtime_path_value),
+        timestamp=timestamp,
+    )
+    if expected_plan != plan:
+        raise OperatorError("transition plan differs from the exact Reviewer verdict")
+    if (
+        record.get("reviewer_verdict_locator") != str(final_path)
+        or record.get("reviewer_verdict_sha256") != reference.get("final_sha256")
+        or authoritative_entry.get("message_type") != RUNNER.REVIEWER_VERDICT
+        or authoritative_entry.get("reviewer_verdict") != "ACCEPT"
+        or authoritative_entry.get("structured_evidence") != record.get("evidence")
+        or value.get("evidence") != record.get("evidence")
+    ):
+        raise OperatorError("transition, verdict, and summary evidence are not identical")
+    target_after = (
+        checkpoint.get("target_after")
+        or checkpoint.get("target_before")
+        or checkpoint.get("target_initial")
+    )
+    if (
+        not isinstance(target_after, dict)
+        or not isinstance(target_after.get("head"), str)
+        or record.get("target_head") != target_after["head"]
+        or value.get("reviewed_target", {}).get("head") != target_after["head"]
+    ):
+        raise OperatorError("authoritative target HEAD binding is inconsistent")
+    return validate_target_evidence_items(
+        record.get("evidence"),
+        target_repo=target_repo,
+        run_root=run_root,
+        authoritative_head=target_after["head"],
+    )
 
 
 def envelope(
@@ -766,57 +1036,44 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
         return "target branch, HEAD, and cleanliness match checkpoint"
 
     def target_evidence_check() -> str:
-        progress = checkpoint.get("summary_progress")
-        if not isinstance(progress, list):
-            raise OperatorError("summary progress is invalid")
         target_repo = Path(config.resolved["target"]["repo"]).resolve()
-        checked = 0
-        for record in progress:
-            entry = RUNNER.P63._entry_from_record(record)
-            evidence_items = entry.get("structured_evidence")
-            if evidence_items is None:
-                continue
-            if not isinstance(evidence_items, list):
-                raise OperatorError("structured evidence list is invalid")
-            for item in evidence_items:
-                if not isinstance(item, dict):
-                    raise OperatorError("structured evidence item is invalid")
-                kind = item.get("kind")
-                locator = item.get("locator")
-                expected_sha = item.get("sha256")
-                if (
-                    kind not in {"commit", "file", "artifact", "test"}
-                    or not isinstance(locator, str)
-                    or not isinstance(expected_sha, str)
-                    or SHA256_ID.fullmatch(expected_sha) is None
-                ):
-                    raise OperatorError("structured evidence declaration is invalid")
-                if kind == "commit":
-                    if OBJECT_ID.fullmatch(locator) is None:
-                        raise OperatorError("commit evidence locator is invalid")
-                    content = RUNNER.git_bytes(
-                        target_repo, ["cat-file", "commit", locator]
-                    )
-                else:
-                    evidence_path = Path(locator)
-                    if (
-                        not evidence_path.is_absolute()
-                        or not evidence_path.is_file()
-                        or evidence_path.is_symlink()
-                        or not (
-                            RUNNER.P4.path_is_within(evidence_path, target_repo)
-                            or RUNNER.P4.path_is_within(evidence_path, run_root)
-                        )
-                    ):
-                        raise OperatorError("file evidence locator is invalid")
-                    content = evidence_path.read_bytes()
-                if sha256_bytes(content) != expected_sha:
-                    raise OperatorError("structured evidence hash differs")
-                checked += 1
-        if checked == 0:
-            raise FileNotFoundError("structured target evidence is unavailable")
+        checked = validate_authoritative_target_evidence(
+            checkpoint, run_root=run_root, target_repo=target_repo
+        )
         return f"{checked} target evidence locator(s) are valid"
 
+    def correction_provenance_check() -> str:
+        correction = checkpoint.get("verdict_correction")
+        progress = checkpoint.get("summary_progress")
+        if not isinstance(correction, dict) or not isinstance(progress, list):
+            raise OperatorError("correction provenance checkpoint is invalid")
+        entries = [RUNNER.P63._entry_from_record(item) for item in progress]
+        validate_correction_provenance(
+            correction, entries=entries, run_root=run_root
+        )
+        return "historical correction verdict references and hashes are valid"
+
+    correction_provenance_result = (
+        _inspection_check("correction_provenance", correction_provenance_check)
+        if checkpoint.get("verdict_correction") is not None
+        else _not_applicable_check(
+            "correction_provenance", "run has no Reviewer verdict correction"
+        )
+    )
+    target_evidence_result = (
+        _inspection_check("target_evidence", target_evidence_check)
+        if _authoritative_accept_applies(checkpoint)
+        else _not_applicable_check(
+            "target_evidence",
+            "no ACCEPT Runtime transition has current target-evidence authority",
+        )
+    )
+    target_evidence_classification = {
+        "PASS": "VALID",
+        "FAIL": "INVALID",
+        "UNAVAILABLE": "UNAVAILABLE",
+        "NOT_APPLICABLE": "NOT_APPLICABLE",
+    }[target_evidence_result["status"]]
     checks = [
         {"name": "checkpoint_identity", "status": "PASS", "code": "CHECKPOINT_IDENTITY_PASSED", "detail": "checkpoint is bound to the exact config identity"},
         _inspection_check("manifest", manifest_check),
@@ -825,15 +1082,31 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
         _inspection_check("framework_commit", framework_commit_check),
         _inspection_check("framework_push", framework_push_check),
         _inspection_check("target", target_check),
-        _inspection_check("target_evidence", target_evidence_check),
+        correction_provenance_result,
+        target_evidence_result,
     ]
     overall = _overall(checks)
+    final = checkpoint.get("final_result")
+    if not isinstance(final, dict):
+        final = {}
+    logical = checkpoint.get("logical_outcome")
+    logical_state = (
+        logical.get("state") if isinstance(logical, dict)
+        else final.get("logical_outcome")
+    )
     return envelope(
         "inspect", config, overall=overall, checks=checks,
         result={
             "workload_id": config.workload_id,
             "run_id": checkpoint["run_id"],
             "checkpoint_state": checkpoint["state"],
+            "logical_outcome": logical_state,
+            "runtime_transition": final.get("runtime_transition"),
+            "evidence_publication": final.get("evidence_publication"),
+            "human_gate": logical_state == RUNNER.HUMAN_GATE,
+            "failed_closed": logical_state == RUNNER.FAILED_CLOSED,
+            "target_evidence_status": target_evidence_result["status"],
+            "target_evidence_classification": target_evidence_classification,
             "safe_next_action": safe_next_action(checkpoint) if overall != "FAIL" else "STATE_UNAVAILABLE",
             **observation_result,
         },

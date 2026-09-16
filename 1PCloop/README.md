@@ -334,9 +334,15 @@ Command behavior is:
   `TERMINAL_FAILURE`, `START_NEW_RUN_ALLOWED`, or `STATE_UNAVAILABLE`.
 - `inspect` read-only validates config/checkpoint/manifest identity, F2 sequence/hash/suffix and
   live projection, tracked summary and available raw-artifact hashes, framework evidence
-  commit/push, and target Git identity. Missing Git-ignored raw evidence or an incomplete JSONL
-  tail is `UNAVAILABLE`; conflicting complete evidence is `FAIL`. Inspect never truncates the
-  journal or repairs an artifact.
+  commit/push, and target Git identity. For an ACCEPT transition it binds the transition record to
+  the exact routed Reviewer verdict, correction resolution, unique summary entry, target HEAD,
+  and evidence list; superseded verdict evidence remains provenance and is not re-authorized.
+  HUMAN_GATE, FAILED_CLOSED, REJECT/correction-exhausted, and capability-disabled runs report
+  target evidence as `NOT_APPLICABLE`. Missing Git-ignored raw evidence or an incomplete JSONL
+  tail is `UNAVAILABLE`; conflicting complete evidence is `FAIL`. An overall `PASS` means the
+  evidence package is internally consistent, not that the task was accepted. Inspect never
+  truncates the journal or repairs an artifact. The result separately classifies authoritative
+  target evidence as `VALID`, `INVALID`, `UNAVAILABLE`, or `NOT_APPLICABLE`.
 
 `doctor`, `preflight`, `status`, and `inspect` print exactly one compact JSON object with
 `schema_version`, command, config identity, overall status, checks/result, and public artifact
@@ -602,7 +608,7 @@ Repository-backed evidence covers:
 - structured progress sequence/identity recovery, monotonic active timing, live projection,
   tool-activity throttling, and observation-failure isolation.
 
-The current deterministic regression suite contains 140 tests and passes with `ResourceWarning`
+The current deterministic regression suite contains 147 tests and passes with `ResourceWarning`
 promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
 in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
 not duplicate progress records.

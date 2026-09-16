@@ -39,10 +39,15 @@ class Crash(BaseException):
 
 
 class OperatorCliTests(unittest.TestCase):
-    def fixture(self, root: Path, *, run_id: str = "operator-fixture"):
+    def fixture(
+        self, root: Path, *, run_id: str = "operator-fixture",
+        runtime_transition: bool = False,
+    ):
         helper = evidence.EvidenceSummaryTests()
         args, framework, remote, target_remote, baseline, target_remote_head = (
-            helper.fixture(root, run_id=run_id)
+            helper.fixture(
+                root, run_id=run_id, runtime_transition=runtime_transition
+            )
         )
         config_dir = root / "configuration"
         config_dir.mkdir()
@@ -105,9 +110,25 @@ class OperatorCliTests(unittest.TestCase):
     def write_json(path: Path, value):
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    def run_config(self, config, *, verdict="HUMAN_GATE"):
-        with patch.dict(os.environ, {"P6_TEST_VERDICT": verdict}, clear=False), contextlib.redirect_stdout(io.StringIO()):
+    def run_config(self, config, *, verdict="HUMAN_GATE", environment=None):
+        selected = {"P6_TEST_VERDICT": verdict}
+        selected.update(environment or {})
+        with patch.dict(os.environ, selected, clear=False), contextlib.redirect_stdout(io.StringIO()):
             return OP.run_mutation(config)
+
+    def accepted_run(self, root, *, corrected, run_id="accepted-inspect"):
+        config_path, *_ = self.fixture(
+            root, run_id=run_id, runtime_transition=True
+        )
+        config = OP.load_config(config_path)
+        environment = {"P5_TEST_SCENARIO": "executor-commit"}
+        if corrected:
+            environment["P6_TEST_INITIAL_BAD_LOCATOR"] = "1"
+        code, run_root = self.run_config(
+            config, verdict="ACCEPT", environment=environment
+        )
+        self.assertEqual(code, 0)
+        return config, run_root, self.read_json(OP.checkpoint_path(config))
 
     def test_config_parse_canonical_identity_and_relative_paths_ignore_cwd(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -397,7 +418,203 @@ class OperatorCliTests(unittest.TestCase):
             self.run_config(config)
             result = OP.inspect_run(config)
             self.assertEqual(result["overall_status"], "PASS", result)
-            self.assertTrue(all(item["status"] == "PASS" for item in result["checks"]))
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(checks["target_evidence"]["status"], "NOT_APPLICABLE")
+            self.assertEqual(checks["correction_provenance"]["status"], "NOT_APPLICABLE")
+            self.assertEqual(result["result"]["safe_next_action"], "HUMAN_REVIEW_REQUIRED")
+            self.assertTrue(result["result"]["human_gate"])
+
+    def test_corrected_accept_selects_only_exact_authoritative_verdict(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config, run_root, checkpoint = self.accepted_run(
+                Path(temporary), corrected=True
+            )
+            entries = [
+                OP.RUNNER.P63._entry_from_record(record)
+                for record in checkpoint["summary_progress"]
+            ]
+            historical = [
+                item for entry in entries
+                for item in entry.get("structured_evidence", [])
+                if item.get("locator") == "python -m unittest -v"
+            ]
+            self.assertEqual(len(historical), 1)
+            result = OP.inspect_run(config)
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(result["overall_status"], "PASS", result)
+            self.assertEqual(checks["target_evidence"]["status"], "PASS")
+            self.assertEqual(checks["correction_provenance"]["status"], "PASS")
+            self.assertEqual(result["result"]["logical_outcome"], OP.RUNNER.RUNTIME_TRANSITION_COMMITTED)
+            self.assertEqual(result["result"]["target_evidence_status"], "PASS")
+            self.assertEqual(result["result"]["target_evidence_classification"], "VALID")
+            self.assertTrue((run_root / "manifest.json").is_file())
+
+    def test_normal_accept_authoritative_evidence_still_passes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config, _run_root, _checkpoint = self.accepted_run(
+                Path(temporary), corrected=False, run_id="plain-accept"
+            )
+            result = OP.inspect_run(config)
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(result["overall_status"], "PASS", result)
+            self.assertEqual(checks["target_evidence"]["status"], "PASS")
+            self.assertEqual(checks["correction_provenance"]["status"], "NOT_APPLICABLE")
+
+    def test_authoritative_transition_verdict_summary_tamper_fails(self):
+        mutations = (
+            ("verdict_hash", lambda checkpoint: checkpoint["runtime_transition"]["record"].__setitem__("reviewer_verdict_sha256", "0" * 64)),
+            ("verdict_locator", lambda checkpoint: checkpoint["runtime_transition"]["record"].__setitem__("reviewer_verdict_locator", "/forged/final.txt")),
+            ("transition_evidence", lambda checkpoint: checkpoint["runtime_transition"]["record"]["evidence"][0].__setitem__("sha256", "0" * 64)),
+        )
+        for name, mutate in mutations:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                config, _run_root, checkpoint = self.accepted_run(
+                    Path(temporary), corrected=True, run_id=f"tamper-{name}"
+                )
+                mutate(checkpoint)
+                self.write_json(OP.checkpoint_path(config), checkpoint)
+                result = OP.inspect_run(config)
+                checks = {item["name"]: item for item in result["checks"]}
+                self.assertEqual(result["overall_status"], "FAIL")
+                self.assertEqual(checks["target_evidence"]["status"], "FAIL")
+                self.assertEqual(result["result"]["target_evidence_classification"], "INVALID")
+
+    def test_historical_invalid_verdict_raw_tamper_is_not_skipped(self):
+        for action in ("tamper", "delete"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as temporary:
+                config, _run_root, checkpoint = self.accepted_run(
+                    Path(temporary), corrected=True,
+                    run_id=f"historical-{action}",
+                )
+                original = checkpoint["verdict_correction"]["original_verdict_reference"]
+                original_path = Path(checkpoint["run_root"]) / original["final_path"]
+                if action == "tamper":
+                    original_path.write_bytes(original_path.read_bytes() + b"tampered\n")
+                else:
+                    original_path.unlink()
+                result = OP.inspect_run(config)
+                checks = {item["name"]: item for item in result["checks"]}
+                expected = "FAIL" if action == "tamper" else "UNAVAILABLE"
+                self.assertEqual(result["overall_status"], expected)
+                self.assertEqual(checks["summary"]["status"], expected)
+                self.assertEqual(checks["correction_provenance"]["status"], expected)
+
+    def test_nonaccept_terminals_make_target_evidence_not_applicable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path, *_ = self.fixture(Path(temporary), run_id="human-terminal")
+            config = OP.load_config(config_path)
+            self.run_config(config, verdict="HUMAN_GATE")
+            result = OP.inspect_run(config)
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(result["overall_status"], "PASS", result)
+            self.assertEqual(checks["target_evidence"]["status"], "NOT_APPLICABLE")
+            self.assertEqual(result["result"]["target_evidence_classification"], "NOT_APPLICABLE")
+            self.assertTrue(result["result"]["human_gate"])
+            self.assertEqual(result["result"]["safe_next_action"], "HUMAN_REVIEW_REQUIRED")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path, *_ = self.fixture(
+                Path(temporary), run_id="exhausted-terminal", runtime_transition=True
+            )
+            config = OP.load_config(config_path)
+            code, _run_root = self.run_config(
+                config,
+                verdict="ACCEPT",
+                environment={
+                    "P5_TEST_SCENARIO": "executor-commit",
+                    "P6_TEST_INITIAL_BAD_LOCATOR": "1",
+                    "P6_TEST_CORRECTION_BAD_LOCATOR": "1",
+                },
+            )
+            self.assertEqual(code, 1)
+            checkpoint = self.read_json(OP.checkpoint_path(config))
+            self.assertEqual(checkpoint["logical_outcome"]["state"], OP.RUNNER.FAILED_CLOSED)
+            self.assertEqual(len(checkpoint["summary_progress"]), 5)
+            result = OP.inspect_run(config)
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(result["overall_status"], "PASS", result)
+            self.assertEqual(checks["target_evidence"]["status"], "NOT_APPLICABLE")
+            self.assertEqual(result["result"]["target_evidence_classification"], "NOT_APPLICABLE")
+            self.assertEqual(checks["correction_provenance"]["status"], "PASS")
+            self.assertTrue(result["result"]["failed_closed"])
+            self.assertEqual(result["result"]["safe_next_action"], "TERMINAL_FAILURE")
+
+    def test_authoritative_raw_missing_is_unavailable_and_inspect_is_read_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config, run_root, checkpoint = self.accepted_run(
+                Path(temporary), corrected=True, run_id="raw-missing"
+            )
+            authoritative = checkpoint["instruction_reference"]
+            (run_root / authoritative["final_path"]).unlink()
+            protected = {
+                path: path.read_bytes()
+                for path in (
+                    OP.checkpoint_path(config),
+                    run_root / "manifest.json",
+                    run_root / OP.RUNNER.PROGRESS.EVENTS_FILENAME,
+                    run_root / OP.RUNNER.PROGRESS.STATUS_FILENAME,
+                    Path(config.resolved["evidence"]["summary_root"])
+                    / f"{checkpoint['run_id']}.md",
+                )
+            }
+            first = OP.inspect_run(config)
+            second = OP.inspect_run(config)
+            for result in (first, second):
+                checks = {item["name"]: item for item in result["checks"]}
+                self.assertEqual(result["overall_status"], "UNAVAILABLE")
+                self.assertEqual(checks["summary"]["status"], "UNAVAILABLE")
+                self.assertEqual(checks["target_evidence"]["status"], "UNAVAILABLE")
+                self.assertEqual(result["result"]["target_evidence_classification"], "UNAVAILABLE")
+            self.assertEqual(first, second)
+            for path, content in protected.items():
+                self.assertEqual(path.read_bytes(), content)
+
+    def test_commit_evidence_object_type_hash_reachability_and_full_id(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config, run_root, checkpoint = self.accepted_run(
+                Path(temporary), corrected=False, run_id="commit-rules"
+            )
+            target = Path(config.resolved["target"]["repo"])
+            head = checkpoint["target_after"]["head"]
+            valid = checkpoint["runtime_transition"]["record"]["evidence"]
+            self.assertEqual(
+                OP.validate_target_evidence_items(
+                    valid, target_repo=target, run_root=run_root,
+                    authoritative_head=head,
+                ),
+                1,
+            )
+            self.assertIsNotNone(OP.OBJECT_ID.fullmatch("a" * 40))
+            self.assertIsNotNone(OP.OBJECT_ID.fullmatch("a" * 64))
+            self.assertIsNone(OP.OBJECT_ID.fullmatch("a" * 39))
+
+            blob = subprocess.check_output(
+                ["git", "hash-object", "-w", "--stdin"],
+                cwd=target, input=b"blob evidence\n", text=False,
+            ).decode().strip()
+            tree = subprocess.check_output(
+                ["git", "rev-parse", "HEAD^{tree}"], cwd=target, text=True
+            ).strip()
+            unreachable = subprocess.check_output(
+                ["git", "commit-tree", tree, "-m", "unreachable evidence"],
+                cwd=target, text=True,
+            ).strip()
+            unreachable_bytes = subprocess.check_output(
+                ["git", "cat-file", "commit", unreachable], cwd=target
+            )
+            invalid = (
+                {"kind": "commit", "locator": "0" * 40, "sha256": "0" * 64},
+                {"kind": "commit", "locator": "0" * 64, "sha256": "0" * 64},
+                {"kind": "commit", "locator": blob, "sha256": OP.sha256_bytes(b"blob evidence\n")},
+                {**valid[0], "sha256": "0" * 64},
+                {"kind": "commit", "locator": unreachable, "sha256": OP.sha256_bytes(unreachable_bytes)},
+            )
+            for item in invalid:
+                with self.subTest(locator=item["locator"][:12]), self.assertRaises(OP.OperatorError):
+                    OP.validate_target_evidence_items(
+                        [item], target_repo=target, run_root=run_root,
+                        authoritative_head=head,
+                    )
 
     def test_inspect_detects_rehashed_event_tamper(self):
         with tempfile.TemporaryDirectory() as temporary:
