@@ -1967,6 +1967,9 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         "framework_static": str(args.framework_static.resolve()),
         "max_cycles": args.max_cycles,
         "max_review_correction_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
+        "operator_config_identity": copy.deepcopy(
+            getattr(args, "operator_config_identity", None)
+        ),
         "progress_contract_version": PROGRESS.SCHEMA_VERSION,
         "progress_events_filename": PROGRESS.EVENTS_FILENAME,
         "progress_status_filename": PROGRESS.STATUS_FILENAME,
@@ -1990,6 +1993,26 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
             "framework_repo": settings["repo"],
         })
     return configuration
+
+
+def checkpoint_configuration_matches(
+    saved: Any, current: Mapping[str, Any]
+) -> bool:
+    """Compare config exactly, treating a pre-F3 legacy omission as legacy null.
+
+    This compatibility is only available when the current invocation is also a
+    legacy long-argument invocation.  A config-backed invocation never upgrades
+    or adopts an old checkpoint.
+    """
+    if not isinstance(saved, dict):
+        return False
+    normalized = dict(saved)
+    if (
+        "operator_config_identity" not in normalized
+        and current.get("operator_config_identity") is None
+    ):
+        normalized["operator_config_identity"] = None
+    return normalized == current
 
 
 def target_state_from_metadata(value: Mapping[str, Any]) -> TargetState:
@@ -3140,7 +3163,9 @@ def orchestrate(
         if (not evidence_finalization_enabled
                 and checkpoint["state"] in {HUMAN_GATE, FAILED_CLOSED}):
             raise InvariantViolation("terminal checkpoint has no incomplete work to resume")
-        if checkpoint.get("configuration") != configuration:
+        if not checkpoint_configuration_matches(
+            checkpoint.get("configuration"), configuration
+        ):
             raise InvariantViolation("resume configuration does not match checkpoint")
         run_id = P4.validate_run_id(checkpoint.get("run_id"))
         run_root = Path(checkpoint.get("run_root", "")).resolve()
@@ -3298,6 +3323,9 @@ def orchestrate(
             ),
             "max_cycles": args.max_cycles,
             "max_review_correction_attempts": MAX_REVIEW_CORRECTION_ATTEMPTS,
+            "operator_config_identity": copy.deepcopy(
+                configuration.get("operator_config_identity")
+            ),
             "reviewer_home": str(args.reviewer_home.resolve()),
             "reviewer_session_mode": "persistent-with-explicit-resume",
             "reviewer_sandbox": NO_CODEX_SANDBOX,
@@ -4746,6 +4774,9 @@ def preflight_report(
         "executor_home": str(args.executor_home.resolve()),
         "governance": governance.metadata(),
         "max_cycles": args.max_cycles,
+        "operator_config_identity": copy.deepcopy(
+            getattr(args, "operator_config_identity", None)
+        ),
         "runtime_transition_cli_enabled": bool(getattr(args, "enable_runtime_transition", False)),
         "preflight": "passed",
         "reviewer_home": str(args.reviewer_home.resolve()),

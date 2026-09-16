@@ -254,8 +254,97 @@ Common optional arguments:
 --summary-root
 ```
 
-The current interface uses explicit CLI arguments. Higher-level workload configuration,
-doctor/status/inspect commands, and an interactive UI are not yet available.
+This long-argument interface remains supported. The workload-config interface below compiles to
+the same arguments and state machine.
+
+## Workload config and operator CLI
+
+`scripts/onepcloop.py` provides one versioned operator entry point:
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json doctor
+
+# Replace doctor with: preflight, run, resume, status, or inspect.
+```
+
+The strict JSON config has exactly these sections and fields:
+
+```json
+{
+  "schema_version": 1,
+  "workload_id": "example-workload",
+  "target": {"repo": "./target", "branch": "feature"},
+  "governance": {
+    "workload_static": "./workload_static.md",
+    "workload_runtime": "./workload_runtime.md",
+    "framework_repo": "../framework-loop",
+    "framework_static": "../framework-loop/1PCloop/docs/miniloop_static.md",
+    "framework_runtime": "../framework-loop/1PCloop/docs/miniloop_runtime.md"
+  },
+  "profiles": {
+    "reviewer_home": "/absolute/reviewer-profile",
+    "executor_home": "/absolute/executor-profile"
+  },
+  "execution": {
+    "codex_bin": "/absolute/path/to/codex",
+    "max_cycles": 8,
+    "timeout_seconds": 900,
+    "progress_interval_seconds": 15,
+    "enable_runtime_transition": true
+  },
+  "evidence": {
+    "runs_root": "../framework-loop/1PCloop/.local/runs",
+    "state_root": "../framework-loop/1PCloop/.local/state",
+    "summary_root": "../framework-loop/1PCloop/evidence-summaries"
+  },
+  "framework_git": {
+    "branch": "main",
+    "remote": "origin",
+    "push_ref": "refs/heads/main"
+  }
+}
+```
+
+Duplicate keys, unknown or missing fields, wrong types/versions, prohibited credential/prompt
+fields, and identical Reviewer/Executor profiles are rejected. Relative paths resolve from the
+config file's directory, never the caller's working directory. `~` is rejected and environment
+or shell expansion is not performed. The raw file SHA-256, canonical resolved-config SHA-256,
+absolute config path, and workload ID form the config identity. New config-backed runs bind that
+identity to the checkpoint and manifest; resume rejects any byte, resolved-value, path, profile,
+target, governance, Git, or storage drift. Legacy invocations record a `null` operator config
+identity and remain resumable only through their legacy long arguments—they are never guessed
+into the new contract.
+
+Command behavior is:
+
+- `doctor` checks Python/jsonschema, Codex executable/version, distinct profile directories, Git,
+  target/framework identities, remote ref, governance/schemas, and ignored local storage. It
+  creates no run/checkpoint and invokes no Agent.
+- `preflight` calls the existing mutation-runner validator and emits its report without creating
+  evidence or invoking an Agent.
+- `run` compiles config into the existing runner and executes the unchanged Reviewer–Executor
+  state machine.
+- `resume` reads exactly `<state_root>/<workload_id>/checkpoint.json`, obtains its run ID, and
+  validates the saved exact config identity. It never scans directories or accepts overrides.
+- `status` projects checkpoint, F2 live/event observation, and F1 final-result fields, including
+  cycle/role/timers/activity/target, logical outcome, Runtime transition, publication,
+  Human-Gate/failed-closed flags, artifact locators, observation availability, and one mechanical
+  safe action: `RESUME_ALLOWED`, `HUMAN_REVIEW_REQUIRED`, `TERMINAL_SUCCESS`,
+  `TERMINAL_FAILURE`, `START_NEW_RUN_ALLOWED`, or `STATE_UNAVAILABLE`.
+- `inspect` read-only validates config/checkpoint/manifest identity, F2 sequence/hash/suffix and
+  live projection, tracked summary and available raw-artifact hashes, framework evidence
+  commit/push, and target Git identity. Missing Git-ignored raw evidence or an incomplete JSONL
+  tail is `UNAVAILABLE`; conflicting complete evidence is `FAIL`. Inspect never truncates the
+  journal or repairs an artifact.
+
+`doctor`, `preflight`, `status`, and `inspect` print exactly one compact JSON object with
+`schema_version`, command, config identity, overall status, checks/result, and public artifact
+locators. `PASS` and `UNAVAILABLE` return 0; `FAIL` returns 1; invalid config returns 2. Exceptions,
+profile contents, prompts, peer messages, command output, stderr, and internal diagnostics are not
+included. `run` and `resume` retain existing `PROGRESS` plus F1 `FINAL_RESULT` output.
+
+F3 does not add interactive decisions or a TUI/GUI; the TUI remains F6 scope.
 
 ## Automatic loop semantics
 
@@ -343,8 +432,8 @@ Mechanically attributable Agent turns, Executor commits, corrections, Runtime tr
 summaries, framework commits, and pushes are not repeated. If the runner cannot safely determine
 whether an Executor changed the target, it enters a Human Gate instead of replaying blindly.
 
-The current product does not yet provide a standalone status command or interactive TUI/GUI.
-F2 supplies the underlying local status model; F3 and F6 own those interfaces.
+The config-backed `status` command provides the read-only projection described above. It does not
+resume work or make Human decisions. An interactive TUI/GUI is still not provided.
 
 ## Structured progress and live status
 
@@ -415,9 +504,9 @@ control state. Event/checkpoint identity conflict at resume still fails closed.
 F1 `FINAL_RESULT` remains unchanged and is emitted after the final `run_finished` projection.
 F2 was independently accepted after its initial review rejected incomplete checkpoint-suffix
 validation and duplicate legacy tool output; repair commit
-`54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` closes both findings. F3 is now the sole Active Step
-and owns workload config plus `doctor`/`preflight`/`run`/`resume`/`status`/`inspect` commands; none
-of those new subcommands is implemented yet. Interactive TUI remains F6 scope.
+`54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` closes both findings. The F3 operator commands consume
+these structured artifacts without changing F2 recovery semantics. Interactive TUI remains F6
+scope.
 
 ## Evidence
 
@@ -513,7 +602,7 @@ Repository-backed evidence covers:
 - structured progress sequence/identity recovery, monotonic active timing, live projection,
   tool-activity throttling, and observation-failure isolation.
 
-The current deterministic regression suite contains 114 tests and passes with `ResourceWarning`
+The current deterministic regression suite contains 140 tests and passes with `ResourceWarning`
 promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
 in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
 not duplicate progress records.
@@ -539,6 +628,7 @@ tests/test_runtime_transition.py     structured verdict and Runtime transition
 tests/test_evidence_summary.py       summary, commit, and push recovery
 tests/test_verdict_correction.py     verdict correction and public result
 tests/test_progress_status.py        structured progress, timing, status, and recovery
+tests/test_operator_cli.py           workload config and operator commands
 ```
 
 ## Code and documentation map
@@ -548,6 +638,8 @@ scripts/run_mutation_loop.py      current mutation orchestrator
 scripts/run_text_loop.py          read-only text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary, framework commit, and push helper
 scripts/progress_status.py        F2 progress journal, live snapshot, and renderer
+scripts/workload_operator.py      F3 config, diagnostics, and read-only projection
+scripts/onepcloop.py              unified F3 operator CLI
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance

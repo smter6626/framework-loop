@@ -240,8 +240,90 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 --summary-root
 ```
 
-当前入口仍是显式参数 CLI；更高层的 workload config、doctor/status/inspect 命令和交互式界面
-尚未提供。
+该长参数入口继续受支持。下面的 workload config 入口只把同一配置编译成这些参数，仍调用同一个
+状态机。
+
+## Workload config 与 operator CLI
+
+`scripts/onepcloop.py` 提供统一的版本化入口：
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json doctor
+
+# doctor 可替换为：preflight、run、resume、status 或 inspect。
+```
+
+严格 JSON config 只允许以下 section 和字段：
+
+```json
+{
+  "schema_version": 1,
+  "workload_id": "example-workload",
+  "target": {"repo": "./target", "branch": "feature"},
+  "governance": {
+    "workload_static": "./workload_static.md",
+    "workload_runtime": "./workload_runtime.md",
+    "framework_repo": "../framework-loop",
+    "framework_static": "../framework-loop/1PCloop/docs/miniloop_static.md",
+    "framework_runtime": "../framework-loop/1PCloop/docs/miniloop_runtime.md"
+  },
+  "profiles": {
+    "reviewer_home": "/absolute/reviewer-profile",
+    "executor_home": "/absolute/executor-profile"
+  },
+  "execution": {
+    "codex_bin": "/absolute/path/to/codex",
+    "max_cycles": 8,
+    "timeout_seconds": 900,
+    "progress_interval_seconds": 15,
+    "enable_runtime_transition": true
+  },
+  "evidence": {
+    "runs_root": "../framework-loop/1PCloop/.local/runs",
+    "state_root": "../framework-loop/1PCloop/.local/state",
+    "summary_root": "../framework-loop/1PCloop/evidence-summaries"
+  },
+  "framework_git": {
+    "branch": "main",
+    "remote": "origin",
+    "push_ref": "refs/heads/main"
+  }
+}
+```
+
+Duplicate key、未知/缺失字段、错误类型或版本、credential/prompt 类禁止字段以及相同的
+Reviewer/Executor profile 都会被拒绝。相对路径只按 config 文件目录解析，与调用 cwd 无关；不支持
+`~`，也不执行环境变量或 shell expansion。Raw 文件 SHA-256、canonical resolved-config SHA-256、
+绝对 config path 和 workload ID 共同形成 identity。新 run 把它绑定到 checkpoint 与 manifest；
+resume 对任何字节、resolved value、路径、profile、target、governance、Git 或 storage drift 都
+fail closed。Legacy invocation 的 operator config identity 明确为 `null`，只能继续使用原长参数
+resume，不会被猜测升级。
+
+各命令语义：
+
+- `doctor` 只读检查 Python/jsonschema、Codex executable/version、独立 profile、Git、target/
+  framework identity、remote ref、governance/schema 和 ignored local storage；不创建 run/
+  checkpoint，不调用 Agent。
+- `preflight` 直接调用现有 runner validator，不创建 evidence 或调用 Agent。
+- `run` 将 config 编译成现有参数并调用未复制、未改变的 Reviewer–Executor 状态机。
+- `resume` 只读取 `<state_root>/<workload_id>/checkpoint.json`，从中取得 run ID 并验证保存的精确
+  config identity；不扫描目录、不接受 override。
+- `status` 投影 checkpoint、F2 observation 与 F1 final result，包括 cycle/role/timer/activity/
+  target、logical outcome、Runtime transition、publication、Human Gate/failed-closed、artifact、
+  observation availability，以及 `RESUME_ALLOWED`、`HUMAN_REVIEW_REQUIRED`、
+  `TERMINAL_SUCCESS`、`TERMINAL_FAILURE`、`START_NEW_RUN_ALLOWED` 或 `STATE_UNAVAILABLE`。
+- `inspect` 只读验证 config/checkpoint/manifest、F2 sequence/hash/suffix/live projection、tracked
+  summary 与现存 raw artifact、framework evidence commit/push 和 target Git identity。缺失
+  Git-ignored raw evidence 或 incomplete JSONL tail 为 `UNAVAILABLE`；完整冲突 evidence 为
+  `FAIL`。Inspect 不截断 journal，也不修复 artifact。
+
+`doctor`、`preflight`、`status`、`inspect` 各只输出一个 compact JSON object，包含版本、命令、
+config identity、overall status、checks/result 与公开 artifact locator。`PASS`/`UNAVAILABLE` 返回
+0，`FAIL` 返回 1，无效 config 返回 2。输出不包含异常正文、profile 内容、prompt、peer message、
+命令输出、stderr 或 internal diagnostic。`run`/`resume` 保留原 `PROGRESS` 和 F1 `FINAL_RESULT`。
+
+F3 不增加交互式决定或 TUI/GUI；TUI 仍属于 F6。
 
 ## 自动循环语义
 
@@ -326,7 +408,8 @@ identity、correction attempt、Runtime transition、summary 和 publication rec
 或 push 不会重复。无法安全确定 Executor 是否已修改 target 时会进入 Human Gate，而不是盲目
 重跑。
 
-当前版本尚未提供 run-wide/stage-wide timer、独立 status subcommand 或交互式 TUI/GUI。
+Config-backed `status` 只读投影 checkpoint 与 F2 timer/status，不会自动 resume 或替 Human 作决定。
+当前仍不提供交互式 TUI/GUI。
 
 ## Evidence
 
@@ -424,7 +507,7 @@ Repository-backed evidence 已覆盖：
 - Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
 - public terminal result 的控制字符、长度和字段注入防护。
 
-当前 deterministic regression suite 包含90项测试，并在 `ResourceWarning` 提升为错误时通过。
+当前 deterministic regression suite 包含140项测试，并在 `ResourceWarning` 提升为错误时通过。
 历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
 `evidence-summaries/`、`runs/` 和 Git history；README 不复制这些进度记录。
 
@@ -448,6 +531,8 @@ tests/test_run_mutation_loop.py      mutation state machine/restart
 tests/test_runtime_transition.py     structured verdict/Runtime transition
 tests/test_evidence_summary.py       summary/commit/push recovery
 tests/test_verdict_correction.py     verdict correction/public result
+tests/test_progress_status.py        structured progress/timing/status/recovery
+tests/test_operator_cli.py           workload config/operator commands
 ```
 
 ## 代码和文档入口
@@ -456,6 +541,9 @@ tests/test_verdict_correction.py     verdict correction/public result
 scripts/run_mutation_loop.py      当前 mutation orchestrator
 scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary、framework commit 和 push helper
+scripts/progress_status.py        F2 progress journal、live snapshot 和 renderer
+scripts/workload_operator.py      F3 config、diagnostics 和只读 projection
+scripts/onepcloop.py              统一 F3 operator CLI
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance

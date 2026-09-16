@@ -33,6 +33,9 @@ import time
 from pathlib import Path
 
 args = sys.argv[1:]
+if args == ["--version"]:
+    print("codex-test 1.0")
+    raise SystemExit(0)
 prompt = sys.stdin.buffer.read()
 output_path = Path(args[args.index("--output-last-message") + 1])
 home = Path(os.environ["CODEX_HOME"])

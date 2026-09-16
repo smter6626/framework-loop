@@ -263,7 +263,15 @@ def validate_event(event: Mapping[str, Any]) -> None:
         raise ProgressError("progress evidence-publication projection is invalid")
 
 
-def scan_events(path: Path) -> tuple[List[Dict[str, Any]], bool]:
+def scan_events(
+    path: Path, *, recover_incomplete_tail: bool = True
+) -> tuple[List[Dict[str, Any]], bool]:
+    """Validate complete event lines, optionally repairing one partial tail.
+
+    The mutation runner uses the default recovery behavior.  Read-only operator
+    inspection passes ``recover_incomplete_tail=False`` so observation never
+    changes evidence while still validating the complete prefix.
+    """
     if not path.exists():
         return [], False
     if not path.is_file() or path.is_symlink():
@@ -274,7 +282,8 @@ def scan_events(path: Path) -> tuple[List[Dict[str, Any]], bool]:
         recovered_tail = True
         boundary = data.rfind(b"\n")
         data = data[:boundary + 1] if boundary >= 0 else b""
-        atomic_write_bytes(path, data)
+        if recover_incomplete_tail:
+            atomic_write_bytes(path, data)
     events: List[Dict[str, Any]] = []
     previous: Optional[Dict[str, Any]] = None
     for expected_sequence, line in enumerate(data.splitlines(), start=1):
