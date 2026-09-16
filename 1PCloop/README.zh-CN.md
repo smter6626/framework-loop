@@ -130,6 +130,24 @@ evidence locator。
 Static 不记录当前进度；Runtime 不得静默修改 Static。已经关闭的任务默认冻结，新目标应建立新的
 task-local Static/Runtime。
 
+### 默认中文 Prompt 模板
+
+- [Static Prompt 模板](templates/static_prompt_zh.md)用于建立、审查或经授权修订稳定任务合同。
+  其只读 Framework v1.2 来源是
+  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_static.md`，
+  固定 SHA-256 为
+  `e3ff93b4136c0d3d87d7f1a319ca9c4513f831327daf18aea46f9f3d6659daf7`。
+- [Runtime Prompt 模板](templates/runtime_prompt_zh.md)用于恢复权威状态、独立审核 evidence、维护唯一
+  Active Step，并仅在 evidence 支持时推进状态。其只读 Framework v1.2 来源是
+  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_runtime.md`，
+  固定 SHA-256 为
+  `3cbc4c93adff6ac2b1fb351a8a81f4b65dbd73b4de28ee2d0d4141522258ab54`。
+
+使用时打开对应 tracked 模板，复制 `## 可复制 Prompt` 下的内容，只替换有已知事实支持的
+`{{...}}` 占位符；未知项继续显式保留，低风险任务可以删除没有价值的章节。外部 Tools 文件仅作为
+只读 provenance 输入。本地快照不会自动同步；未来修改模板前必须重新核对来源路径和 hash，并接受
+独立审核。
+
 Reviewer 的 external context 由 orchestrator 从以下来源重建：
 
 ```text

@@ -141,6 +141,26 @@ blockers, pending tasks, Human decisions, and evidence locators.
 Static does not record progress; Runtime cannot silently amend Static. A completed task is frozen
 by default, and a new objective should receive new task-local governance.
 
+### Default Chinese prompt templates
+
+- [Static prompt template](templates/static_prompt_zh.md) initializes, reviews, or performs an
+  authorized revision of a stable task contract. Its read-only Framework v1.2 source is
+  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_static.md`
+  at SHA-256
+  `e3ff93b4136c0d3d87d7f1a319ca9c4513f831327daf18aea46f9f3d6659daf7`.
+- [Runtime prompt template](templates/runtime_prompt_zh.md) restores authoritative state, reviews
+  evidence independently, maintains the single Active Step, and advances state only when evidence
+  supports it. Its read-only Framework v1.2 source is
+  `/Users/smterpro/Workspace/Tools/structured-llm-execution-framework/structured-llm-execution-framework_runtime.md`
+  at SHA-256
+  `3cbc4c93adff6ac2b1fb351a8a81f4b65dbd73b4de28ee2d0d4141522258ab54`.
+
+Open the appropriate tracked template, copy the content under `## 可复制 Prompt`, and replace only
+the `{{...}}` placeholders supported by known task facts. Keep unknowns explicit and tailor away
+sections that add no value for a low-risk task. The external Tools files are read-only provenance
+inputs. These local snapshots do not synchronize automatically; any future template change must
+recheck the source path and hash and receive independent review.
+
 The orchestrator reconstructs Reviewer context from:
 
 ```text
