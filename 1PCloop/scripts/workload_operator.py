@@ -60,6 +60,20 @@ def _load_runner() -> ModuleType:
 RUNNER = _load_runner()
 
 
+def _load_human_gate() -> ModuleType:
+    path = SCRIPT_PATH.with_name("human_gate.py")
+    spec = importlib.util.spec_from_file_location("_f5_human_gate", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Human Gate projection is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+HUMAN_GATE = _load_human_gate()
+
+
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -851,29 +865,130 @@ def _validate_observation(
     return status, events, incomplete
 
 
+def _gate_evidence_availability(
+    config: WorkloadConfig,
+    checkpoint: Mapping[str, Any],
+    paths: Mapping[str, str],
+) -> str:
+    """Classify evidence needed by the Human Gate projection without writing."""
+    run_root = Path(paths["run_root"])
+    manifest_path = Path(paths["manifest"])
+    events_path = Path(paths["control_events"])
+    status_path = Path(paths["live_status"])
+    summary_path = Path(paths["tracked_summary"])
+    if not run_root.is_dir() or run_root.is_symlink():
+        return "UNAVAILABLE"
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        return "UNAVAILABLE"
+    if not events_path.is_file() or events_path.is_symlink():
+        return "UNAVAILABLE"
+    if not status_path.is_file() or status_path.is_symlink():
+        return "UNAVAILABLE"
+    try:
+        manifest = _read_object(manifest_path, "manifest")
+        if manifest.get("run_id") != checkpoint.get("run_id"):
+            return "INVALID"
+        configuration = manifest.get("run_configuration")
+        if not isinstance(configuration, dict) or configuration.get(
+            "operator_config_identity"
+        ) != config.identity():
+            return "INVALID"
+        if manifest.get("final_result") != checkpoint.get("final_result"):
+            return "INVALID"
+        live, _events, incomplete = _validate_observation(checkpoint, paths)
+        if live is None or incomplete:
+            return "UNAVAILABLE"
+        progress = checkpoint.get("summary_progress", [])
+        if not isinstance(progress, list):
+            return "INVALID"
+        expected = RUNNER.P63.expected_summary_bytes(
+            str(checkpoint["run_id"]), run_root, progress
+        )
+        if progress:
+            if not summary_path.is_file() or summary_path.is_symlink():
+                return "UNAVAILABLE"
+            if summary_path.read_bytes() != expected:
+                return "INVALID"
+        elif summary_path.exists():
+            return "INVALID"
+        for record in progress:
+            entry = RUNNER.P63._entry_from_record(record)
+            artifacts = entry.get("raw_artifacts")
+            if not isinstance(artifacts, list):
+                return "INVALID"
+            for artifact in artifacts:
+                locator = artifact.get("locator") if isinstance(artifact, dict) else None
+                if not isinstance(locator, str) or not Path(locator).is_file():
+                    return "UNAVAILABLE"
+        RUNNER.P63.validate_summary_artifacts(
+            run_id=str(checkpoint["run_id"]),
+            run_root=run_root,
+            progress=progress,
+        )
+    except FileNotFoundError:
+        return "UNAVAILABLE"
+    except (KeyError, OSError, RuntimeError, ValueError, OperatorError):
+        return "INVALID"
+    return "AVAILABLE"
+
+
+def _human_gate_projection(
+    config: WorkloadConfig,
+    checkpoint: Optional[Mapping[str, Any]],
+    *,
+    identity_status: str = "VALID",
+) -> Dict[str, Any]:
+    if checkpoint is None:
+        artifacts = {
+            "config": str(config.path),
+            "checkpoint": str(checkpoint_path(config)),
+        }
+        availability = "UNAVAILABLE"
+    else:
+        artifacts = _status_paths(config, checkpoint)
+        availability = (
+            "INVALID"
+            if identity_status == "INVALID"
+            else _gate_evidence_availability(config, checkpoint, artifacts)
+        )
+    return HUMAN_GATE.project_human_gate(
+        checkpoint,
+        identity_status=identity_status,
+        evidence_availability=availability,
+        artifact_locators=artifacts,
+    )
+
+
 def status(config: WorkloadConfig) -> Dict[str, Any]:
     path = checkpoint_path(config)
     if not path.exists():
+        gate = _human_gate_projection(config, None)
         return envelope(
             "status", config, overall="PASS",
             result={
                 "workload_id": config.workload_id,
                 "run_id": None,
-                "checkpoint_state": None,
                 "safe_next_action": "START_NEW_RUN_ALLOWED",
                 "observation_availability": "UNAVAILABLE",
+                **gate,
             },
             artifacts={"config": str(config.path), "checkpoint": str(path)},
         )
     try:
         checkpoint = load_bound_checkpoint(config)
     except OperatorError:
+        gate = _human_gate_projection(config, None, identity_status="INVALID")
         return envelope(
             "status", config, overall="FAIL",
-            result={"workload_id": config.workload_id, "safe_next_action": "STATE_UNAVAILABLE"},
+            result={
+                "workload_id": config.workload_id,
+                "safe_next_action": "STATE_UNAVAILABLE",
+                **gate,
+            },
             artifacts={"config": str(config.path), "checkpoint": str(path)},
         )
     paths = _status_paths(config, checkpoint)
+    gate = _human_gate_projection(config, checkpoint)
     observation = "AVAILABLE"
     live: Optional[Dict[str, Any]] = None
     incomplete = False
@@ -909,8 +1024,10 @@ def status(config: WorkloadConfig) -> Dict[str, Any]:
         "human_gate": checkpoint.get("state") == RUNNER.HUMAN_GATE or logical_state == RUNNER.HUMAN_GATE,
         "failed_closed": checkpoint.get("state") == RUNNER.FAILED_CLOSED or logical_state == RUNNER.FAILED_CLOSED,
         "safe_next_action": safe_next_action(checkpoint),
+        **gate,
     }
-    return envelope("status", config, overall="PASS", result=result, artifacts=paths)
+    overall = "FAIL" if gate["gate_status"] == "INVALID" else "PASS"
+    return envelope("status", config, overall=overall, result=result, artifacts=paths)
 
 
 def _inspection_check(name: str, function: Callable[[], Any]) -> Dict[str, Any]:
@@ -927,13 +1044,15 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
     try:
         checkpoint = load_bound_checkpoint(config)
     except OperatorError:
+        gate = _human_gate_projection(config, None, identity_status="INVALID")
         return envelope(
             "inspect", config, overall="FAIL",
             checks=[{"name": "checkpoint_identity", "status": "FAIL", "code": "CHECKPOINT_IDENTITY_FAILED", "detail": "checkpoint identity validation did not pass"}],
-            result={"safe_next_action": "STATE_UNAVAILABLE"},
+            result={"safe_next_action": "STATE_UNAVAILABLE", **gate},
             artifacts={"config": str(config.path), "checkpoint": str(checkpoint_path(config))},
         )
     paths = _status_paths(config, checkpoint)
+    gate = _human_gate_projection(config, checkpoint)
     run_root = Path(paths["run_root"])
 
     def manifest_check() -> str:
@@ -1109,8 +1228,36 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
             "target_evidence_classification": target_evidence_classification,
             "safe_next_action": safe_next_action(checkpoint) if overall != "FAIL" else "STATE_UNAVAILABLE",
             **observation_result,
+            **gate,
         },
         artifacts=paths,
+    )
+
+
+def human_gate_status(config: WorkloadConfig) -> Dict[str, Any]:
+    """Return one read-only, config-bound Human Gate projection."""
+    path = checkpoint_path(config)
+    if not path.exists():
+        gate = _human_gate_projection(config, None)
+    else:
+        try:
+            checkpoint = load_bound_checkpoint(config)
+        except OperatorError:
+            gate = _human_gate_projection(config, None, identity_status="INVALID")
+        else:
+            gate = _human_gate_projection(config, checkpoint)
+    overall = {
+        "INVALID": "FAIL",
+        "UNAVAILABLE": "UNAVAILABLE",
+        "ACTIVE": "PASS",
+        "NOT_APPLICABLE": "PASS",
+    }[gate["gate_status"]]
+    return envelope(
+        "human-gate",
+        config,
+        overall=overall,
+        result=gate,
+        artifacts=gate["artifacts"],
     )
 
 

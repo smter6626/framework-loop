@@ -49,6 +49,9 @@ The current implementation provides:
 - separate logical-outcome, Runtime-transition, and evidence-publication results;
 - a versioned structured progress journal, atomic live-status snapshot, run/stage/timeout
   timing, and bounded terminal projection;
+- pure mutation contract helpers with compatibility re-exports from the runner;
+- a deterministic, read-only Human Gate projection shared by `status`, `inspect`, and
+  `human-gate`;
 - fail-closed behavior for state that cannot be explained mechanically.
 
 These capabilities improve review independence, recoverability, and traceability. They do not
@@ -285,7 +288,7 @@ the same arguments and state machine.
 1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
   --config /absolute/path/workload.json doctor
 
-# Replace doctor with: preflight, run, resume, status, or inspect.
+# Replace doctor with: preflight, run, resume, status, inspect, or human-gate.
 ```
 
 The strict JSON config has exactly these sections and fields:
@@ -363,14 +366,30 @@ Command behavior is:
   evidence package is internally consistent, not that the task was accepted. Inspect never
   truncates the journal or repairs an artifact. The result separately classifies authoritative
   target evidence as `VALID`, `INVALID`, `UNAVAILABLE`, or `NOT_APPLICABLE`.
+- `human-gate` returns the same bounded Human Gate projection used by `status` and `inspect`. It
+  creates no run, checkpoint, Agent turn, repair, or Human decision.
 
-`doctor`, `preflight`, `status`, and `inspect` print exactly one compact JSON object with
+`doctor`, `preflight`, `status`, `inspect`, and `human-gate` print exactly one compact JSON object with
 `schema_version`, command, config identity, overall status, checks/result, and public artifact
 locators. `PASS` and `UNAVAILABLE` return 0; `FAIL` returns 1; invalid config returns 2. Exceptions,
 profile contents, prompts, peer messages, command output, stderr, and internal diagnostics are not
 included. `run` and `resume` retain existing `PROGRESS` plus F1 `FINAL_RESULT` output.
 
-F3 does not add interactive decisions or a TUI/GUI; the TUI remains F6 scope.
+`scripts/mutation_contracts.py` owns side-effect-free control/message/public-result contracts.
+`scripts/human_gate.py` is a pure projection over structured state and public locators. It does
+not import the runner or inspect artifacts. `run_mutation_loop.py` re-exports its historical
+contract names for compatibility and remains the only mutation control state machine.
+
+Human Gate states are `ACTIVE`, `NOT_APPLICABLE`, `UNAVAILABLE`, and `INVALID`. Allowed actions
+are limited to `INSPECT_EVIDENCE`, `FINALIZE_EVIDENCE`, `REMEDIATE_EXTERNAL_STATE`,
+`START_NEW_RUN_AFTER_HUMAN_REVIEW`, and `NO_AUTOMATIC_REPAIR`. Recovery modes are
+`FINALIZATION_ONLY`, `HUMAN_REMEDIATION_REQUIRED`, `NEW_RUN_AFTER_REVIEW`, and `NO_ACTION`.
+Unknown or conflicting state defaults to inspection and Human remediation, never automatic
+repair. A complete evidence package does not resolve a Human Gate, and successful evidence
+publication does not change the logical outcome.
+
+The Human Gate projection is not an interactive decision surface and cannot resolve a gate.
+The F6 TUI and F7 real-service smoke are not implemented.
 
 ## Automatic loop semantics
 
@@ -458,8 +477,9 @@ Mechanically attributable Agent turns, Executor commits, corrections, Runtime tr
 summaries, framework commits, and pushes are not repeated. If the runner cannot safely determine
 whether an Executor changed the target, it enters a Human Gate instead of replaying blindly.
 
-The config-backed `status` command provides the read-only projection described above. It does not
-resume work or make Human decisions. An interactive TUI/GUI is still not provided.
+The config-backed `status`, `inspect`, and `human-gate` commands use the same read-only Human Gate
+projection. They do not resume work or make Human decisions. Publication recovery may resume only
+evidence finalization after a logical terminal; it cannot replay Reviewer or Executor turns.
 
 ## Structured progress and live status
 
@@ -628,8 +648,8 @@ Repository-backed evidence covers:
 - structured progress sequence/identity recovery, monotonic active timing, live projection,
   tool-activity throttling, and observation-failure isolation.
 
-The current deterministic regression suite contains 147 tests and passes with `ResourceWarning`
-promoted to an error. Historical experiments, phase verdicts, and complete evidence locators live
+The deterministic regression suite passes with `ResourceWarning` promoted to an error.
+Historical experiments, phase verdicts, and complete evidence locators live
 in `docs/miniloop_runtime.md`, `evidence-summaries/`, `runs/`, and Git history; this README does
 not duplicate progress records.
 
@@ -655,17 +675,21 @@ tests/test_evidence_summary.py       summary, commit, and push recovery
 tests/test_verdict_correction.py     verdict correction and public result
 tests/test_progress_status.py        structured progress, timing, status, and recovery
 tests/test_operator_cli.py           workload config and operator commands
+tests/test_mutation_contracts.py     pure contracts and runner compatibility
+tests/test_human_gate.py             Human Gate projection and read-only CLI
 ```
 
 ## Code and documentation map
 
 ```text
 scripts/run_mutation_loop.py      current mutation orchestrator
+scripts/mutation_contracts.py     side-effect-free control/message contracts
+scripts/human_gate.py             pure Human Gate status projection
 scripts/run_text_loop.py          read-only text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary, framework commit, and push helper
 scripts/progress_status.py        F2 progress journal, live snapshot, and renderer
-scripts/workload_operator.py      F3 config, diagnostics, and read-only projection
-scripts/onepcloop.py              unified F3 operator CLI
+scripts/workload_operator.py      config, diagnostics, and read-only projections
+scripts/onepcloop.py              unified operator CLI
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance

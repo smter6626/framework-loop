@@ -21,9 +21,7 @@ import sys
 import tempfile
 import threading
 import time
-import unicodedata
 from dataclasses import dataclass, replace
-from enum import Enum
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -39,11 +37,6 @@ DEFAULT_FRAMEWORK_STATIC = ACTIVE_ROOT / "docs/miniloop_static.md"
 DEFAULT_FRAMEWORK_RUNTIME = ACTIVE_ROOT / "docs/miniloop_runtime.md"
 DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
 DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
-SCHEMAS_ROOT = ACTIVE_ROOT / "schemas"
-REVIEWER_INSTRUCTION = "reviewer_instruction"
-EXECUTOR_RECEIPT = "executor_receipt"
-REVIEWER_VERDICT = "reviewer_verdict"
-TURN_SCHEMAS = (REVIEWER_INSTRUCTION, EXECUTOR_RECEIPT, REVIEWER_VERDICT)
 RUNTIME_STATE_BEGIN = b"<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->"
 RUNTIME_STATE_END = b"<!-- 1PCLOOP_RUNTIME_STATE_END -->"
 
@@ -89,21 +82,50 @@ TERMINAL_CHECKPOINT_STATES = {
     FRAMEWORK_EVIDENCE_PUSHED,
 }
 MAX_REVIEW_CORRECTION_ATTEMPTS = 2
-MAX_PUBLIC_REASON_CHARS = 512
-PUBLIC_REASON_TRUNCATION_MARKER = "...[truncated]"
-UNCLASSIFIED_PUBLIC_REASON = (
-    "mutation loop stopped; inspect checkpoint and local evidence"
-)
-FINAL_RESULT_FIELDS = (
-    "run_id",
-    "logical_outcome",
-    "exit_code",
-    "runtime_transition",
-    "evidence_publication",
-    "reason",
-    "error_code",
-    "run_root",
-)
+
+
+def load_contract_helpers() -> ModuleType:
+    """Load pure mutation contracts without creating a runner dependency."""
+    name = "mutation_contracts"
+    path = SCRIPT_PATH.with_name("mutation_contracts.py")
+    existing = sys.modules.get(name)
+    existing_path = getattr(existing, "__file__", None)
+    if existing_path is not None and Path(existing_path).resolve() == path.resolve():
+        return existing
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load mutation contracts: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+CONTRACTS = load_contract_helpers()
+SCHEMAS_ROOT = CONTRACTS.SCHEMAS_ROOT
+REVIEWER_INSTRUCTION = CONTRACTS.REVIEWER_INSTRUCTION
+EXECUTOR_RECEIPT = CONTRACTS.EXECUTOR_RECEIPT
+REVIEWER_VERDICT = CONTRACTS.REVIEWER_VERDICT
+TURN_SCHEMAS = CONTRACTS.TURN_SCHEMAS
+InvariantViolation = CONTRACTS.InvariantViolation
+ControlErrorCode = CONTRACTS.ControlErrorCode
+CORRECTABLE_VERDICT_CODES = CONTRACTS.CORRECTABLE_VERDICT_CODES
+ControlFailure = CONTRACTS.ControlFailure
+correctable_failure = CONTRACTS.correctable_failure
+control_error_code = CONTRACTS.control_error_code
+MAX_PUBLIC_REASON_CHARS = CONTRACTS.MAX_PUBLIC_REASON_CHARS
+PUBLIC_REASON_TRUNCATION_MARKER = CONTRACTS.PUBLIC_REASON_TRUNCATION_MARKER
+UNCLASSIFIED_PUBLIC_REASON = CONTRACTS.UNCLASSIFIED_PUBLIC_REASON
+FINAL_RESULT_FIELDS = CONTRACTS.FINAL_RESULT_FIELDS
+escape_public_text = CONTRACTS.escape_public_text
+bounded_public_reason = CONTRACTS.bounded_public_reason
+public_final_result = CONTRACTS.public_final_result
+terminal_scalar = CONTRACTS.terminal_scalar
+strict_json = CONTRACTS.strict_json
+validate_json_schema = CONTRACTS.validate_json_schema
+schema_path = CONTRACTS.schema_path
+validate_turn_payload = CONTRACTS.validate_turn_payload
+validate_verdict_relationships = CONTRACTS.validate_verdict_relationships
 
 
 def load_p4_helpers() -> ModuleType:
@@ -160,222 +182,6 @@ def record_active_progress(method: str, *args: Any, **kwargs: Any) -> Optional[A
         reporter.observation_available = False
         reporter.observation_error = "structured progress observation unavailable"
         return None
-
-
-class InvariantViolation(RuntimeError):
-    """A mechanical invariant failed and the loop must not continue."""
-
-
-class ControlErrorCode(str, Enum):
-    """Stable public codes for F1 control decisions."""
-
-    VERDICT_REJECT_CONTRACT = "VERDICT_REJECT_CONTRACT"
-    VERDICT_HUMAN_GATE_CONTRACT = "VERDICT_HUMAN_GATE_CONTRACT"
-    VERDICT_ACCEPT_CONTRACT = "VERDICT_ACCEPT_CONTRACT"
-    VERDICT_REVIEWED_TARGET_MISMATCH = "VERDICT_REVIEWED_TARGET_MISMATCH"
-    VERDICT_GOVERNANCE_HASH_MISMATCH = "VERDICT_GOVERNANCE_HASH_MISMATCH"
-    VERDICT_RUNTIME_HASH_MISMATCH = "VERDICT_RUNTIME_HASH_MISMATCH"
-    VERDICT_ACTIVE_STEP_MISMATCH = "VERDICT_ACTIVE_STEP_MISMATCH"
-    EVIDENCE_COMMIT_LOCATOR_INVALID = "EVIDENCE_COMMIT_LOCATOR_INVALID"
-    EVIDENCE_COMMIT_UNRESOLVABLE = "EVIDENCE_COMMIT_UNRESOLVABLE"
-    EVIDENCE_COMMIT_NOT_COMMIT = "EVIDENCE_COMMIT_NOT_COMMIT"
-    EVIDENCE_COMMIT_UNREACHABLE = "EVIDENCE_COMMIT_UNREACHABLE"
-    EVIDENCE_LOCATOR_NOT_ABSOLUTE = "EVIDENCE_LOCATOR_NOT_ABSOLUTE"
-    EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY = "EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY"
-    EVIDENCE_LOCATOR_MISSING = "EVIDENCE_LOCATOR_MISSING"
-    EVIDENCE_HASH_MISMATCH = "EVIDENCE_HASH_MISMATCH"
-    EVIDENCE_COMMIT_REQUIRED = "EVIDENCE_COMMIT_REQUIRED"
-    REVIEW_PROCESS_AUTHORITY_INVALID = "REVIEW_PROCESS_AUTHORITY_INVALID"
-    REVIEW_THREAD_MISMATCH = "REVIEW_THREAD_MISMATCH"
-    REVIEW_CONTEXT_STALE = "REVIEW_CONTEXT_STALE"
-    REVIEW_RESUME_RELATIONSHIP_INVALID = "REVIEW_RESUME_RELATIONSHIP_INVALID"
-    REVIEW_BOOTSTRAP_INVALID = "REVIEW_BOOTSTRAP_INVALID"
-    REVIEW_TARGET_STATE_INVALID = "REVIEW_TARGET_STATE_INVALID"
-    RUNTIME_CAPABILITY_DISABLED = "RUNTIME_CAPABILITY_DISABLED"
-    RUNTIME_DESTINATION_MISMATCH = "RUNTIME_DESTINATION_MISMATCH"
-    RUNTIME_MACHINE_UNAUTHORIZED = "RUNTIME_MACHINE_UNAUTHORIZED"
-    VERDICT_CORRECTION_CHECKPOINT_INVALID = "VERDICT_CORRECTION_CHECKPOINT_INVALID"
-    VERDICT_CORRECTION_PROCESS_FAILED = "VERDICT_CORRECTION_PROCESS_FAILED"
-    VERDICT_CORRECTION_EXHAUSTED = "VERDICT_CORRECTION_EXHAUSTED"
-    UNCLASSIFIED_CONTROL_FAILURE = "UNCLASSIFIED_CONTROL_FAILURE"
-
-
-CORRECTABLE_VERDICT_CODES = frozenset({
-    ControlErrorCode.VERDICT_REJECT_CONTRACT,
-    ControlErrorCode.VERDICT_HUMAN_GATE_CONTRACT,
-    ControlErrorCode.VERDICT_ACCEPT_CONTRACT,
-    ControlErrorCode.VERDICT_REVIEWED_TARGET_MISMATCH,
-    ControlErrorCode.VERDICT_GOVERNANCE_HASH_MISMATCH,
-    ControlErrorCode.VERDICT_RUNTIME_HASH_MISMATCH,
-    ControlErrorCode.VERDICT_ACTIVE_STEP_MISMATCH,
-    ControlErrorCode.EVIDENCE_COMMIT_LOCATOR_INVALID,
-    ControlErrorCode.EVIDENCE_COMMIT_UNRESOLVABLE,
-    ControlErrorCode.EVIDENCE_COMMIT_NOT_COMMIT,
-    ControlErrorCode.EVIDENCE_COMMIT_UNREACHABLE,
-    ControlErrorCode.EVIDENCE_LOCATOR_NOT_ABSOLUTE,
-    ControlErrorCode.EVIDENCE_LOCATOR_OUTSIDE_BOUNDARY,
-    ControlErrorCode.EVIDENCE_LOCATOR_MISSING,
-    ControlErrorCode.EVIDENCE_HASH_MISMATCH,
-    ControlErrorCode.EVIDENCE_COMMIT_REQUIRED,
-})
-
-
-class ControlFailure(InvariantViolation):
-    """A typed control-plane failure with a bounded public reason."""
-
-    def __init__(
-        self, code: ControlErrorCode, reason: str, *, correctable: bool = False
-    ) -> None:
-        super().__init__(reason)
-        self.code = code
-        self.public_reason = reason
-        self.correctable = correctable
-
-
-def correctable_failure(code: ControlErrorCode, reason: str) -> ControlFailure:
-    if code not in CORRECTABLE_VERDICT_CODES:
-        raise ValueError("control error code is not correction-eligible")
-    return ControlFailure(code, reason, correctable=True)
-
-
-def control_error_code(exc: BaseException) -> str:
-    if isinstance(exc, ControlFailure):
-        return exc.code.value
-    return ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value
-
-
-def escape_public_text(value: str) -> str:
-    """Make a public string physically single-line and terminal inert."""
-    escaped: List[str] = []
-    for character in value:
-        category = unicodedata.category(character)
-        if category in {"Cc", "Cf", "Zl", "Zp"}:
-            codepoint = ord(character)
-            escaped.append(
-                f"\\u{codepoint:04x}"
-                if codepoint <= 0xFFFF
-                else f"\\U{codepoint:08x}"
-            )
-        else:
-            escaped.append(character)
-    return "".join(escaped)
-
-
-def bounded_public_reason(reason: Any, error_code: Any) -> Optional[str]:
-    if reason is None:
-        return None
-    if error_code == ControlErrorCode.UNCLASSIFIED_CONTROL_FAILURE.value:
-        rendered = UNCLASSIFIED_PUBLIC_REASON
-    else:
-        rendered = escape_public_text(str(reason))
-    if len(rendered) > MAX_PUBLIC_REASON_CHARS:
-        keep = MAX_PUBLIC_REASON_CHARS - len(PUBLIC_REASON_TRUNCATION_MARKER)
-        rendered = rendered[:keep] + PUBLIC_REASON_TRUNCATION_MARKER
-    return rendered
-
-
-def public_final_result(result: Mapping[str, Any]) -> Dict[str, Any]:
-    """Central checkpoint/manifest/terminal boundary for F1 public fields."""
-    error_code = result.get("error_code")
-    public: Dict[str, Any] = {}
-    for name in FINAL_RESULT_FIELDS:
-        value = result.get(name)
-        if name == "exit_code":
-            public[name] = value if type(value) is int else None
-        elif name == "reason":
-            public[name] = bounded_public_reason(value, error_code)
-        elif value is None:
-            public[name] = None
-        else:
-            public[name] = escape_public_text(str(value))
-    return public
-
-
-def terminal_scalar(value: Any) -> str:
-    """Encode one public value as a deterministic single-line JSON scalar."""
-    return json.dumps(value, ensure_ascii=True, separators=(",", ":"))
-
-
-def strict_json(data: bytes) -> Any:
-    """Reject duplicate keys and non-JSON numbers, without touching peer bytes."""
-    def pairs(items: Any) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError("duplicate JSON key")
-            result[key] = value
-        return result
-
-    def invalid_constant(value: str) -> None:
-        raise ValueError(f"invalid JSON constant: {value}")
-
-    try:
-        return json.loads(data.decode("utf-8"), object_pairs_hook=pairs,
-                          parse_constant=invalid_constant)
-    except (ValueError, UnicodeError) as exc:
-        raise InvariantViolation(f"invalid JSON: {exc}") from exc
-
-
-def validate_json_schema(value: Any, schema: Mapping[str, Any]) -> None:
-    try:
-        from jsonschema import Draft202012Validator
-    except ImportError as exc:
-        raise InvariantViolation(
-            "P6 requires jsonschema; install 1PCloop/requirements.txt"
-        ) from exc
-    Draft202012Validator.check_schema(schema)
-    error = next(Draft202012Validator(schema).iter_errors(value), None)
-    if error is not None:
-        # Do not echo a potentially huge or sensitive peer payload in the terminal.
-        raise InvariantViolation(
-            f"schema validation failed at {list(error.absolute_path)}: {error.validator}"
-        )
-
-
-def schema_path(message_type: str) -> Path:
-    if message_type not in TURN_SCHEMAS:
-        raise InvariantViolation("unknown turn schema")
-    return SCHEMAS_ROOT / f"{message_type}.schema.json"
-
-
-def validate_turn_payload(payload: bytes, message_type: str) -> Dict[str, Any]:
-    """Validate only the runtime-enforced/local JSON Schema contract.
-
-    Reviewer verdict cross-field and authoritative-state relationships are checked
-    later, after process/profile/thread/read-only authority is established.  This
-    separation is what makes a narrow class of schema-valid control declarations
-    eligible for F1 correction without treating schema failure as correctable.
-    """
-    schema = strict_json(schema_path(message_type).read_bytes())
-    value = strict_json(payload)
-    validate_json_schema(value, schema)
-    return value
-
-
-def validate_verdict_relationships(value: Mapping[str, Any]) -> None:
-    """Enforce schema-subset cross-field rules with explicit correction codes."""
-    verdict = value["verdict"]
-    if verdict == "REJECT":
-        if value["next_instruction"] is None or value["runtime_transition"] is not None:
-            raise correctable_failure(
-                ControlErrorCode.VERDICT_REJECT_CONTRACT,
-                "REJECT requires one bounded next_instruction and no transition",
-            )
-    elif verdict == "HUMAN_GATE":
-        if value["next_instruction"] is not None or value["runtime_transition"] is not None:
-            raise correctable_failure(
-                ControlErrorCode.VERDICT_HUMAN_GATE_CONTRACT,
-                "HUMAN_GATE must not request repair or transition",
-            )
-    elif (
-        value["next_instruction"] is not None
-        or value["runtime_transition"] is None
-        or not value["evidence"]
-    ):
-        raise correctable_failure(
-            ControlErrorCode.VERDICT_ACCEPT_CONTRACT,
-            "ACCEPT requires evidence and transition, and forbids repair instruction",
-        )
 
 
 def emit_progress(message: str) -> None:

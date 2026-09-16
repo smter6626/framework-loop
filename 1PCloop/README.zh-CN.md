@@ -45,6 +45,8 @@ Python orchestrator
 - Git-ignored raw evidence、逐 turn concise summary、一次 framework evidence commit/push；
 - 对可机械纠正的 Reviewer verdict 最多进行两次同线程 correction，不重跑已完成 Executor；
 - 明确区分 logical outcome、Runtime transition 和 evidence publication；
+- 纯 mutation contract helper，并由 runner 兼容性 re-export 原公共名称；
+- 由 `status`、`inspect` 和 `human-gate` 共用的确定性只读 Human Gate projection；
 - 在无法解释状态时 fail closed，而不是自动执行破坏性修复。
 
 这些能力提高了 coding-agent 自我复核的独立性、可恢复性和可追溯性，但不保证 LLM 永远正确，
@@ -269,7 +271,7 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
   --config /absolute/path/workload.json doctor
 
-# doctor 可替换为：preflight、run、resume、status 或 inspect。
+# doctor 可替换为：preflight、run、resume、status、inspect 或 human-gate。
 ```
 
 严格 JSON config 只允许以下 section 和字段：
@@ -341,13 +343,29 @@ resume，不会被猜测升级。
   evidence package 内部一致，不表示任务已 ACCEPT。Inspect 不截断 journal，也不修复 artifact。
   Result 另外把 authoritative target evidence 分类为 `VALID`、`INVALID`、`UNAVAILABLE` 或
   `NOT_APPLICABLE`。
+- `human-gate` 返回与 `status`、`inspect` 相同的 bounded Human Gate projection，不创建 run、
+  checkpoint、Agent turn、repair 或 Human decision。
 
-`doctor`、`preflight`、`status`、`inspect` 各只输出一个 compact JSON object，包含版本、命令、
+`doctor`、`preflight`、`status`、`inspect`、`human-gate` 各只输出一个 compact JSON object，包含
+版本、命令、
 config identity、overall status、checks/result 与公开 artifact locator。`PASS`/`UNAVAILABLE` 返回
 0，`FAIL` 返回 1，无效 config 返回 2。输出不包含异常正文、profile 内容、prompt、peer message、
 命令输出、stderr 或 internal diagnostic。`run`/`resume` 保留原 `PROGRESS` 和 F1 `FINAL_RESULT`。
 
-F3 不增加交互式决定或 TUI/GUI；TUI 仍属于 F6。
+`scripts/mutation_contracts.py` 持有无 side effect 的 control/message/public-result contract。
+`scripts/human_gate.py` 只根据结构化状态和公开 locator 做纯 projection，不 import runner，也不读取
+artifact。`run_mutation_loop.py` 为兼容既有 caller re-export 原公共 contract 名称，并继续是唯一
+mutation control state machine。
+
+Human Gate state 固定为 `ACTIVE`、`NOT_APPLICABLE`、`UNAVAILABLE`、`INVALID`。Allowed action 仅有
+`INSPECT_EVIDENCE`、`FINALIZE_EVIDENCE`、`REMEDIATE_EXTERNAL_STATE`、
+`START_NEW_RUN_AFTER_HUMAN_REVIEW`、`NO_AUTOMATIC_REPAIR`。Recovery mode 固定为
+`FINALIZATION_ONLY`、`HUMAN_REMEDIATION_REQUIRED`、`NEW_RUN_AFTER_REVIEW`、`NO_ACTION`。
+未知或冲突状态默认只允许检查和 Human remediation，不自动 repair。Evidence package 完整不代表
+Human Gate 已解决，publication 成功也不改变 logical outcome。
+
+Human Gate projection 不是交互式决定界面，不能替 Human 解除 gate。F6 TUI 和 F7 real-service
+smoke 尚未实现。
 
 ## 自动循环语义
 
@@ -432,8 +450,9 @@ identity、correction attempt、Runtime transition、summary 和 publication rec
 或 push 不会重复。无法安全确定 Executor 是否已修改 target 时会进入 Human Gate，而不是盲目
 重跑。
 
-Config-backed `status` 只读投影 checkpoint 与 F2 timer/status，不会自动 resume 或替 Human 作决定。
-当前仍不提供交互式 TUI/GUI。
+Config-backed `status`、`inspect`、`human-gate` 使用同一个只读 Human Gate projection，不会自动
+resume 或替 Human 作决定。Logical terminal 后如需恢复 publication，最多只恢复 evidence
+finalization，不会重放 Reviewer 或 Executor turn。
 
 ## Evidence
 
@@ -531,7 +550,7 @@ Repository-backed evidence 已覆盖：
 - Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
 - public terminal result 的控制字符、长度和字段注入防护。
 
-当前 deterministic regression suite 包含147项测试，并在 `ResourceWarning` 提升为错误时通过。
+Deterministic regression suite 在 `ResourceWarning` 提升为错误时通过。
 历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
 `evidence-summaries/`、`runs/` 和 Git history；README 不复制这些进度记录。
 
@@ -557,17 +576,21 @@ tests/test_evidence_summary.py       summary/commit/push recovery
 tests/test_verdict_correction.py     verdict correction/public result
 tests/test_progress_status.py        structured progress/timing/status/recovery
 tests/test_operator_cli.py           workload config/operator commands
+tests/test_mutation_contracts.py     纯 contract 与 runner 兼容性
+tests/test_human_gate.py             Human Gate projection 与只读 CLI
 ```
 
 ## 代码和文档入口
 
 ```text
 scripts/run_mutation_loop.py      当前 mutation orchestrator
+scripts/mutation_contracts.py     无 side effect 的 control/message contract
+scripts/human_gate.py             纯 Human Gate 状态 projection
 scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary、framework commit 和 push helper
 scripts/progress_status.py        F2 progress journal、live snapshot 和 renderer
-scripts/workload_operator.py      F3 config、diagnostics 和只读 projection
-scripts/onepcloop.py              统一 F3 operator CLI
+scripts/workload_operator.py      config、diagnostics 和只读 projection
+scripts/onepcloop.py              统一 operator CLI
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance

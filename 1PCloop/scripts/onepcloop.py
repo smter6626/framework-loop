@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unified F3 operator CLI for one configured 1PCloop workload."""
+"""Unified operator CLI for one configured 1PCloop workload."""
 
 from __future__ import annotations
 
@@ -11,7 +11,15 @@ from typing import Optional, Sequence
 import workload_operator as OPERATOR
 
 
-COMMANDS = ("doctor", "preflight", "run", "resume", "status", "inspect")
+COMMANDS = (
+    "doctor",
+    "preflight",
+    "run",
+    "resume",
+    "status",
+    "inspect",
+    "human-gate",
+)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -51,6 +59,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         result = OPERATOR.status(config)
     elif selected.command == "inspect":
         result = OPERATOR.inspect_run(config)
+    elif selected.command == "human-gate":
+        result = OPERATOR.human_gate_status(config)
     else:
         try:
             exit_code, _run_root = OPERATOR.run_mutation(
