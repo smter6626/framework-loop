@@ -19,6 +19,7 @@ COMMANDS = (
     "status",
     "inspect",
     "human-gate",
+    "tui",
 )
 
 
@@ -61,6 +62,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         result = OPERATOR.inspect_run(config)
     elif selected.command == "human-gate":
         result = OPERATOR.human_gate_status(config)
+    elif selected.command == "tui":
+        import local_tui
+
+        return local_tui.main(local_tui.OperatorDataSource(OPERATOR, config))
     else:
         try:
             exit_code, _run_root = OPERATOR.run_mutation(

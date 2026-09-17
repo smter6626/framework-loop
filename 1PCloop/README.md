@@ -52,6 +52,7 @@ The current implementation provides:
 - pure mutation contract helpers with compatibility re-exports from the runner;
 - a deterministic, read-only Human Gate projection shared by `status`, `inspect`, and
   `human-gate`;
+- a local read-only TUI over the F2/F3/F5 operator projections;
 - fail-closed behavior for state that cannot be explained mechanically.
 
 These capabilities improve review independence, recoverability, and traceability. They do not
@@ -288,7 +289,7 @@ the same arguments and state machine.
 1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
   --config /absolute/path/workload.json doctor
 
-# Replace doctor with: preflight, run, resume, status, inspect, or human-gate.
+# Replace doctor with: preflight, run, resume, status, inspect, human-gate, or tui.
 ```
 
 The strict JSON config has exactly these sections and fields:
@@ -368,6 +369,8 @@ Command behavior is:
   target evidence as `VALID`, `INVALID`, `UNAVAILABLE`, or `NOT_APPLICABLE`.
 - `human-gate` returns the same bounded Human Gate projection used by `status` and `inspect`. It
   creates no run, checkpoint, Agent turn, repair, or Human decision.
+- `tui` opens a local read-only dashboard over `status`, `inspect`, and their shared Human Gate
+  projection. It does not call the runner or execute a recovery action.
 
 `status` and `inspect` keep their F3 top-level checkpoint, logical outcome, Runtime transition,
 publication, and safe-action fields. Their Human Gate fields are grouped under
@@ -400,8 +403,38 @@ Unknown or conflicting state defaults to inspection and Human remediation, never
 repair. A complete evidence package does not resolve a Human Gate, and successful evidence
 publication does not change the logical outcome.
 
-The Human Gate projection is not an interactive decision surface and cannot resolve a gate.
-The F6 TUI and F7 real-service smoke are not implemented.
+The Human Gate projection cannot resolve a gate. The TUI displays its fixed actions as guidance,
+not buttons or commands. F7 real-service smoke is not implemented.
+
+## Local read-only TUI
+
+On a macOS interactive terminal, launch the config-backed dashboard with:
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json tui
+```
+
+`r` refreshes, `Tab` switches summary and inspection, `j`/`k` or arrow keys scroll, `?` toggles
+help, and `q` or Esc quits. The keys are shown in the footer or help view. The dashboard refreshes
+at most once per second while idle, handles resize and narrow terminals, and restores terminal
+settings on exit. Non-TTY use exits with a plain error message and no screen control sequences.
+
+`scripts/local_tui.py` separates the operator data source from the pure presenter. It renders only
+the structured `status`/`inspect` envelopes and nested F5 Human Gate projection; it never opens
+raw Codex events, prompts, peer messages, stderr, or command output. It displays run/cycle/role,
+control state, target HEAD, F2 active-time elapsed/timeout/activity, observation and integrity
+availability, and the three independent logical/Runtime/publication states. It does not add
+offline wall time to F2 elapsed values. When observation is unavailable, unverified progress is
+hidden. If consecutive `status` and `inspect` reads disagree, recovery actions are hidden until
+refresh. `PUSHED` is only publication, not logical success; a terminal Human Gate is never shown
+as ordinary Agent resume. `INVALID` or `UNAVAILABLE` never gets broader advice than the F5
+projection.
+
+The TUI never starts or resumes an Agent, finalizes evidence, repairs identity, or writes
+checkpoint, evidence, Git, or governance state. It is a single-writer local dashboard, not a
+concurrency protocol or GUI. A very narrow terminal shows a resize/quit notice rather than the
+full view. F7 real-service smoke remains future work.
 
 ## Automatic loop semantics
 
@@ -563,8 +596,8 @@ F1 `FINAL_RESULT` remains unchanged and is emitted after the final `run_finished
 F2 was independently accepted after its initial review rejected incomplete checkpoint-suffix
 validation and duplicate legacy tool output; repair commit
 `54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` closes both findings. The F3 operator commands consume
-these structured artifacts without changing F2 recovery semantics. Interactive TUI remains F6
-scope.
+these structured artifacts without changing F2 recovery semantics. The local TUI displays their
+read-only projections without replacing the F2 terminal or recovery contract.
 
 ## Evidence
 
@@ -689,6 +722,7 @@ tests/test_progress_status.py        structured progress, timing, status, and re
 tests/test_operator_cli.py           workload config and operator commands
 tests/test_mutation_contracts.py     pure contracts and runner compatibility
 tests/test_human_gate.py             Human Gate projection and read-only CLI
+tests/test_local_tui.py              read-only TUI presenter and disposable integration
 ```
 
 ## Code and documentation map
@@ -697,6 +731,7 @@ tests/test_human_gate.py             Human Gate projection and read-only CLI
 scripts/run_mutation_loop.py      current mutation orchestrator
 scripts/mutation_contracts.py     side-effect-free control/message contracts
 scripts/human_gate.py             pure Human Gate status projection
+scripts/local_tui.py              read-only terminal presenter and operator data source
 scripts/run_text_loop.py          read-only text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary, framework commit, and push helper
 scripts/progress_status.py        F2 progress journal, live snapshot, and renderer

@@ -47,6 +47,7 @@ Python orchestrator
 - 明确区分 logical outcome、Runtime transition 和 evidence publication；
 - 纯 mutation contract helper，并由 runner 兼容性 re-export 原公共名称；
 - 由 `status`、`inspect` 和 `human-gate` 共用的确定性只读 Human Gate projection；
+- 基于 F2/F3/F5 operator projection 的本地只读 TUI；
 - 在无法解释状态时 fail closed，而不是自动执行破坏性修复。
 
 这些能力提高了 coding-agent 自我复核的独立性、可恢复性和可追溯性，但不保证 LLM 永远正确，
@@ -271,7 +272,7 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
   --config /absolute/path/workload.json doctor
 
-# doctor 可替换为：preflight、run、resume、status、inspect 或 human-gate。
+# doctor 可替换为：preflight、run、resume、status、inspect、human-gate 或 tui。
 ```
 
 严格 JSON config 只允许以下 section 和字段：
@@ -345,6 +346,8 @@ resume，不会被猜测升级。
   `NOT_APPLICABLE`。
 - `human-gate` 返回与 `status`、`inspect` 相同的 bounded Human Gate projection，不创建 run、
   checkpoint、Agent turn、repair 或 Human decision。
+- `tui` 打开基于 `status`、`inspect` 和共用 Human Gate projection 的本地只读 dashboard，
+  不调用 runner，也不执行恢复动作。
 
 `status` 和 `inspect` 保留 F3 顶层 checkpoint、logical outcome、Runtime transition、
 publication 和 safe action 字段。Human Gate 字段放在 `result.human_gate_projection`；
@@ -373,8 +376,34 @@ Human Gate state 固定为 `ACTIVE`、`NOT_APPLICABLE`、`UNAVAILABLE`、`INVALI
 未知或冲突状态默认只允许检查和 Human remediation，不自动 repair。Evidence package 完整不代表
 Human Gate 已解决，publication 成功也不改变 logical outcome。
 
-Human Gate projection 不是交互式决定界面，不能替 Human 解除 gate。F6 TUI 和 F7 real-service
-smoke 尚未实现。
+Human Gate projection 不能替 Human 解除 gate。TUI 只显示固定 allowed action 作为说明，
+不提供执行按钮或命令。F7 real-service smoke 尚未实现。
+
+## 本地只读 TUI
+
+在 macOS 交互式终端中使用 config-backed 入口：
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json tui
+```
+
+`r` 刷新，`Tab` 切换摘要/检查视图，`j`/`k` 或方向键滚动，`?` 切换帮助，`q` 或 Esc 退出。
+键位显示在页脚或帮助页。空闲时最多每秒刷新一次；支持 resize 和窄终端，并在退出时恢复终端。
+非 TTY 仅返回纯文本错误，不输出屏幕控制序列。
+
+`scripts/local_tui.py` 将 operator 数据源和纯呈现层分开。它只渲染结构化的 `status`/`inspect`
+envelope 和嵌套 F5 Human Gate projection；不打开 raw Codex events、prompt、peer message、
+stderr 或命令输出。界面显示 run/cycle/role、control state、target HEAD、F2 active-time
+elapsed/timeout/activity、observation/integrity availability，以及相互独立的 logical、Runtime、
+publication 三层状态。它不把停机 wall time 加进 F2 elapsed。Observation 不可用时隐藏未验证的
+progress。连续读取的 `status` 和 `inspect` 不一致时，隐藏恢复动作直到刷新。`PUSHED` 只代表
+publication，不代表 logical success；终端 Human Gate 不显示为普通 Agent resume。`INVALID` 或
+`UNAVAILABLE` 时不会给出比 F5 projection 更宽的建议。
+
+TUI 不启动或恢复 Agent，不 finalization、repair identity，也不写 checkpoint、evidence、Git 或
+governance。它是单 writer 边界内的本地 dashboard，不是 concurrency protocol 或 GUI。极窄终端
+显示 resize/quit 提示而不显示完整视图。F7 real-service smoke 仍属后续工作。
 
 ## 自动循环语义
 
@@ -587,6 +616,7 @@ tests/test_progress_status.py        structured progress/timing/status/recovery
 tests/test_operator_cli.py           workload config/operator commands
 tests/test_mutation_contracts.py     纯 contract 与 runner 兼容性
 tests/test_human_gate.py             Human Gate projection 与只读 CLI
+tests/test_local_tui.py              只读 TUI 呈现层与 disposable integration
 ```
 
 ## 代码和文档入口
@@ -595,6 +625,7 @@ tests/test_human_gate.py             Human Gate projection 与只读 CLI
 scripts/run_mutation_loop.py      当前 mutation orchestrator
 scripts/mutation_contracts.py     无 side effect 的 control/message contract
 scripts/human_gate.py             纯 Human Gate 状态 projection
+scripts/local_tui.py              只读终端呈现层与 operator 数据源
 scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
 scripts/p63_evidence.py           summary、framework commit 和 push helper
 scripts/progress_status.py        F2 progress journal、live snapshot 和 renderer
