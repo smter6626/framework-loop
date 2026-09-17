@@ -4,7 +4,7 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`REJECTED -- NARROW REPAIR REQUIRED`
+- 当前 verdict：`REJECTED -- SECOND NARROW REPAIR REQUIRED`
 - 最近接受：`F5 -- ACCEPTED AFTER INDEPENDENT RE-REVIEW`
 - 唯一 Active Step：`F6 -- 本地只读 TUI`
 - 当前顶层 Step：`Step 6`
@@ -346,10 +346,10 @@ Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- F6 acceptance 当前被 no-checkpoint -> new-run 顺序读取竞争阻塞：presenter 将已经互相矛盾的
-  `status`/`inspect` snapshot 判为 consistent，并错误显示“无 checkpoint”，而不是
-  `SNAPSHOT UNAVAILABLE`。通用终端字段 sanitizer 同时遗漏 Unicode `Zl/Zp` 行/段分隔符。
-- 两项均属于 F6 presenter 的窄修复，不需要 Human Owner 作新的产品或合同决定。
+- F6 acceptance 当前仍被 stable no-checkpoint 的证据不足阻塞：`inspect` 对 checkpoint 不存在和
+  checkpoint 已出现但 malformed/identity-invalid 使用同一个 generic failure；presenter 将后者仍
+  误判为 stable absence。上一轮的合法 new-run 竞争和 Unicode `Zl/Zp` 边界已经修复。
+- 剩余项属于 F6 只读 snapshot protocol 的窄修复，不需要 Human Owner 作新的产品或合同决定。
 - framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知 self-hosting
   limitation，不是 F6 blocker。
 
@@ -1010,9 +1010,82 @@ Independent review verdict：
 - 本次仍是 1PCloop self-application 中“Executor 和完整回归全绿，但独立 Reviewer 发现未覆盖
   lifecycle/output boundary”的 evidence，不是 F7 smoke 或 P7 fault injection。
 
+### 2026-09-17 F6 first independent re-review：`REJECTED -- SECOND NARROW REPAIR REQUIRED`
+
+审核对象：repair commit `004364290b39d94274b1816c18040fe912f883cf`，parent 为保存首次
+F6 REJECT 的 Runtime commit `e2e15f4b68ab95eeefbfad9c7096dd5e621f16e1`。
+
+#### Repair evidence 与已关闭 finding
+
+- `_public()` 改为复用无 runner side effect 的 `mutation_contracts.escape_public_text()`；Reviewer
+  直接验证 LF/CR/NUL/ESC、`Cf`、`Zl`、`Zp` 均被 ASCII escape，普通中文保持不变；该 finding
+  `CLOSED`；
+- status 无 checkpoint、inspect 已看到合法 `new-run` 的原始竞争现为
+  `no_checkpoint=false / consistent=false / SNAPSHOT UNAVAILABLE`；下一次两侧一致后才显示 run；
+- Executor F6 focused `17 / 17`，`2.773s`；F2/F3/F5 `76 / 76`，`99.081s`；完整 strict
+  `195 / 195`，`245.219s`；Python 3.9、direct import、唯一 `orchestrate()`、scope、protected
+  paths、diff、push、refs 和 clean worktree 报告通过；
+- Reviewer 独立 F6 focused `17 / 17`，`2.471s`；完整 ResourceWarning-strict regression
+  `195 / 195`，`246.114s`；commit scope、Static identity、refs 与审核前 clean worktree 通过。
+
+#### Remaining reject finding -- generic identity failure 不能证明 checkpoint 缺失
+
+repair 中 `_stable_no_checkpoint()` 要求 inspect 仅含一个固定
+`CHECKPOINT_IDENTITY_FAILED`。但 F3 `inspect_run()` 对以下两种情况返回相同 envelope：
+
+```text
+A. checkpoint path 不存在
+B. checkpoint path 已存在，但 bytes malformed 或 config/identity invalid
+```
+
+因此该 generic failure 不是“checkpoint missing”的结构化证据。Reviewer 直接使用真实 operator
+复现：先调用 `status()` 得到 no checkpoint，再于同一路径写入 `{}` checkpoint，随后调用
+`inspect_run()`。当前 presenter 结果为：
+
+```text
+checkpoint_exists=true
+checkpoint_bytes={}\n
+inspect overall_status=FAIL
+inspect code=CHECKPOINT_IDENTITY_FAILED
+no_checkpoint=true
+consistent=true
+banner=NO CHECKPOINT -- no run was opened
+```
+
+实际 authoritative path 已存在冲突状态，界面却将其降级为 absence，而不是
+`SNAPSHOT UNAVAILABLE`/identity remediation。这仍违反“只有双方证明 absence 才显示 NO CHECKPOINT”
+以及 Static 的 default-deny 边界。新增 matrix 只模拟合法 new run、disappearance 和 run-ID replacement，
+没有覆盖 malformed/identity-invalid checkpoint 在两次读取之间出现。
+
+#### Required second narrow repair
+
+1. 不得把 generic `CHECKPOINT_IDENTITY_FAILED` 本身当作 checkpoint 缺失证明；
+2. 在不读取 raw checkpoint、不复制 operator parser 的前提下，为 stable absence 增加可区分证据。
+   推荐在 `OperatorDataSource.read()` 对 no-checkpoint 候选执行 bounded status bracket：
+   `status_before -> inspect -> status_after`，并把第二次 status 的结构化结果带给 presenter；只有前后
+   status 都是同一 exact no-checkpoint projection 且 inspect 没有 run projection 时才显示稳定 absence；
+3. 如果第二次 status 为 INVALID、出现 run、config identity/locator 改变或任一投影不一致，必须
+   `SNAPSHOT UNAVAILABLE`，不显示 recovery actions；不得由 TUI 直接 `exists()`/open/read checkpoint；
+4. 增加真实 disposable operator tests：status 后写入 `{}`、config-identity-invalid checkpoint、
+   合法 new run，以及 stable absence；断言 malformed/invalid appearance fail closed，下一次一致状态
+   才可显示；
+5. 保留已通过的 Unicode escape、只读、privacy、non-TTY、cleanup、active-time 和 F5 default-deny
+   behavior；重跑 F6 focused、F2/F3/F5 和完整 strict suite。
+
+Independent re-review verdict：
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- verdict：`REJECTED -- SECOND NARROW REPAIR REQUIRED`；
+- 当前状态：F6 继续唯一 Active Step，F7 不激活；PT-01 `RESOLVED`，PT-02
+  `+∞ / PERMANENTLY_NON_BLOCKING`；
+- 第一次 repair 的成功内容保留，不要求回退或重写；剩余 blocker 仅限 absence proof。
+
 ## 9. Next Direction
 
-只执行 F6 narrow repair：修复 stable no-checkpoint 的跨读取判定和 TUI 最终字符串边界，补充
-启动竞争及 `Zl/Zp` regression。F1-F5 保持 accepted；不得重写 TUI/operator 架构、orchestrate、
-自动处理 Human decision、修改 Static/Runtime、运行 F7 real-service smoke 或提前实现 F8/P7。
-修复完成后停止于 `AWAITING INDEPENDENT RE-REVIEW`。
+只执行 F6 second narrow repair：为 stable no-checkpoint 增加不依赖 generic identity failure 的
+结构化 absence proof，覆盖 malformed/identity-invalid checkpoint 在顺序读取期间出现。保留已经
+通过的合法 new-run race 和 Unicode 修复；F1-F5 保持 accepted；不得读取 raw checkpoint、重写
+operator/orchestrate、修改 Static/Runtime、运行 F7 smoke 或提前实现 F8/P7。修复后停止于
+`AWAITING SECOND INDEPENDENT RE-REVIEW`。
