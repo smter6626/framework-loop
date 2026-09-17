@@ -865,70 +865,251 @@ def _validate_observation(
     return status, events, incomplete
 
 
-def _gate_evidence_availability(
+def _inspection_check(name: str, function: Callable[[], Any]) -> Dict[str, Any]:
+    try:
+        detail = function()
+    except FileNotFoundError:
+        return {
+            "name": name,
+            "status": "UNAVAILABLE",
+            "code": f"{name.upper()}_UNAVAILABLE",
+            "detail": f"{name} artifact is unavailable",
+        }
+    except (AttributeError, KeyError, IndexError, OSError, RuntimeError, TypeError, ValueError):
+        return {
+            "name": name,
+            "status": "FAIL",
+            "code": f"{name.upper()}_FAIL",
+            "detail": f"{name} validation did not pass",
+        }
+    return {
+        "name": name,
+        "status": "PASS",
+        "code": f"{name.upper()}_PASSED",
+        "detail": detail,
+    }
+
+
+def _framework_commit_applies(checkpoint: Mapping[str, Any]) -> bool:
+    return (
+        checkpoint.get("framework_evidence_committed") is True
+        or checkpoint.get("framework_commit_id") is not None
+        or checkpoint.get("state")
+        in {RUNNER.FRAMEWORK_EVIDENCE_COMMITTED, RUNNER.FRAMEWORK_EVIDENCE_PUSHED}
+    )
+
+
+def _framework_push_applies(checkpoint: Mapping[str, Any]) -> bool:
+    return (
+        checkpoint.get("framework_evidence_pushed") is True
+        or checkpoint.get("state") == RUNNER.FRAMEWORK_EVIDENCE_PUSHED
+    )
+
+
+def _authoritative_integrity_checks(
     config: WorkloadConfig,
     checkpoint: Mapping[str, Any],
     paths: Mapping[str, str],
-) -> str:
-    """Classify evidence needed by the Human Gate projection without writing."""
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any], Dict[str, Any]]:
+    """Read and validate all state-aware identities used by inspect and gates."""
     run_root = Path(paths["run_root"])
-    manifest_path = Path(paths["manifest"])
-    events_path = Path(paths["control_events"])
-    status_path = Path(paths["live_status"])
-    summary_path = Path(paths["tracked_summary"])
-    if not run_root.is_dir() or run_root.is_symlink():
-        return "UNAVAILABLE"
-    if not manifest_path.is_file() or manifest_path.is_symlink():
-        return "UNAVAILABLE"
-    if not events_path.is_file() or events_path.is_symlink():
-        return "UNAVAILABLE"
-    if not status_path.is_file() or status_path.is_symlink():
-        return "UNAVAILABLE"
-    try:
+    observation_result: Dict[str, Any] = {}
+
+    def manifest_check() -> str:
+        manifest_path = Path(paths["manifest"])
+        if not manifest_path.is_file():
+            raise FileNotFoundError("local manifest is unavailable")
         manifest = _read_object(manifest_path, "manifest")
-        if manifest.get("run_id") != checkpoint.get("run_id"):
-            return "INVALID"
-        configuration = manifest.get("run_configuration")
-        if not isinstance(configuration, dict) or configuration.get(
+        if manifest.get("run_id") != checkpoint["run_id"]:
+            raise OperatorError("manifest run identity mismatch")
+        run_configuration = manifest.get("run_configuration")
+        if not isinstance(run_configuration, dict) or run_configuration.get(
             "operator_config_identity"
         ) != config.identity():
-            return "INVALID"
+            raise OperatorError("manifest config identity mismatch")
         if manifest.get("final_result") != checkpoint.get("final_result"):
-            return "INVALID"
-        live, _events, incomplete = _validate_observation(checkpoint, paths)
-        if live is None or incomplete:
-            return "UNAVAILABLE"
+            raise OperatorError("manifest final result differs from checkpoint")
+        return "manifest identity matches checkpoint"
+
+    def event_check() -> str:
+        events_path = Path(paths["control_events"])
+        status_path = Path(paths["live_status"])
+        if (
+            not events_path.is_file() or events_path.is_symlink()
+            or not status_path.is_file() or status_path.is_symlink()
+        ):
+            raise FileNotFoundError("local observation artifacts are unavailable")
+        status_value, events, incomplete = _validate_observation(checkpoint, paths)
+        observation_result.update({
+            "event_count": len(events),
+            "status_available": status_value is not None,
+            "incomplete_tail": incomplete,
+        })
+        if incomplete:
+            raise FileNotFoundError("partial event tail is not modified by inspect")
+        if status_value is None:
+            raise FileNotFoundError("local live status is unavailable")
+        return "event sequence, hash, suffix, and live projection are valid"
+
+    def summary_check() -> str:
+        summary_path = Path(paths["tracked_summary"])
         progress = checkpoint.get("summary_progress", [])
         if not isinstance(progress, list):
-            return "INVALID"
+            raise OperatorError("summary progress is invalid")
+        if not run_root.is_dir() or run_root.is_symlink():
+            raise FileNotFoundError("local raw evidence root is unavailable")
         expected = RUNNER.P63.expected_summary_bytes(
-            str(checkpoint["run_id"]), run_root, progress
+            checkpoint["run_id"], run_root, progress
         )
         if progress:
             if not summary_path.is_file() or summary_path.is_symlink():
-                return "UNAVAILABLE"
+                raise OperatorError("tracked summary is missing")
             if summary_path.read_bytes() != expected:
-                return "INVALID"
+                raise OperatorError("tracked summary bytes differ")
         elif summary_path.exists():
-            return "INVALID"
+            raise OperatorError("unexpected summary exists")
         for record in progress:
             entry = RUNNER.P63._entry_from_record(record)
             artifacts = entry.get("raw_artifacts")
             if not isinstance(artifacts, list):
-                return "INVALID"
+                raise OperatorError("summary raw artifact list is invalid")
             for artifact in artifacts:
                 locator = artifact.get("locator") if isinstance(artifact, dict) else None
                 if not isinstance(locator, str) or not Path(locator).is_file():
-                    return "UNAVAILABLE"
+                    raise FileNotFoundError("local raw evidence is unavailable")
         RUNNER.P63.validate_summary_artifacts(
-            run_id=str(checkpoint["run_id"]),
-            run_root=run_root,
-            progress=progress,
+            run_id=checkpoint["run_id"], run_root=run_root, progress=progress
         )
-    except FileNotFoundError:
-        return "UNAVAILABLE"
-    except (KeyError, OSError, RuntimeError, ValueError, OperatorError):
+        return "tracked summary and available raw artifact identities are valid"
+
+    def framework_commit_check() -> str:
+        commit = checkpoint.get("framework_commit_id")
+        plan = checkpoint.get("framework_commit_plan")
+        initial = checkpoint.get("framework_initial")
+        if (
+            not isinstance(commit, str)
+            or not OBJECT_ID.fullmatch(commit)
+            or not isinstance(plan, dict)
+            or not isinstance(initial, dict)
+        ):
+            raise OperatorError("framework commit checkpoint is incomplete")
+        framework_git = config.resolved["framework_git"]
+        if (
+            plan.get("repo") != config.resolved["governance"]["framework_repo"]
+            or plan.get("branch") != framework_git["branch"]
+            or plan.get("remote") != framework_git["remote"]
+            or plan.get("push_ref") != framework_git["push_ref"]
+            or plan.get("run_id") != checkpoint["run_id"]
+            or plan.get("expected_parent") != initial.get("head")
+            or plan.get("expected_remote_head") != initial.get("remote_head")
+            or plan.get("expected_remote_url") != initial.get("remote_url")
+        ):
+            raise OperatorError("framework commit plan differs from bound run identity")
+        RUNNER.P63._validate_commit(plan, commit)
+        current = RUNNER.P63.capture_framework(
+            repo=Path(plan["repo"]), branch=plan["branch"],
+            remote=plan["remote"], push_ref=plan["push_ref"],
+            require_clean=True,
+        )
+        if current["head"] != commit or current["remote_url"] != plan["expected_remote_url"]:
+            raise OperatorError("framework commit differs from current repository identity")
+        return "framework evidence commit matches its checkpointed plan"
+
+    def framework_push_check() -> str:
+        commit = checkpoint.get("framework_commit_id")
+        plan = checkpoint.get("framework_commit_plan")
+        if not isinstance(commit, str) or not isinstance(plan, dict):
+            raise OperatorError("framework push identity is incomplete")
+        observed = RUNNER.P63.remote_head(
+            Path(plan["repo"]), plan["remote"], plan["push_ref"]
+        )
+        if observed != commit:
+            raise OperatorError("framework remote does not contain the evidence commit")
+        return "framework remote ref matches the evidence commit"
+
+    def target_check() -> str:
+        current = RUNNER.capture_target_state(
+            Path(config.resolved["target"]["repo"]),
+            config.resolved["target"]["branch"],
+            require_clean=True,
+        )
+        expected = (
+            checkpoint.get("target_after")
+            or checkpoint.get("target_before")
+            or checkpoint.get("target_initial")
+        )
+        if not isinstance(expected, dict) or current.metadata() != expected:
+            raise OperatorError("target identity differs from checkpoint evidence")
+        return "target branch, HEAD, and cleanliness match checkpoint"
+
+    def target_evidence_check() -> str:
+        target_repo = Path(config.resolved["target"]["repo"]).resolve()
+        checked = validate_authoritative_target_evidence(
+            checkpoint, run_root=run_root, target_repo=target_repo
+        )
+        return f"{checked} target evidence locator(s) are valid"
+
+    def correction_provenance_check() -> str:
+        correction = checkpoint.get("verdict_correction")
+        progress = checkpoint.get("summary_progress")
+        if not isinstance(correction, dict) or not isinstance(progress, list):
+            raise OperatorError("correction provenance checkpoint is invalid")
+        entries = [RUNNER.P63._entry_from_record(item) for item in progress]
+        validate_correction_provenance(
+            correction, entries=entries, run_root=run_root
+        )
+        return "historical correction verdict references and hashes are valid"
+
+    commit_result = (
+        _inspection_check("framework_commit", framework_commit_check)
+        if _framework_commit_applies(checkpoint)
+        else _not_applicable_check(
+            "framework_commit", "framework evidence commit has not been formed"
+        )
+    )
+    push_result = (
+        _inspection_check("framework_push", framework_push_check)
+        if _framework_push_applies(checkpoint)
+        else _not_applicable_check(
+            "framework_push", "framework evidence push has not been completed"
+        )
+    )
+    correction_result = (
+        _inspection_check("correction_provenance", correction_provenance_check)
+        if checkpoint.get("verdict_correction") is not None
+        else _not_applicable_check(
+            "correction_provenance", "run has no Reviewer verdict correction"
+        )
+    )
+    target_evidence_result = (
+        _inspection_check("target_evidence", target_evidence_check)
+        if _authoritative_accept_applies(checkpoint)
+        else _not_applicable_check(
+            "target_evidence",
+            "no ACCEPT Runtime transition has current target-evidence authority",
+        )
+    )
+    checks = [
+        _inspection_check("manifest", manifest_check),
+        _inspection_check("observation", event_check),
+        _inspection_check("summary", summary_check),
+        commit_result,
+        push_result,
+        _inspection_check("target", target_check),
+        correction_result,
+        target_evidence_result,
+    ]
+    return checks, observation_result, target_evidence_result
+
+
+def _gate_evidence_availability(
+    integrity_checks: Sequence[Mapping[str, Any]],
+) -> str:
+    """Convert shared authoritative checks to the pure projection vocabulary."""
+    if any(item.get("status") == "FAIL" for item in integrity_checks):
         return "INVALID"
+    if any(item.get("status") == "UNAVAILABLE" for item in integrity_checks):
+        return "UNAVAILABLE"
     return "AVAILABLE"
 
 
@@ -937,6 +1118,7 @@ def _human_gate_projection(
     checkpoint: Optional[Mapping[str, Any]],
     *,
     identity_status: str = "VALID",
+    integrity_checks: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> Dict[str, Any]:
     if checkpoint is None:
         artifacts = {
@@ -946,10 +1128,15 @@ def _human_gate_projection(
         availability = "UNAVAILABLE"
     else:
         artifacts = _status_paths(config, checkpoint)
+        checks = (
+            list(integrity_checks)
+            if integrity_checks is not None
+            else _authoritative_integrity_checks(config, checkpoint, artifacts)[0]
+        )
         availability = (
             "INVALID"
             if identity_status == "INVALID"
-            else _gate_evidence_availability(config, checkpoint, artifacts)
+            else _gate_evidence_availability(checks)
         )
     return HUMAN_GATE.project_human_gate(
         checkpoint,
@@ -968,9 +1155,10 @@ def status(config: WorkloadConfig) -> Dict[str, Any]:
             result={
                 "workload_id": config.workload_id,
                 "run_id": None,
+                "checkpoint_state": None,
                 "safe_next_action": "START_NEW_RUN_ALLOWED",
                 "observation_availability": "UNAVAILABLE",
-                **gate,
+                "human_gate_projection": gate,
             },
             artifacts={"config": str(config.path), "checkpoint": str(path)},
         )
@@ -983,7 +1171,7 @@ def status(config: WorkloadConfig) -> Dict[str, Any]:
             result={
                 "workload_id": config.workload_id,
                 "safe_next_action": "STATE_UNAVAILABLE",
-                **gate,
+                "human_gate_projection": gate,
             },
             artifacts={"config": str(config.path), "checkpoint": str(path)},
         )
@@ -1024,20 +1212,10 @@ def status(config: WorkloadConfig) -> Dict[str, Any]:
         "human_gate": checkpoint.get("state") == RUNNER.HUMAN_GATE or logical_state == RUNNER.HUMAN_GATE,
         "failed_closed": checkpoint.get("state") == RUNNER.FAILED_CLOSED or logical_state == RUNNER.FAILED_CLOSED,
         "safe_next_action": safe_next_action(checkpoint),
-        **gate,
+        "human_gate_projection": gate,
     }
     overall = "FAIL" if gate["gate_status"] == "INVALID" else "PASS"
     return envelope("status", config, overall=overall, result=result, artifacts=paths)
-
-
-def _inspection_check(name: str, function: Callable[[], Any]) -> Dict[str, Any]:
-    try:
-        detail = function()
-    except FileNotFoundError:
-        return {"name": name, "status": "UNAVAILABLE", "code": f"{name.upper()}_UNAVAILABLE", "detail": f"{name} artifact is unavailable"}
-    except (OSError, RuntimeError, ValueError, OperatorError):
-        return {"name": name, "status": "FAIL", "code": f"{name.upper()}_FAIL", "detail": f"{name} validation did not pass"}
-    return {"name": name, "status": "PASS", "code": f"{name.upper()}_PASSED", "detail": detail}
 
 
 def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
@@ -1048,144 +1226,18 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
         return envelope(
             "inspect", config, overall="FAIL",
             checks=[{"name": "checkpoint_identity", "status": "FAIL", "code": "CHECKPOINT_IDENTITY_FAILED", "detail": "checkpoint identity validation did not pass"}],
-            result={"safe_next_action": "STATE_UNAVAILABLE", **gate},
+            result={
+                "safe_next_action": "STATE_UNAVAILABLE",
+                "human_gate_projection": gate,
+            },
             artifacts={"config": str(config.path), "checkpoint": str(checkpoint_path(config))},
         )
     paths = _status_paths(config, checkpoint)
-    gate = _human_gate_projection(config, checkpoint)
-    run_root = Path(paths["run_root"])
-
-    def manifest_check() -> str:
-        if not Path(paths["manifest"]).is_file():
-            raise FileNotFoundError("local manifest is unavailable")
-        manifest = _read_object(Path(paths["manifest"]), "manifest")
-        if manifest.get("run_id") != checkpoint["run_id"]:
-            raise OperatorError("manifest run identity mismatch")
-        run_configuration = manifest.get("run_configuration")
-        if not isinstance(run_configuration, dict) or run_configuration.get(
-            "operator_config_identity"
-        ) != config.identity():
-            raise OperatorError("manifest config identity mismatch")
-        if manifest.get("final_result") != checkpoint.get("final_result"):
-            raise OperatorError("manifest final result differs from checkpoint")
-        return "manifest identity matches checkpoint"
-
-    observation_result: Dict[str, Any] = {}
-
-    def event_check() -> str:
-        if not Path(paths["control_events"]).is_file() or not Path(paths["live_status"]).is_file():
-            raise FileNotFoundError("local observation artifacts are unavailable")
-        status_value, events, incomplete = _validate_observation(checkpoint, paths)
-        observation_result.update({
-            "event_count": len(events),
-            "status_available": status_value is not None,
-            "incomplete_tail": incomplete,
-        })
-        if incomplete:
-            raise FileNotFoundError("partial event tail is not modified by inspect")
-        return "event sequence, hash, suffix, and live projection are valid"
-
-    def summary_check() -> str:
-        summary_path = Path(paths["tracked_summary"])
-        progress = checkpoint.get("summary_progress", [])
-        if not isinstance(progress, list):
-            raise OperatorError("summary progress is invalid")
-        if not run_root.is_dir():
-            raise FileNotFoundError("local raw evidence root is unavailable")
-        expected = RUNNER.P63.expected_summary_bytes(
-            checkpoint["run_id"], run_root, progress
-        )
-        if progress:
-            if not summary_path.is_file() or summary_path.is_symlink():
-                raise OperatorError("tracked summary is missing")
-            if summary_path.read_bytes() != expected:
-                raise OperatorError("tracked summary bytes differ")
-        elif summary_path.exists():
-            raise OperatorError("unexpected summary exists")
-        try:
-            for record in progress:
-                entry = RUNNER.P63._entry_from_record(record)
-                artifacts = entry.get("raw_artifacts")
-                if not isinstance(artifacts, list):
-                    raise OperatorError("summary raw artifact list is invalid")
-                for artifact in artifacts:
-                    locator = artifact.get("locator") if isinstance(artifact, dict) else None
-                    if not isinstance(locator, str) or not Path(locator).is_file():
-                        raise FileNotFoundError("local raw evidence is unavailable")
-            RUNNER.P63.validate_summary_artifacts(
-                run_id=checkpoint["run_id"], run_root=run_root, progress=progress
-            )
-        except FileNotFoundError:
-            raise
-        return "tracked summary and available raw artifact identities are valid"
-
-    def framework_commit_check() -> str:
-        commit = checkpoint.get("framework_commit_id")
-        plan = checkpoint.get("framework_commit_plan")
-        if commit is None and plan is None:
-            raise FileNotFoundError("framework evidence commit is not available")
-        if not isinstance(commit, str) or not OBJECT_ID.fullmatch(commit) or not isinstance(plan, dict):
-            raise OperatorError("framework commit checkpoint is incomplete")
-        RUNNER.P63._validate_commit(plan, commit)
-        return "framework evidence commit matches its checkpointed plan"
-
-    def framework_push_check() -> str:
-        if not checkpoint.get("framework_evidence_pushed"):
-            raise FileNotFoundError("framework evidence push is not available")
-        commit = checkpoint.get("framework_commit_id")
-        plan = checkpoint.get("framework_commit_plan")
-        if not isinstance(commit, str) or not isinstance(plan, dict):
-            raise OperatorError("framework push identity is incomplete")
-        observed = RUNNER.P63.remote_head(
-            Path(plan["repo"]), plan["remote"], plan["push_ref"]
-        )
-        if observed != commit:
-            raise OperatorError("framework remote does not contain the evidence commit")
-        return "framework remote ref matches the evidence commit"
-
-    def target_check() -> str:
-        current = RUNNER.capture_target_state(
-            Path(config.resolved["target"]["repo"]),
-            config.resolved["target"]["branch"],
-            require_clean=True,
-        )
-        expected = checkpoint.get("target_after") or checkpoint.get("target_before") or checkpoint.get("target_initial")
-        if not isinstance(expected, dict) or current.metadata() != expected:
-            raise OperatorError("target identity differs from checkpoint evidence")
-        return "target branch, HEAD, and cleanliness match checkpoint"
-
-    def target_evidence_check() -> str:
-        target_repo = Path(config.resolved["target"]["repo"]).resolve()
-        checked = validate_authoritative_target_evidence(
-            checkpoint, run_root=run_root, target_repo=target_repo
-        )
-        return f"{checked} target evidence locator(s) are valid"
-
-    def correction_provenance_check() -> str:
-        correction = checkpoint.get("verdict_correction")
-        progress = checkpoint.get("summary_progress")
-        if not isinstance(correction, dict) or not isinstance(progress, list):
-            raise OperatorError("correction provenance checkpoint is invalid")
-        entries = [RUNNER.P63._entry_from_record(item) for item in progress]
-        validate_correction_provenance(
-            correction, entries=entries, run_root=run_root
-        )
-        return "historical correction verdict references and hashes are valid"
-
-    correction_provenance_result = (
-        _inspection_check("correction_provenance", correction_provenance_check)
-        if checkpoint.get("verdict_correction") is not None
-        else _not_applicable_check(
-            "correction_provenance", "run has no Reviewer verdict correction"
-        )
+    integrity_checks, observation_result, target_evidence_result = (
+        _authoritative_integrity_checks(config, checkpoint, paths)
     )
-    target_evidence_result = (
-        _inspection_check("target_evidence", target_evidence_check)
-        if _authoritative_accept_applies(checkpoint)
-        else _not_applicable_check(
-            "target_evidence",
-            "no ACCEPT Runtime transition has current target-evidence authority",
-        )
+    gate = _human_gate_projection(
+        config, checkpoint, integrity_checks=integrity_checks
     )
     target_evidence_classification = {
         "PASS": "VALID",
@@ -1195,14 +1247,7 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
     }[target_evidence_result["status"]]
     checks = [
         {"name": "checkpoint_identity", "status": "PASS", "code": "CHECKPOINT_IDENTITY_PASSED", "detail": "checkpoint is bound to the exact config identity"},
-        _inspection_check("manifest", manifest_check),
-        _inspection_check("observation", event_check),
-        _inspection_check("summary", summary_check),
-        _inspection_check("framework_commit", framework_commit_check),
-        _inspection_check("framework_push", framework_push_check),
-        _inspection_check("target", target_check),
-        correction_provenance_result,
-        target_evidence_result,
+        *integrity_checks,
     ]
     overall = _overall(checks)
     final = checkpoint.get("final_result")
@@ -1228,7 +1273,7 @@ def inspect_run(config: WorkloadConfig) -> Dict[str, Any]:
             "target_evidence_classification": target_evidence_classification,
             "safe_next_action": safe_next_action(checkpoint) if overall != "FAIL" else "STATE_UNAVAILABLE",
             **observation_result,
-            **gate,
+            "human_gate_projection": gate,
         },
         artifacts=paths,
     )

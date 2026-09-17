@@ -369,6 +369,16 @@ Command behavior is:
 - `human-gate` returns the same bounded Human Gate projection used by `status` and `inspect`. It
   creates no run, checkpoint, Agent turn, repair, or Human decision.
 
+`status` and `inspect` keep their F3 top-level checkpoint, logical outcome, Runtime transition,
+publication, and safe-action fields. Their Human Gate fields are grouped under
+`result.human_gate_projection`; `human-gate` returns that projection directly in `result`.
+All three use one read-only authoritative-integrity check set. It validates local evidence,
+target branch/HEAD/cleanliness, formed framework commit identity, completed remote push identity,
+and authoritative ACCEPT target evidence when applicable. Missing required raw evidence is
+`UNAVAILABLE`; an identity conflict is `INVALID` and never suggests finalization or a new run.
+An unformed commit or incomplete push is not an identity conflict merely because its artifact
+does not yet exist.
+
 `doctor`, `preflight`, `status`, `inspect`, and `human-gate` print exactly one compact JSON object with
 `schema_version`, command, config identity, overall status, checks/result, and public artifact
 locators. `PASS` and `UNAVAILABLE` return 0; `FAIL` returns 1; invalid config returns 2. Exceptions,
@@ -377,8 +387,10 @@ included. `run` and `resume` retain existing `PROGRESS` plus F1 `FINAL_RESULT` o
 
 `scripts/mutation_contracts.py` owns side-effect-free control/message/public-result contracts.
 `scripts/human_gate.py` is a pure projection over structured state and public locators. It does
-not import the runner or inspect artifacts. `run_mutation_loop.py` re-exports its historical
-contract names for compatibility and remains the only mutation control state machine.
+not import the runner or inspect artifacts. `scripts/workload_operator.py` supplies the shared
+read-only integrity result to the pure projection and to `inspect`.
+`run_mutation_loop.py` re-exports its historical contract names for compatibility and remains
+the only mutation control state machine.
 
 Human Gate states are `ACTIVE`, `NOT_APPLICABLE`, `UNAVAILABLE`, and `INVALID`. Allowed actions
 are limited to `INSPECT_EVIDENCE`, `FINALIZE_EVIDENCE`, `REMEDIATE_EXTERNAL_STATE`,

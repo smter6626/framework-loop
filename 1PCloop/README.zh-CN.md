@@ -346,6 +346,14 @@ resume，不会被猜测升级。
 - `human-gate` 返回与 `status`、`inspect` 相同的 bounded Human Gate projection，不创建 run、
   checkpoint、Agent turn、repair 或 Human decision。
 
+`status` 和 `inspect` 保留 F3 顶层 checkpoint、logical outcome、Runtime transition、
+publication 和 safe action 字段。Human Gate 字段放在 `result.human_gate_projection`；
+`human-gate` 则直接在 `result` 输出同一 projection。三个命令共用一组只读 authoritative-
+integrity 检查，按适用状态验证本地 evidence、target branch/HEAD/cleanliness、已形成的
+framework commit、已完成 push 的 remote ref，以及适用的 ACCEPT target evidence。必需 raw
+evidence 缺失为 `UNAVAILABLE`；identity 冲突为 `INVALID`，不会建议 finalization 或新 run。
+尚未形成 commit 或尚未完成 push 的合法中间态，不会仅因该 artifact 尚不存在而被判为冲突。
+
 `doctor`、`preflight`、`status`、`inspect`、`human-gate` 各只输出一个 compact JSON object，包含
 版本、命令、
 config identity、overall status、checks/result 与公开 artifact locator。`PASS`/`UNAVAILABLE` 返回
@@ -354,8 +362,9 @@ config identity、overall status、checks/result 与公开 artifact locator。`P
 
 `scripts/mutation_contracts.py` 持有无 side effect 的 control/message/public-result contract。
 `scripts/human_gate.py` 只根据结构化状态和公开 locator 做纯 projection，不 import runner，也不读取
-artifact。`run_mutation_loop.py` 为兼容既有 caller re-export 原公共 contract 名称，并继续是唯一
-mutation control state machine。
+artifact。`scripts/workload_operator.py` 向纯 projection 和 `inspect` 提供共用的只读
+integrity 结果。`run_mutation_loop.py` 为兼容既有 caller re-export 原公共 contract 名称，并继续
+是唯一 mutation control state machine。
 
 Human Gate state 固定为 `ACTIVE`、`NOT_APPLICABLE`、`UNAVAILABLE`、`INVALID`。Allowed action 仅有
 `INSPECT_EVIDENCE`、`FINALIZE_EVIDENCE`、`REMEDIATE_EXTERNAL_STATE`、

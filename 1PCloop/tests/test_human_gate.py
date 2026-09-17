@@ -29,6 +29,7 @@ PROJECTION_KEYS = (
     "reason_code",
     "allowed_actions",
     "recovery_mode",
+    "evidence_availability",
 )
 
 
@@ -43,6 +44,101 @@ class HumanGateTests(unittest.TestCase):
             io.StringIO()
         ):
             return OP.run_mutation(config)
+
+    @staticmethod
+    def gate_result(envelope):
+        result = envelope["result"]
+        if envelope["command"] == "human-gate":
+            return result
+        return result["human_gate_projection"]
+
+    @staticmethod
+    def git_snapshot(repo):
+        return {
+            "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo),
+            "branch": subprocess.check_output(
+                ["git", "branch", "--show-current"], cwd=repo
+            ),
+            "status": subprocess.check_output(
+                ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+                cwd=repo,
+            ),
+            "remote_heads": subprocess.check_output(
+                ["git", "ls-remote", "--heads", "origin"], cwd=repo
+            ),
+        }
+
+    def assert_shared_read_only_projection(
+        self, config, run_root, framework, target, *, status, reason, recovery
+    ):
+        checkpoint_path = OP.checkpoint_path(config)
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+        protected = {
+            path: path.read_bytes() if path.is_file() else None
+            for path in (
+                checkpoint_path,
+                run_root / "manifest.json",
+                run_root / OP.RUNNER.PROGRESS.EVENTS_FILENAME,
+                run_root / OP.RUNNER.PROGRESS.STATUS_FILENAME,
+                Path(config.resolved["evidence"]["summary_root"])
+                / f"{checkpoint['run_id']}.md",
+            )
+        }
+        repositories = {
+            repo: self.git_snapshot(repo) for repo in (framework, target)
+        }
+        for _ in range(2):
+            commands = (
+                OP.status(config), OP.inspect_run(config), OP.human_gate_status(config)
+            )
+            gates = [self.gate_result(command) for command in commands]
+            for key in PROJECTION_KEYS:
+                self.assertEqual(gates[0][key], gates[1][key], key)
+                self.assertEqual(gates[1][key], gates[2][key], key)
+            self.assertEqual(gates[2]["gate_status"], status)
+            self.assertEqual(gates[2]["reason_code"], reason)
+            self.assertEqual(gates[2]["recovery_mode"], recovery)
+            if status == "INVALID":
+                self.assertEqual(commands[1]["overall_status"], "FAIL")
+                self.assertEqual(
+                    commands[1]["result"]["safe_next_action"],
+                    "STATE_UNAVAILABLE",
+                )
+                self.assertEqual(gates[2]["evidence_availability"], "INVALID")
+                self.assertNotIn("FINALIZE_EVIDENCE", gates[2]["allowed_actions"])
+                self.assertNotIn(
+                    "START_NEW_RUN_AFTER_HUMAN_REVIEW", gates[2]["allowed_actions"]
+                )
+            if status == "UNAVAILABLE":
+                self.assertEqual(gates[2]["evidence_availability"], "UNAVAILABLE")
+            if recovery == "FINALIZATION_ONLY":
+                self.assertIn("FINALIZE_EVIDENCE", gates[2]["allowed_actions"])
+                self.assertNotIn(
+                    "START_NEW_RUN_AFTER_HUMAN_REVIEW", gates[2]["allowed_actions"]
+                )
+            if recovery == "NEW_RUN_AFTER_REVIEW":
+                self.assertIn(
+                    "START_NEW_RUN_AFTER_HUMAN_REVIEW", gates[2]["allowed_actions"]
+                )
+        for command_name in ("status", "inspect", "human-gate"):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                exit_code = CLI.main([
+                    "--config", str(config.path), command_name
+                ])
+            self.assertEqual(exit_code, 1 if status == "INVALID" else 0)
+            self.assertEqual(len(output.getvalue().splitlines()), 1)
+            parsed = json.loads(output.getvalue())
+            self.assertEqual(parsed["command"], command_name)
+            for key in PROJECTION_KEYS:
+                self.assertEqual(
+                    self.gate_result(parsed)[key], gates[2][key], key
+                )
+        for path, content in protected.items():
+            self.assertEqual(
+                path.read_bytes() if path.is_file() else None, content, str(path)
+            )
+        for repo, before in repositories.items():
+            self.assertEqual(self.git_snapshot(repo), before)
 
     @staticmethod
     def checkpoint(
@@ -246,8 +342,12 @@ class HumanGateTests(unittest.TestCase):
                 inspect = OP.inspect_run(config)
                 human = OP.human_gate_status(config)
                 for key in PROJECTION_KEYS:
-                    self.assertEqual(status["result"][key], human["result"][key])
-                    self.assertEqual(inspect["result"][key], human["result"][key])
+                    self.assertEqual(
+                        self.gate_result(status)[key], self.gate_result(human)[key]
+                    )
+                    self.assertEqual(
+                        self.gate_result(inspect)[key], self.gate_result(human)[key]
+                    )
                 self.assertEqual(inspect["overall_status"], "PASS")
                 self.assertEqual(human["result"]["gate_status"], "ACTIVE")
                 self.assertEqual(
@@ -291,9 +391,10 @@ class HumanGateTests(unittest.TestCase):
                 OP.human_gate_status(config),
             )
             for result in results:
-                self.assertEqual(result["result"]["gate_status"], "UNAVAILABLE")
+                gate = self.gate_result(result)
+                self.assertEqual(gate["gate_status"], "UNAVAILABLE")
                 self.assertEqual(
-                    result["result"]["reason_code"],
+                    gate["reason_code"],
                     "REQUIRED_EVIDENCE_UNAVAILABLE",
                 )
 
@@ -310,8 +411,9 @@ class HumanGateTests(unittest.TestCase):
                 OP.human_gate_status(config),
             )
             for result in results:
-                self.assertEqual(result["result"]["gate_status"], "INVALID")
-                self.assertEqual(result["result"]["reason_code"], "IDENTITY_CONFLICT")
+                gate = self.gate_result(result)
+                self.assertEqual(gate["gate_status"], "INVALID")
+                self.assertEqual(gate["reason_code"], "IDENTITY_CONFLICT")
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -331,8 +433,9 @@ class HumanGateTests(unittest.TestCase):
                 OP.human_gate_status(config),
             )
             for result in results:
-                self.assertEqual(result["result"]["gate_status"], "INVALID")
-                self.assertEqual(result["result"]["reason_code"], "IDENTITY_CONFLICT")
+                gate = self.gate_result(result)
+                self.assertEqual(gate["gate_status"], "INVALID")
+                self.assertEqual(gate["reason_code"], "IDENTITY_CONFLICT")
 
     def test_terminal_gate_resume_only_finalizes_evidence(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -370,6 +473,211 @@ class HumanGateTests(unittest.TestCase):
             self.assertEqual(
                 completed["result"]["evidence_publication"], "PUSHED"
             )
+
+    def test_authoritative_target_conflict_matrix_is_shared_and_read_only(self):
+        for kind in ("dirty", "wrong_branch", "head_drift"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                config_path, _, _, framework, _, _, _, _ = self.fixture(
+                    root, run_id=f"gate-target-{kind}"
+                )
+                config = OP.load_config(config_path)
+                code, run_root = self.run_config(config)
+                self.assertEqual(code, 0)
+                target = Path(config.resolved["target"]["repo"])
+                if kind == "dirty":
+                    (target / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+                elif kind == "wrong_branch":
+                    subprocess.run(
+                        ["git", "switch", "-q", "-c", "different-branch"],
+                        cwd=target, check=True,
+                    )
+                else:
+                    subprocess.run(
+                        ["git", "commit", "-qm", "later target commit", "--allow-empty"],
+                        cwd=target, check=True,
+                    )
+                self.assert_shared_read_only_projection(
+                    config, run_root, framework, target,
+                    status="INVALID", reason="IDENTITY_CONFLICT",
+                    recovery="HUMAN_REMEDIATION_REQUIRED",
+                )
+
+    def test_framework_commit_and_pushed_remote_conflicts_are_shared(self):
+        for kind in ("commit_id", "commit_plan", "remote"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                config_path, _, _, framework, remote, _, baseline, _ = self.fixture(
+                    root, run_id=f"gate-framework-{kind}"
+                )
+                config = OP.load_config(config_path)
+                code, run_root = self.run_config(config)
+                self.assertEqual(code, 0)
+                if kind in {"commit_id", "commit_plan"}:
+                    path = OP.checkpoint_path(config)
+                    checkpoint = json.loads(path.read_text(encoding="utf-8"))
+                    if kind == "commit_id":
+                        checkpoint["framework_commit_id"] = "0" * 40
+                    else:
+                        checkpoint["framework_commit_plan"]["subject"] = "wrong plan"
+                    path.write_text(
+                        json.dumps(checkpoint, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                else:
+                    subprocess.run(
+                        ["git", "update-ref", "refs/heads/main", baseline],
+                        cwd=remote, check=True,
+                    )
+                target = Path(config.resolved["target"]["repo"])
+                self.assert_shared_read_only_projection(
+                    config, run_root, framework, target,
+                    status="INVALID", reason="IDENTITY_CONFLICT",
+                    recovery="HUMAN_REMEDIATION_REQUIRED",
+                )
+
+    def test_authoritative_accept_evidence_conflict_is_shared(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, run_root, checkpoint = operator_tests.OperatorCliTests().accepted_run(
+                root, corrected=False, run_id="gate-authoritative-accept"
+            )
+            checkpoint["runtime_transition"]["record"]["evidence"][0][
+                "sha256"
+            ] = "0" * 64
+            OP.checkpoint_path(config).write_text(
+                json.dumps(checkpoint, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            framework = Path(config.resolved["governance"]["framework_repo"])
+            target = Path(config.resolved["target"]["repo"])
+            self.assert_shared_read_only_projection(
+                config, run_root, framework, target,
+                status="INVALID", reason="IDENTITY_CONFLICT",
+                recovery="HUMAN_REMEDIATION_REQUIRED",
+            )
+            checks = {item["name"]: item for item in OP.inspect_run(config)["checks"]}
+            self.assertEqual(checks["target_evidence"]["status"], "FAIL")
+
+    def test_publication_pending_and_completed_gate_use_applicable_checks(self):
+        for pending in (True, False):
+            with self.subTest(pending=pending), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                config_path, _, _, framework, remote, _, _, _ = self.fixture(
+                    root, run_id=f"gate-publication-{pending}"
+                )
+                config = OP.load_config(config_path)
+                hook = remote / "hooks" / "pre-receive"
+                if pending:
+                    hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+                    hook.chmod(0o755)
+                code, run_root = self.run_config(config)
+                self.assertEqual(code, 1 if pending else 0)
+                target = Path(config.resolved["target"]["repo"])
+                self.assert_shared_read_only_projection(
+                    config, run_root, framework, target,
+                    status="ACTIVE", reason="REVIEWER_HUMAN_GATE",
+                    recovery="FINALIZATION_ONLY" if pending else "NEW_RUN_AFTER_REVIEW",
+                )
+                checks = {item["name"]: item for item in OP.inspect_run(config)["checks"]}
+                self.assertEqual(checks["framework_commit"]["status"], "PASS")
+                self.assertEqual(
+                    checks["framework_push"]["status"],
+                    "NOT_APPLICABLE" if pending else "PASS",
+                )
+
+    def test_precommit_finalization_does_not_require_unformed_artifacts(self):
+        class Interrupted(BaseException):
+            pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path, _, _, framework, _, _, _, _ = self.fixture(
+                root, run_id="gate-precommit-finalization"
+            )
+            config = OP.load_config(config_path)
+            args = OP.build_runner_args(config, run_id="gate-precommit-finalization")
+            target_initial, governance_initial = OP.RUNNER.validate_preflight(args)
+
+            def interrupt(state, _checkpoint):
+                if state == OP.RUNNER.EVIDENCE_FINALIZATION_PENDING:
+                    raise Interrupted()
+
+            with patch.dict(os.environ, {"P6_TEST_VERDICT": "HUMAN_GATE"}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(Interrupted):
+                    OP.RUNNER.orchestrate(
+                        args=args,
+                        target_initial=target_initial,
+                        governance_initial=governance_initial,
+                        checkpoint_observer=interrupt,
+                    )
+            checkpoint = json.loads(OP.checkpoint_path(config).read_text(encoding="utf-8"))
+            self.assertIsNone(checkpoint["framework_commit_id"])
+            self.assertFalse(checkpoint["framework_evidence_pushed"])
+            run_root = Path(checkpoint["run_root"])
+            target = Path(config.resolved["target"]["repo"])
+            self.assert_shared_read_only_projection(
+                config, run_root, framework, target,
+                status="ACTIVE", reason="REVIEWER_HUMAN_GATE",
+                recovery="FINALIZATION_ONLY",
+            )
+            checks = {item["name"]: item for item in OP.inspect_run(config)["checks"]}
+            self.assertEqual(checks["framework_commit"]["status"], "NOT_APPLICABLE")
+            self.assertEqual(checks["framework_push"]["status"], "NOT_APPLICABLE")
+
+    def test_missing_raw_remains_unavailable_across_commands(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path, _, _, framework, _, _, _, _ = self.fixture(
+                root, run_id="gate-raw-unavailable"
+            )
+            config = OP.load_config(config_path)
+            code, run_root = self.run_config(config)
+            self.assertEqual(code, 0)
+            checkpoint = json.loads(OP.checkpoint_path(config).read_text(encoding="utf-8"))
+            entry = OP.RUNNER.P63._entry_from_record(checkpoint["summary_progress"][0])
+            Path(entry["raw_artifacts"][0]["locator"]).unlink()
+            target = Path(config.resolved["target"]["repo"])
+            self.assert_shared_read_only_projection(
+                config, run_root, framework, target,
+                status="UNAVAILABLE", reason="REQUIRED_EVIDENCE_UNAVAILABLE",
+                recovery="HUMAN_REMEDIATION_REQUIRED",
+            )
+
+    def test_f3_top_level_fields_cannot_be_overwritten_by_gate_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path, *_ = self.fixture(root, run_id="gate-f3-fields")
+            config = OP.load_config(config_path)
+            code, _run_root = self.run_config(config)
+            self.assertEqual(code, 0)
+            checkpoint = json.loads(OP.checkpoint_path(config).read_text(encoding="utf-8"))
+            final = checkpoint["final_result"]
+            actual = {
+                "checkpoint_state": checkpoint["state"],
+                "logical_outcome": checkpoint["logical_outcome"]["state"],
+                "runtime_transition": final["runtime_transition"],
+                "evidence_publication": final["evidence_publication"],
+                "safe_next_action": "HUMAN_REVIEW_REQUIRED",
+            }
+            original = OP.HUMAN_GATE.project_human_gate
+
+            def divergent_projection(*args, **kwargs):
+                projection = original(*args, **kwargs)
+                projection.update({key: "SYNTHESIZED" for key in actual})
+                return projection
+
+            with patch.object(
+                OP.HUMAN_GATE, "project_human_gate", side_effect=divergent_projection
+            ):
+                for command in (OP.status(config), OP.inspect_run(config)):
+                    for key, value in actual.items():
+                        self.assertEqual(command["result"][key], value)
+                        self.assertEqual(
+                            command["result"]["human_gate_projection"][key],
+                            "SYNTHESIZED",
+                        )
 
 
 if __name__ == "__main__":
