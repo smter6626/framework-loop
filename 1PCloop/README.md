@@ -427,9 +427,12 @@ control state, target HEAD, F2 active-time elapsed/timeout/activity, observation
 availability, and the three independent logical/Runtime/publication states. It does not add
 offline wall time to F2 elapsed values. When observation is unavailable, unverified progress is
 hidden. If consecutive `status` and `inspect` reads disagree, recovery actions are hidden until
-refresh. `PUSHED` is only publication, not logical success; a terminal Human Gate is never shown
-as ordinary Agent resume. `INVALID` or `UNAVAILABLE` never gets broader advice than the F5
-projection.
+refresh. `NO CHECKPOINT` is displayed only when both projections contain no real run state and
+the inspect side has the exact F3 checkpoint-missing shape. Final terminal rows escape Unicode
+`Cc`, `Cf`, `Zl`, and `Zp` characters before width bounding, so embedded line or paragraph
+separators cannot forge another row. `PUSHED` is only publication, not logical success; a terminal
+Human Gate is never shown as ordinary Agent resume. `INVALID` or `UNAVAILABLE` never gets broader
+advice than the F5 projection.
 
 The TUI never starts or resumes an Agent, finalizes evidence, repairs identity, or writes
 checkpoint, evidence, Git, or governance state. It is a single-writer local dashboard, not a

@@ -398,8 +398,10 @@ stderr 或命令输出。界面显示 run/cycle/role、control state、target HE
 elapsed/timeout/activity、observation/integrity availability，以及相互独立的 logical、Runtime、
 publication 三层状态。它不把停机 wall time 加进 F2 elapsed。Observation 不可用时隐藏未验证的
 progress。连续读取的 `status` 和 `inspect` 不一致时，隐藏恢复动作直到刷新。`PUSHED` 只代表
-publication，不代表 logical success；终端 Human Gate 不显示为普通 Agent resume。`INVALID` 或
-`UNAVAILABLE` 时不会给出比 F5 projection 更宽的建议。
+publication，不代表 logical success。只有两侧都没有真实 run state，且 inspect 侧符合 F3 固定的
+checkpoint-missing 形态时，才显示 `NO CHECKPOINT`。最终终端行在宽度裁剪前转义 Unicode `Cc`、
+`Cf`、`Zl` 和 `Zp`，嵌入的行/段分隔符不能伪造另一行。终端 Human Gate 不显示为普通 Agent
+resume；`INVALID` 或 `UNAVAILABLE` 时不会给出比 F5 projection 更宽的建议。
 
 TUI 不启动或恢复 Agent，不 finalization、repair identity，也不写 checkpoint、evidence、Git 或
 governance。它是单 writer 边界内的本地 dashboard，不是 concurrency protocol 或 GUI。极窄终端

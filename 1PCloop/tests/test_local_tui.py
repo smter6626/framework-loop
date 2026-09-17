@@ -1,11 +1,13 @@
 """F6 read-only local TUI presenter and config-backed integration tests."""
 
 import contextlib
+import copy
 import io
 import subprocess
 import sys
 import tempfile
 import unittest
+import unicodedata
 from pathlib import Path
 from unittest.mock import patch
 
@@ -41,6 +43,8 @@ def snapshot(
     return {
         "status": {
             "command": "status",
+            "config_identity": {"workload_id": "fixture"},
+            "artifacts": {"checkpoint": "/fixture/checkpoint.json"},
             "overall_status": "FAIL" if gate_status == "INVALID" else "PASS",
             "result": {
                 "run_id": "run-1",
@@ -64,6 +68,8 @@ def snapshot(
         },
         "inspect": {
             "command": "inspect",
+            "config_identity": {"workload_id": "fixture"},
+            "artifacts": {"checkpoint": "/fixture/checkpoint.json"},
             "overall_status": inspect_status,
             "result": {
                 "run_id": "run-1",
@@ -78,6 +84,65 @@ def snapshot(
             ],
         },
     }
+
+
+def no_checkpoint_snapshot():
+    value = snapshot()
+    identity = {"workload_id": "fixture"}
+    checkpoint = "/fixture/checkpoint.json"
+    no_checkpoint_gate = {
+        "gate_status": "NOT_APPLICABLE",
+        "reason_code": "NO_CHECKPOINT",
+        "recovery_mode": "NO_ACTION",
+        "allowed_actions": ["NO_AUTOMATIC_REPAIR"],
+        "evidence_availability": "UNAVAILABLE",
+    }
+    invalid_gate = {
+        "gate_status": "INVALID",
+        "reason_code": "IDENTITY_CONFLICT",
+        "recovery_mode": "HUMAN_REMEDIATION_REQUIRED",
+        "allowed_actions": [
+            "INSPECT_EVIDENCE",
+            "REMEDIATE_EXTERNAL_STATE",
+            "NO_AUTOMATIC_REPAIR",
+        ],
+        "evidence_availability": "UNAVAILABLE",
+    }
+    value["status"].update({
+        "config_identity": identity,
+        "artifacts": {"checkpoint": checkpoint},
+        "overall_status": "PASS",
+        "result": {
+            "run_id": None,
+            "checkpoint_state": None,
+            "observation_availability": "UNAVAILABLE",
+            "safe_next_action": "START_NEW_RUN_ALLOWED",
+            "human_gate_projection": no_checkpoint_gate,
+        },
+    })
+    value["inspect"].update({
+        "config_identity": identity,
+        "artifacts": {"checkpoint": checkpoint},
+        "overall_status": "FAIL",
+        "checks": [{
+            "name": "checkpoint_identity",
+            "status": "FAIL",
+            "code": "CHECKPOINT_IDENTITY_FAILED",
+            "detail": "checkpoint identity validation did not pass",
+        }],
+        "result": {
+            "safe_next_action": "STATE_UNAVAILABLE",
+            "human_gate_projection": invalid_gate,
+        },
+    })
+    return value
+
+
+def with_run_id(value, run_id):
+    result = copy.deepcopy(value)
+    result["status"]["result"]["run_id"] = run_id
+    result["inspect"]["result"]["run_id"] = run_id
+    return result
 
 
 def rendered(value, view="summary", width=160, height=40, scroll=0):
@@ -152,19 +217,7 @@ class LocalTuiTests(unittest.TestCase):
         self.assertNotIn("Agent resume", complete)
 
     def test_no_checkpoint_and_unverified_progress_are_explicit(self):
-        value = snapshot()
-        status = value["status"]["result"]
-        status.update({
-            "run_id": None,
-            "checkpoint_state": None,
-            "human_gate_projection": {
-                "gate_status": "NOT_APPLICABLE",
-                "reason_code": "NO_CHECKPOINT",
-                "recovery_mode": "NO_ACTION",
-                "allowed_actions": ["NO_AUTOMATIC_REPAIR"],
-                "evidence_availability": "UNAVAILABLE",
-            },
-        })
+        value = no_checkpoint_snapshot()
         text = rendered(value)
         self.assertIn("NO CHECKPOINT", text)
         self.assertIn("  - NO_AUTOMATIC_REPAIR", text)
@@ -187,7 +240,110 @@ class LocalTuiTests(unittest.TestCase):
             self.assertNotIn("\x1b", text)
             self.assertNotIn("\nnext", text)
             if view == "summary":
-                self.assertIn("run?[31m?next", text)
+                self.assertIn("run\\u001b[31m\\u000anext", text)
+
+    def test_public_text_escapes_every_single_line_category(self):
+        cases = {
+            "LF": "line\nforged",
+            "CR": "line\rforged",
+            "CRLF": "line\r\nforged",
+            "NUL": "line\x00forged",
+            "ESC": "line\x1b[31mforged",
+            "Cf": "line\u200bforged",
+            "Zl": "line\u2028forged",
+            "Zp": "line\u2029forged",
+        }
+        for name, source in cases.items():
+            with self.subTest(name=name):
+                escaped = TUI._public(source, 200)
+                self.assertTrue(escaped.startswith("line\\u"))
+                self.assertEqual(escaped.splitlines(), [escaped])
+                self.assertFalse(any(
+                    unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}
+                    for character in escaped
+                ))
+        self.assertEqual(TUI._public("普通中文", 96), "普通中文")
+
+        forged = "safe\r\nFORGED\x00\x1b\u200b\u2028next\u2029end"
+        value = with_run_id(snapshot(), forged)
+        rows, _offset = TUI.render_frame(
+            value, view="summary", width=240, height=40, scroll=0
+        )
+        for row in rows:
+            self.assertIn(row.splitlines(), ([], [row]))
+            self.assertFalse(any(
+                unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}
+                for character in row
+            ))
+        text = "\n".join(rows)
+        for encoded in ("\\u000d", "\\u000a", "\\u0000", "\\u001b", "\\u200b", "\\u2028", "\\u2029"):
+            self.assertIn(encoded, text)
+
+    def test_sequential_projection_consistency_matrix(self):
+        stable_none = no_checkpoint_snapshot()
+        stable_run = with_run_id(snapshot(), "run-a")
+        other_run = with_run_id(snapshot(), "run-b")
+        cases = (
+            ("stable_no_checkpoint", stable_none, True, True),
+            ("stable_existing_run", stable_run, False, True),
+            ("no_checkpoint_to_new_run", {"status": stable_none["status"], "inspect": stable_run["inspect"]}, False, False),
+            ("existing_run_to_missing", {"status": stable_run["status"], "inspect": stable_none["inspect"]}, False, False),
+            ("run_id_replaced", {"status": stable_run["status"], "inspect": other_run["inspect"]}, False, False),
+        )
+        for name, value, expected_none, expected_consistent in cases:
+            with self.subTest(name=name):
+                _result, _inspect, _gate, no_checkpoint, consistent = TUI._snapshot_parts(value)
+                self.assertEqual(no_checkpoint, expected_none)
+                self.assertEqual(consistent, expected_consistent)
+                text = rendered(value)
+                if expected_consistent:
+                    self.assertNotIn("SNAPSHOT UNAVAILABLE", text)
+                else:
+                    self.assertIn("SNAPSHOT UNAVAILABLE", text)
+                    self.assertNotIn("Allowed actions:", text)
+
+    def test_data_source_start_race_is_unavailable_until_consistent_refresh(self):
+        stable_none = no_checkpoint_snapshot()
+        stable_run = with_run_id(snapshot(), "new-run")
+
+        class SequencedOperator:
+            def __init__(self):
+                self.statuses = [stable_none["status"], stable_run["status"]]
+                self.inspections = [stable_run["inspect"], stable_run["inspect"]]
+                self.calls = []
+
+            def status(self, config):
+                self.calls.append(("status", config))
+                return self.statuses.pop(0)
+
+            def inspect_run(self, config):
+                self.calls.append(("inspect", config))
+                return self.inspections.pop(0)
+
+        operator = SequencedOperator()
+        config = object()
+        source = TUI.OperatorDataSource(operator, config)
+        first = source.read()
+        self.assertEqual(
+            operator.calls, [("status", config), ("inspect", config)]
+        )
+        first_text = rendered(first)
+        self.assertIn("SNAPSHOT UNAVAILABLE", first_text)
+        self.assertNotIn("Allowed actions:", first_text)
+        self.assertNotIn("NO CHECKPOINT --", first_text)
+
+        second = source.read()
+        self.assertEqual(
+            operator.calls,
+            [
+                ("status", config), ("inspect", config),
+                ("status", config), ("inspect", config),
+            ],
+        )
+        second_text = rendered(second)
+        self.assertNotIn("SNAPSHOT UNAVAILABLE", second_text)
+        self.assertIn("Run: new-run", second_text)
+        self.assertIn("Allowed actions:", second_text)
 
     def test_disagreeing_operator_projections_fail_closed_in_presenter(self):
         value = snapshot()

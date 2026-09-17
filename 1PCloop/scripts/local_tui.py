@@ -10,10 +10,10 @@ from __future__ import annotations
 import curses
 import math
 import sys
-import unicodedata
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from human_gate import ALLOWED_ACTIONS, GATE_STATUSES, RECOVERY_MODES
+from mutation_contracts import escape_public_text
 from progress_status import TURN_CONTROL_STATES
 
 
@@ -26,6 +26,13 @@ GATE_COMPARE_FIELDS = (
     "evidence_availability",
 )
 STATE_COMPARE_FIELDS = (
+    "checkpoint_state",
+    "logical_outcome",
+    "runtime_transition",
+    "evidence_publication",
+)
+RUN_PROJECTION_FIELDS = (
+    "run_id",
     "checkpoint_state",
     "logical_outcome",
     "runtime_transition",
@@ -63,6 +70,8 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 
 
 def _public(value: Any, limit: int = 96) -> str:
+    if limit <= 0:
+        return ""
     if value is None:
         return "-"
     if isinstance(value, bool):
@@ -72,11 +81,7 @@ def _public(value: Any, limit: int = 96) -> str:
     if isinstance(value, float):
         if not math.isfinite(value):
             return "-"
-    source = str(value)
-    safe = "".join(
-        character if not unicodedata.category(character).startswith("C") else "?"
-        for character in source[:limit]
-    )
+    safe = escape_public_text(str(value))[:limit]
     return safe or "-"
 
 
@@ -92,6 +97,56 @@ def _seconds(value: Any) -> str:
     return f"{value:.1f}s"
 
 
+def _has_run_projection(result: Mapping[str, Any]) -> bool:
+    return any(result.get(name) is not None for name in RUN_PROJECTION_FIELDS)
+
+
+def _stable_no_checkpoint(
+    status: Mapping[str, Any],
+    inspect: Mapping[str, Any],
+    result: Mapping[str, Any],
+    inspect_result: Mapping[str, Any],
+    gate: Mapping[str, Any],
+    inspect_gate: Mapping[str, Any],
+) -> bool:
+    """Recognize the exact F3 no-checkpoint pair, not an arbitrary inspect FAIL."""
+    checks = inspect.get("checks")
+    checkpoint_check = (
+        checks[0]
+        if isinstance(checks, list) and len(checks) == 1
+        and isinstance(checks[0], Mapping)
+        else {}
+    )
+    status_artifacts = _mapping(status.get("artifacts"))
+    inspect_artifacts = _mapping(inspect.get("artifacts"))
+    return (
+        not _has_run_projection(result)
+        and gate.get("gate_status") == "NOT_APPLICABLE"
+        and gate.get("reason_code") == "NO_CHECKPOINT"
+        and gate.get("recovery_mode") == "NO_ACTION"
+        and gate.get("allowed_actions") == ["NO_AUTOMATIC_REPAIR"]
+        and gate.get("evidence_availability") == "UNAVAILABLE"
+        and result.get("safe_next_action") == "START_NEW_RUN_ALLOWED"
+        and not _has_run_projection(inspect_result)
+        and inspect.get("overall_status") == "FAIL"
+        and checkpoint_check.get("name") == "checkpoint_identity"
+        and checkpoint_check.get("status") == "FAIL"
+        and checkpoint_check.get("code") == "CHECKPOINT_IDENTITY_FAILED"
+        and inspect_gate.get("gate_status") == "INVALID"
+        and inspect_gate.get("reason_code") == "IDENTITY_CONFLICT"
+        and inspect_gate.get("recovery_mode") == "HUMAN_REMEDIATION_REQUIRED"
+        and inspect_gate.get("allowed_actions") == [
+            "INSPECT_EVIDENCE",
+            "REMEDIATE_EXTERNAL_STATE",
+            "NO_AUTOMATIC_REPAIR",
+        ]
+        and inspect_gate.get("evidence_availability") == "UNAVAILABLE"
+        and inspect_result.get("safe_next_action") == "STATE_UNAVAILABLE"
+        and status.get("config_identity") == inspect.get("config_identity")
+        and status_artifacts.get("checkpoint") == inspect_artifacts.get("checkpoint")
+    )
+
+
 def _snapshot_parts(
     snapshot: Mapping[str, Any],
 ) -> Tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any], bool, bool]:
@@ -102,10 +157,13 @@ def _snapshot_parts(
     gate = _mapping(result.get("human_gate_projection"))
     inspect_gate = _mapping(inspect_result.get("human_gate_projection"))
     actions = gate.get("allowed_actions")
-    no_checkpoint = result.get("run_id") is None and gate.get("reason_code") == "NO_CHECKPOINT"
-    consistent = (
+    no_checkpoint = _stable_no_checkpoint(
+        status, inspect, result, inspect_result, gate, inspect_gate
+    )
+    basic_contract = (
         status.get("command") == "status"
         and inspect.get("command") == "inspect"
+        and status.get("config_identity") == inspect.get("config_identity")
         and isinstance(gate.get("gate_status"), str)
         and gate.get("gate_status") in GATE_STATUSES
         and isinstance(gate.get("recovery_mode"), str)
@@ -116,11 +174,17 @@ def _snapshot_parts(
             gate.get("gate_status") in {"INVALID", "UNAVAILABLE"}
             and any(action in {"FINALIZE_EVIDENCE", "START_NEW_RUN_AFTER_HUMAN_REVIEW"} for action in actions)
         )
-        and (no_checkpoint or all(gate.get(key) == inspect_gate.get(key) for key in GATE_COMPARE_FIELDS))
-        and (no_checkpoint or all(result.get(key) == inspect_result.get(key) for key in STATE_COMPARE_FIELDS))
-        and (no_checkpoint or result.get("run_id") == inspect_result.get("run_id"))
-        and (no_checkpoint or inspect.get("overall_status") != "FAIL" or gate.get("gate_status") == "INVALID")
     )
+    existing_run_consistent = (
+        isinstance(result.get("run_id"), str)
+        and bool(result.get("run_id"))
+        and isinstance(inspect_result.get("run_id"), str)
+        and all(gate.get(key) == inspect_gate.get(key) for key in GATE_COMPARE_FIELDS)
+        and all(result.get(key) == inspect_result.get(key) for key in STATE_COMPARE_FIELDS)
+        and result.get("run_id") == inspect_result.get("run_id")
+        and (inspect.get("overall_status") != "FAIL" or gate.get("gate_status") == "INVALID")
+    )
+    consistent = basic_contract and (no_checkpoint or existing_run_consistent)
     return result, inspect, gate, no_checkpoint, consistent
 
 
