@@ -4,15 +4,15 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`REJECTED -- NARROW REPAIR REQUIRED`
-- 最近接受：`F4 -- ACCEPTED AFTER INDEPENDENT REVIEW`
-- 唯一 Active Step：`F5 -- runner 模块化和 Human Gate UX`
-- 当前顶层 Step：`Step 5`
+- 当前 verdict：`NOT EVALUATED`
+- 最近接受：`F5 -- ACCEPTED AFTER INDEPENDENT RE-REVIEW`
+- 唯一 Active Step：`F6 -- 本地只读 TUI`
+- 当前顶层 Step：`Step 6`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
 - 当前执行方式：Human-mediated Reviewer/Executor
-- 最后更新：`2026-09-16`
+- 最后更新：`2026-09-17`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
 transition。本文件不包含 `1PCLOOP_RUNTIME_STATE` machine block；现有 runner 禁止 framework
@@ -197,129 +197,147 @@ Runtime。Event SHA-256 是 canonical byte identity，不是 keyed authority；c
 `eeb75e11480ecc245e040862bd42a952ec008c97` 的模板、来源 identity 与独立审核 evidence
 关闭为 `RESOLVED`，因此 Step 5 gate 已解除。
 
+### G. F5 -- runner 模块化和 Human Gate UX
+
+状态：`ACCEPTED AFTER REJECT -> NARROW REPAIR -> INDEPENDENT RE-REVIEW`
+
+结果：
+
+- implementation commit `3f3bba9d94b5446008d6773792af00ded566a5ae` 提取无 runner 反向
+  dependency 的 `mutation_contracts.py` 和纯 `human_gate.py`，增加 config-backed `human-gate`
+  只读命令，并保持唯一 `orchestrate()` 与 runner re-export identity；
+- 首次独立审核发现 Human Gate 未检查完整 target/framework authoritative identity，target 外部
+  mutation 后仍允许开始新 run，而 `inspect` 已返回 FAIL；REJECT 及 Executor/Reviewer 全绿测试和
+  原始复现记录于治理 commit `40c58a180e2daffeacb2e5bf65616e551d579e6a`；
+- narrow repair commit `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0` 让 `status`、`inspect`、
+  `human-gate` 共用一组 state-aware、只读的 authoritative-integrity 检查；gate projection
+  冲突时统一 default-deny，F3 顶层字段与嵌套 `human_gate_projection` 分离；
+- 合法 publication pending 仍为 `FINALIZATION_ONLY`，已完成的合法 Human Gate 仍须 Human review
+  才能开始新 run；缺失 raw evidence 为 `UNAVAILABLE`，identity conflict 为 `INVALID`。
+
+独立 re-review evidence：
+
+- Executor repair focused `19 / 19`，`37.533s`；F3 operator `33 / 33`，`47.378s`；
+  点名 F1-F4 regression `139 / 139`，`185.257s`；完整 ResourceWarning-strict regression
+  `178 / 178`，`225.025s`；
+- Reviewer 独立复跑 F5 focused `19 / 19`，其中 Human Gate `14 / 14`、contract `5 / 5`；
+  完整 ResourceWarning-strict regression `178 / 178`，`224.051s`；
+- Reviewer 重跑首次 REJECT 的 disposable target-dirty 复现：修改前三个命令均为
+  `ACTIVE / NEW_RUN_AFTER_REVIEW`，`inspect=PASS`；target 变 dirty 后三命令均为
+  `INVALID / HUMAN_REMEDIATION_REQUIRED`，allowed actions 不含 finalization 或新 run，
+  `inspect=FAIL / STATE_UNAVAILABLE`；
+- Reviewer 检查共享检查集、F3 顶层字段隔离、双语 README、四个文件的 commit scope、Static hash、
+  `git diff --check`、远端同步与审核前 clean worktree；未运行 real-service smoke，仍留至 F7。
+
+当前语义：Static AC-07、AC-08 与 AC-11 在 F5 范围内有充分 evidence。首次 REJECT 与
+repair/re-review 链保留于 §8；F5 文件默认冻结，F6 不重开其 control contract。
+
 ## 3. Active Step
 
-### F5 / Step 5 -- runner 模块化和 Human Gate UX
+### F6 / Step 6 -- 本地只读 TUI
 
 #### Objective
 
-在不重写 authoritative orchestrator 的前提下，提取可复用的 control contract 与 Human Gate
-projection，使 `run_mutation_loop.py` 不再同时承担全部协议、状态机和 operator UX 职责；同时为
-Human operator 提供一个只读、结构化、可定位 evidence 的 Human Gate 检查入口，明确原因、允许
-动作和恢复边界。F5 不替 Human 作决定、不自动修复 checkpoint/target/governance，也不实现 F6 TUI。
+提供 macOS 本地终端中的可用 TUI dashboard，让 Human operator 不必从原始日志推断运行位置。
+界面只读展示 F2 structured progress、F3 operator status/inspect 和 F5 Human Gate projection；
+可以刷新、切换视图和退出，但不启动或恢复 Agent、不替 Human 选择 gate action。`run`/`resume`
+继续使用现有 CLI。F6 不引入 Codex GUI automation、Web UI 或并发控制。
 
 #### Inputs 及固定 identity
 
 - Static：`1PCloop/workloads/foundation_v1/workload_static.md`，SHA-256
   `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`；
-- F1 accepted control/output/correction contracts；
-- F2 accepted progress/event/recovery contracts；
-- F3 accepted operator config、status、inspect 与 safe-next-action contracts；
-- F4 accepted templates commit `eeb75e11480ecc245e040862bd42a952ec008c97`；
-- `1PCloop/scripts/run_mutation_loop.py`、`workload_operator.py`、`onepcloop.py`、现有 helper 和 test
-  suites；
-- Static AC-07、AC-08、AC-11。
+- F2 accepted `control-events.jsonl`、`live-status.json`、timer/last-activity semantics；
+- F3 accepted strict workload config、`status`/`inspect` 和 safe-next-action；
+- F5 accepted nested Human Gate projection 和 shared authoritative-integrity checks，repair commit
+  `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0`；
+- `1PCloop/scripts/onepcloop.py`、`workload_operator.py`、`progress_status.py`、`human_gate.py`、
+  双语 README 及相关 tests；
+- Static AC-04、AC-05、AC-09、AC-11。
 
 #### Permitted changes
 
-- 新建 `1PCloop/scripts/mutation_contracts.py`，提取无 orchestrator side effect 的 control state/error、
-  strict JSON/schema/verdict relationship 和 public final-result contract；
-- 新建 `1PCloop/scripts/human_gate.py`，以普通 mapping/artifact locator 为输入生成纯只读 Human Gate
-  projection，且不得反向 import `run_mutation_loop.py`；
-- 修改 `run_mutation_loop.py` 以单向 import 并兼容 re-export 已有公共名称，保持 `orchestrate()` 为
-  唯一 mutation control state machine；
-- 修改 `workload_operator.py`、`onepcloop.py`，增加 config-backed `human-gate` 只读命令，并让
-  `status`/`inspect` 复用同一 projection；
-- 增加 F5 module/Human Gate tests，并对既有 tests 做必要 import/output 兼容调整；
-- 更新双语 README 的模块边界、Human Gate 命令、允许动作和恢复语义。
+- 新增独立 TUI/presenter module 与对应 tests；
+- 在 `onepcloop.py` 增加 config-backed `tui` 入口；必要时增加只读 operator adapter，但不得
+  改变 `status`、`inspect`、`human-gate` 的现有 JSON/output contract；
+- 更新双语 README，说明启动、键位、刷新、非 TTY、缺失 evidence、退出与安全边界；
+- 使用 Python 3.9/macOS 可用的本地终端能力；优先标准库，不新增依赖，除非有直接必要性
+  evidence 并单独说明。
 
 #### Prohibited changes
 
-- 全局和 task-local Static/Runtime；
-- F1-F4/P4-P6 authoritative semantics、schema、roles、requirements、templates 和历史 evidence；
-- 复制第二套 `orchestrate()`、Runtime transition、checkpoint recovery 或 publication state machine；
-- 自动接受/拒绝 Human Gate、从 peer_message 推断 gate、自动修改 checkpoint/target/governance、
-  删除 evidence 或替 Human 执行不可逆 repair；
-- interactive prompt、curses/TUI/GUI、F6-F8、P7、real-service smoke、self-hosting 或 concurrency；
-- closed workload、外部 Tools、target history/remote、force push 或 history rewrite。
+- 全局/task-local Static/Runtime、schema、roles、requirements、templates 和历史 evidence；
+- 修改 F1-F5/P4-P6 authoritative behavior、runner state machine、checkpoint/recovery、Runtime
+  transition、evidence publication 或 safe-next-action semantics；
+- 从 raw Codex events、prompt、peer_message、stderr、命令输出或自然语言猜测 UI/control state；
+- TUI 写入 checkpoint、event/status、summary、target/framework Git，或自动运行 `run`/`resume`、
+  finalization、Human Gate action、repair；
+- F7 real-service smoke、F8 GUI/治理压缩、P7、self-hosting、lock/watcher/concurrency、外部 Tools
+  或 closed workload mutation、force push/history rewrite。
 
 #### Required evidence
 
-- module dependency/import evidence：新 helper 不反向加载 runner，runner 保持唯一 state machine；
-- extracted symbol equivalence 与 existing import compatibility tests；
-- Reviewer-requested Human Gate、target unchanged、max cycles、ambiguous Executor recovery、transition
-  interruption、publication pending/completed、non-gate、missing/conflicting evidence 的 projection tests；
-- `human-gate`、`status`、`inspect` 对同一 checkpoint 产生同一 gate classification/recovery boundary；
-- read-only byte snapshot 证明上述命令不修改 checkpoint、manifest、event/status、summary、Git state；
-- resume boundary tests 证明 terminal gate 不重放 Agent/Executor，publication 未完成时最多只恢复
-  evidence finalization；
-- privacy tests 证明不输出 peer payload、prompt、stderr、command output、internal diagnostic 或 secret；
-- F1-F4 focused regression 与完整 ResourceWarning-strict regression、commit 和精确文件列表。
+- event-source test 证明 presenter 只消费 F2/F3/F5 的 structured projections，不读取或解析
+  natural-language payload；
+- deterministic rendering/input tests 覆盖无 checkpoint、active turn、Human Gate、failed closed、
+  publication pending/completed、raw unavailable 和 identity INVALID；
+- run/stage elapsed、timeout remaining、last activity、cycle/role/state、target HEAD、logical outcome、
+  Runtime transition、evidence publication 与 gate recovery/action 分层可见；
+- 非 TTY、窄终端、终端 resize、退出/异常清理有明确且可测试行为；刷新有界，不 busy-loop；
+- 两次只读 UI refresh 前后 checkpoint、manifest、events/status、summary 与 target/framework Git
+  状态不变；privacy fixture 不展示 prompt、peer、stderr、internal diagnostic 或 secret；
+- F2/F3/F5 focused regression 与完整 ResourceWarning-strict regression、精确 commit scope。
 
 #### Acceptance criteria
 
-1. `mutation_contracts.py` 是无 I/O side effect 的单一 control-contract implementation；runner 通过
-   单向 import 使用并兼容 re-export，现有 caller 不需要复制定义或改变 semantics。
-2. `human_gate.py` 是独立纯 projection，不 import runner、不修改文件、不解析自然语言；同一输入
-   始终得到同一 bounded machine-readable 结果。
-3. `human-gate` 命令只读输出一个 JSON object，区分 `ACTIVE`、`NOT_APPLICABLE`、`UNAVAILABLE`
-   和 `INVALID`，并显示 stable reason/error code、checkpoint/logical/publication state、evidence
-   locator、允许动作和 recovery mode。
-4. 允许动作必须来自固定枚举，至少区分 `INSPECT_EVIDENCE`、`FINALIZE_EVIDENCE`、
-   `REMEDIATE_EXTERNAL_STATE`、`START_NEW_RUN_AFTER_HUMAN_REVIEW`、`NO_AUTOMATIC_REPAIR`；不得根据
-   peer prose 发明动作。
-5. recovery mode 明确区分 `FINALIZATION_ONLY`、`HUMAN_REMEDIATION_REQUIRED`、
-   `NEW_RUN_AFTER_REVIEW` 和 `NO_ACTION`；terminal Human Gate 不得被显示为普通 Agent resume。
-6. `status`、`inspect`、`human-gate` 复用相同 projection；inspect package PASS 不等于 Human Gate
-   已解决，publication success 也不等于 logical success。
-7. 所有 Human Gate 查看路径只读且隐私安全；缺失 raw 为 UNAVAILABLE，identity 冲突为 INVALID，
-   不做自动修复、删除或猜测性升级。
-8. `orchestrate()`、checkpoint/transition/correction/progress/publication 的 accepted behavior 保持不变；
-   full strict regression 与 AC-11 继续通过。
+1. `onepcloop.py --config <absolute-config> tui` 在可交互 macOS 终端启动、显示并可退出；
+   非 TTY 不发出屏幕控制序列，也不创建 run/checkpoint。
+2. TUI 只从已验证的 structured control/status/checkpoint/event projection 和固定枚举构造显示；
+   raw Codex/free-text payload 不是 UI 的控制或状态来源。
+3. 操作者可区分正在执行、等待 Human、failed closed、evidence finalization、已发布等状态；计时
+   与 F2 active-time 语义一致，不把进程停止期间 wall time 伪装为 run elapsed。
+4. `INVALID`/`UNAVAILABLE` 有显著标识，且不显示比 F5 projection 更宽的允许动作；
+   publication success 不能覆盖 logical failure，terminal gate 不显示为普通 Agent resume。
+5. 至少支持可发现的刷新、视图切换/滚动和退出键；窄终端和 resize 不崩溃；渲染/输入错误后
+   终端状态可恢复。UI 不执行 mutation 或 Human decision。
+6. 重复打开/刷新不修改任何 authoritative artifact 或 Git state；privacy 与完整 strict
+   regression 通过。F7 前不宣称 real-service end-to-end 已验收。
 
 #### Tests
 
-- direct module import、无 runner back-import/circular import、symbol identity/equivalence；
-- gate classification/reason/action/recovery matrix；
-- status/inspect/human-gate consistency and one-object JSON output；
-- no-checkpoint、non-gate、active gate、terminal gate、raw unavailable、identity conflict；
-- repeated read-only command byte/Git invariance；
-- terminal resume call-count 与 finalization-only recovery；
-- malicious public reason/control/secret privacy regression；
-- legacy long-argument CLI、F1-F4 focused 和完整 strict regression。
+- pure presenter/data-source tests，不依赖真实 TTY 或 sleep；
+- disposable config-backed read-only TUI integration/snapshot tests；
+- fake terminal/input tests 覆盖键位、窄屏、resize、异常清理和非 TTY；
+- F2 progress、F3 operator、F5 Human Gate 与完整 strict regression。
 
-F5 不运行 real-service smoke；完整 post-foundation real-service smoke 留到 F7。
+F6 不运行 real-service Codex smoke；真实可用性和合法 ACCEPT 闭环留到 F7。
 
 #### Stop conditions / Human Gate
 
-- 模块提取需要重写 orchestrate、改变 checkpoint/schema 或 accepted transition semantics；
-- safe action/recovery mode 不能仅由 structured checkpoint/final-result/evidence state 确定；
-- 处理 Human Gate 需要主观 Owner decision、自动 repair 或不可逆 Git/governance mutation；
-- 无法避免 circular import、第二套状态机或从 natural-language peer payload 推断控制状态；
-- 需要 F6 TUI、F7 service smoke、P7 fault injection 或 Static 变化。
+- TUI 需要改变 F2/F3/F5 accepted contract 或从 peer prose/raw payload 猜测状态；
+- 需要自动 Human decision、mutation/resume、不可逆操作、新 dependency 或 Static 变化；
+- 需要 F7 real-service smoke、F8 GUI、P7 或 concurrency 才能完成当前只读 dashboard。
 
 #### Executor report format
 
 ```text
-F5 implementation status: IMPLEMENTED / BLOCKED
+F6 implementation status: IMPLEMENTED / BLOCKED
 branch / implementation commit / parent / working-tree state
 changed files
-module boundaries and dependency direction
-extracted symbols and compatibility behavior
-Human Gate states, fixed actions and recovery modes
-read-only/privacy/resume-boundary evidence
-focused regressions and full strict regression
+TUI entrypoint, data source, screens and keys
+timer/state semantics, INVALID/UNAVAILABLE behavior
+read-only/privacy/non-TTY/resize/terminal-cleanup evidence
+focused regressions and full ResourceWarning-strict regression
 known limitations
 recommended Runtime evidence summary
 ```
 
-Executor 不得宣告 F5 accepted，也不得推进本 Runtime。
+Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
 
 ## 4. Queued
 
 | Step | Deliverable | 状态 |
 | --- | --- | --- |
-| F6 / Step 6 | 本地 TUI | `QUEUED` |
 | F7 / Step 7 | post-foundation real-service smoke | `QUEUED` |
 | F8 / Step 8 | GUI/治理压缩/evidence lifecycle 的 evidence-driven 决策 | `QUEUED` |
 
@@ -328,16 +346,14 @@ Executor 不得宣告 F5 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- F5 acceptance 当前被 Human Gate projection 的 identity/default-deny 缺口阻塞：target 或
-  framework authoritative identity 已失败时，projection 仍可能允许
-  `START_NEW_RUN_AFTER_HUMAN_REVIEW`，与同一 checkpoint 的 `inspect` 结果矛盾。
-- 该 blocker 需要窄代码修复和独立 re-review，不需要 Human Owner 作新的产品或合同决定。
-- 当前 framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知
-  self-hosting limitation，不是 F5 blocker。
+- 当前无 F6 implementation blocker 或 Human Decision Gate；F5 的历史阻塞已由 repair 与独立
+  re-review 关闭，首次 REJECT 仍保留于 §8。
+- framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知 self-hosting
+  limitation，不是 F6 blocker。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`5`
+当前顶层 Step：`6`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -346,12 +362,12 @@ Executor 不得宣告 F5 accepted，也不得推进本 Runtime。
 
 ### Pending Gate Check
 
-- 下一顶层 Step：`Step 6 / F6`
+- 下一顶层 Step：`Step 7 / F7`
 - 激活前必须关闭的 Pending Task：无；PT-01 已在其 Step 5 deadline gate 前关闭。
 - Gate verdict：`CLEAR`
 - 支持 evidence：F4 implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`
   与本次独立 review；PT-02 保持 `+∞`。
-- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F5 blocker。
+- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F6 blocker。
 
 ## 7. State Transition
 
@@ -400,7 +416,7 @@ F3 -> F4 transition（历史状态）：
   ACCEPT 只 supersede 当时的“当前拒绝状态”，不删除 rejection evidence；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
 
-Latest step transition：
+F4 -> F5 transition（历史状态）：
 
 - Previous step state：F4 `ACTIVE / NOT EVALUATED`，PT-01 `DUE_NEXT`；
 - Triggering evidence：implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`、
@@ -413,6 +429,19 @@ Latest step transition：
 - Meaning：默认中文治理模板成为 tracked、provenance-bound 的稳定输入；F5 可以开始，F4 文件
   默认冻结；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
+
+F5 -> F6 transition（当前状态）：
+
+- Previous step state：F5 `REJECTED -- NARROW REPAIR REQUIRED`，首次拒绝及原始复现保留于 §8；
+- Triggering evidence：repair commit `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0`、Reviewer
+  target-dirty 原阻塞路径独立复测、F5 focused `19 / 19`、完整 strict `178 / 178`；
+- Verdict：F5 `ACCEPTED AFTER INDEPENDENT RE-REVIEW`；
+- Current step：F6 / Step 6 `ACTIVE / NOT EVALUATED`；
+- Pending update：PT-01 保持 `RESOLVED`，PT-02 保持 `+∞ / PERMANENTLY_NON_BLOCKING`，
+  下一 Step 7 gate 为 `CLEAR`；
+- Meaning：F5 的共享只读 identity check 与嵌套 Human Gate projection 成为 F6 TUI 的稳定输入；
+  F6 不重开 F5 control semantics；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
 
 ## 8. Independent Review
 
@@ -862,10 +891,40 @@ Independent review verdict：
 - 本次再次形成“Executor 测试全绿但独立 Reviewer 发现跨模块状态盲点”的 self-application
   evidence；不是 P7 fault injection，也不运行 real-service smoke。
 
+### 2026-09-17 F5 independent re-review：`ACCEPTED`
+
+审核对象：repair commit `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0`，parent 为保存
+首次 REJECT 的 Runtime commit `40c58a180e2daffeacb2e5bf65616e551d579e6a`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| 原 default-deny 阻塞 | Reviewer 独立重跑 target-dirty 前后 disposable fixture | 变 dirty 后三命令一致 `INVALID / HUMAN_REMEDIATION_REQUIRED`，不再允许 finalization 或新 run；`inspect` 为 `FAIL / STATE_UNAVAILABLE` | PASS |
+| 共享 authoritative checks | `workload_operator.py` 中同一 state-aware check set 供 inspect 与 gate 使用；target/framework/ACCEPT conflict tests | 适用的 target branch/HEAD/cleanliness、commit/remote、最终 ACCEPT evidence 均纳入；合法未形成的 artifact 不被误判 | PASS |
+| F3 字段兼容 | `status`/`inspect` 使用 `result.human_gate_projection`，双语 README 和 fallback isolation test | 既有顶层 checkpoint/logical/runtime/publication/safe action 字段不被 gate flat merge 覆盖 | PASS |
+| Human Gate recovery/privacy | pending/completed、raw missing、重复只读 snapshot、terminal no-Agent-replay tests | `UNAVAILABLE` 与 `INVALID` 分离；合法 pending 只允许 finalization，terminal gate 不伪装成 resume | PASS |
+| regression/scope | F5 focused、全量 strict、commit diff 和 Static hash | 仅改四个授权文件；runner、governance、schema、roles 和历史 evidence 未变 | PASS |
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Reviewer F5 focused：`19 / 19`，Human Gate `14 / 14` 用时 `35.189s`，contract `5 / 5`
+  用时 `0.075s`；
+- Reviewer 完整 ResourceWarning-strict regression：`178 / 178`，`224.051s`；
+- branch/local HEAD/origin/GitHub ref 均为 repair commit，审核前工作树 clean，Static SHA-256
+  `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e` 不变，
+  `git diff --check` 与修改范围通过；
+- Reviewer verdict：`ACCEPTED`；
+- Review limitation：只读检查基于 single-writer 的即时状态，不提供并发快照；真实 Codex service
+  与完整 post-foundation smoke 留至 F7。两者不阻塞 F5 deterministic acceptance。
+
+本次 ACCEPT supersede §8 中 F5 的当前拒绝状态，但保留首次 REJECT、Executor/Reviewer 全绿仍被
+打回、窄修复及独立 re-review 的完整 provenance；不是 P7 fault injection。
+
 ## 9. Next Direction
 
-只执行 F5 narrow repair：把 Human Gate projection 绑定到完整 authoritative identity，统一
-`status`/`inspect`/`human-gate` 的 default-deny classification 与动作边界，并消除 gate flat merge
-覆盖 F3 顶层字段的风险。F1-F4 保持 accepted；不得重写 orchestrate、扩大产品范围、修改 Static、
-运行 real-service smoke 或提前实现 F6-F8。修复完成后停止于
-`AWAITING INDEPENDENT RE-REVIEW`。
+只执行 F6：实现 config-backed、本地只读 TUI，以 F2 structured progress、F3 operator status/
+inspect 和 F5 Human Gate projection 为唯一状态来源。F1-F5 保持 accepted；不得重写
+orchestrate、自动处理 Human decision、修改 Static/Runtime、运行 F7 real-service smoke 或提前
+实现 F8/P7。F6 完成后停止于 `AWAITING INDEPENDENT REVIEW`。
