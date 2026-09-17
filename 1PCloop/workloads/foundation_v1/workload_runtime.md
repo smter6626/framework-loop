@@ -4,7 +4,7 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
+- 当前 verdict：`REJECTED -- NARROW REPAIR REQUIRED`
 - 最近接受：`F5 -- ACCEPTED AFTER INDEPENDENT RE-REVIEW`
 - 唯一 Active Step：`F6 -- 本地只读 TUI`
 - 当前顶层 Step：`Step 6`
@@ -346,8 +346,10 @@ Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无 F6 implementation blocker 或 Human Decision Gate；F5 的历史阻塞已由 repair 与独立
-  re-review 关闭，首次 REJECT 仍保留于 §8。
+- F6 acceptance 当前被 no-checkpoint -> new-run 顺序读取竞争阻塞：presenter 将已经互相矛盾的
+  `status`/`inspect` snapshot 判为 consistent，并错误显示“无 checkpoint”，而不是
+  `SNAPSHOT UNAVAILABLE`。通用终端字段 sanitizer 同时遗漏 Unicode `Zl/Zp` 行/段分隔符。
+- 两项均属于 F6 presenter 的窄修复，不需要 Human Owner 作新的产品或合同决定。
 - framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知 self-hosting
   limitation，不是 F6 blocker。
 
@@ -922,9 +924,95 @@ Acceptance mapping：
 本次 ACCEPT supersede §8 中 F5 的当前拒绝状态，但保留首次 REJECT、Executor/Reviewer 全绿仍被
 打回、窄修复及独立 re-review 的完整 provenance；不是 P7 fault injection。
 
+### 2026-09-17 F6 independent review：`REJECTED -- NARROW REPAIR REQUIRED`
+
+审核对象：commit `79eacb69f104314b3f6149192c792111b2bb3982`，parent
+`29fca30981ef467086bb961c4a1dd8bb5b338eca`。
+
+#### Executor implementation 与 validation evidence
+
+- 新增 config-backed `tui`、独立 `local_tui.py` presenter/data source 和 fake-terminal/disposable
+  tests；data source 只调用既有 `status()`/`inspect_run()`，未修改 runner、operator control、
+  Human Gate、Runtime 或 Static；
+- Executor F6 focused `14 / 14`，`2.570s`；F2/F3/F5 focused `76 / 76`，`94.004s`；
+  完整 ResourceWarning-strict regression `192 / 192`，`217.923s`；
+- Executor 报告 Python 3.9 compilation/import、direct import、唯一 `orchestrate()`、read-only Git/
+  artifact snapshot、privacy、non-TTY、resize、cleanup、allowlist、protected paths、diff、push、refs
+  和 clean worktree 均通过；
+- Reviewer 独立复跑 F6 focused `14 / 14`，`2.455s`；完整 ResourceWarning-strict regression
+  `192 / 192`，`251.525s`；branch/local/origin/GitHub refs、五文件 scope、Static identity、
+  `git diff --check` 与审核前 clean worktree 通过。
+
+上述全绿 evidence 支持 TUI 的基本只读边界和已覆盖状态，但没有覆盖下述两个 presenter blind
+spot，因此不足以支持 F6 ACCEPT。
+
+#### Finding 1 -- no-checkpoint 特判吞掉启动竞争
+
+`_snapshot_parts()` 仅根据 `status.result.run_id is None` 和 status gate 的
+`reason_code=NO_CHECKPOINT` 设置 `no_checkpoint=true`。一旦为 true，当前实现跳过 gate、四层 state
+和 run ID 的全部 status/inspect 对比。
+
+Reviewer 构造了与真实顺序读取一致的边界：`status()` 先读到无 checkpoint，随后 run 在
+`inspect_run()` 前创建，inspect 已看到 `run_id=new-run`、`FRAMEWORK_EVIDENCE_PUSHED` 和
+`HUMAN_GATE`。当前结果仍为：
+
+```text
+no_checkpoint=true
+consistent=true
+banner=NO CHECKPOINT -- no run was opened
+inspect overall_status=PASS
+inspect run_id=new-run
+```
+
+该 snapshot 明确自相矛盾，却没有进入 `SNAPSHOT UNAVAILABLE`。这违反 F6 Runtime/README 和
+Executor 报告中的边界：顺序读取期间状态变化应保守隐藏恢复 guidance，等待刷新。虽然当前
+no-checkpoint actions 只有 `NO_AUTOMATIC_REPAIR`，没有直接扩大 mutation authority，但它会在 run
+实际已启动时向 Human 显示错误的生命周期状态，因此是 live dashboard 的 acceptance blocker。
+
+#### Finding 2 -- terminal string boundary 遗漏 Unicode line separators
+
+`_public()` 只替换 Unicode category 以 `C` 开头的字符。项目在 F1/F2 已把 `Cc`、`Cf`、`Zl`、
+`Zp` 共同定义为公开单行边界；当前 TUI 会原样保留 `U+2028 LINE SEPARATOR` 和
+`U+2029 PARAGRAPH SEPARATOR`。Reviewer 直接复现：
+
+```text
+_public("safe\u2028forged-line") preserves U+2028
+_public("safe\u2029forged-paragraph") preserves U+2029
+```
+
+现有 malicious-control test 只覆盖 ESC/LF，因此未发现该差异。当前 operator 字段已有较强 schema
+约束，但 presenter 自身宣称 bounded printable rows，且是终端最终输出边界；应与既有 public-output
+规则一致，而不是依赖每个未来上游字段永远排除 `Zl/Zp`。
+
+#### Required narrow repair
+
+1. 收紧 stable no-checkpoint 判定：只有 status 与 inspect 都证明同一 config 下尚无 checkpoint 时
+   才显示 `NO CHECKPOINT`。如果 inspect 已观察到任意 run ID/checkpoint state 或与 no-checkpoint
+   contract 不一致，必须 `consistent=false` 并显示 `SNAPSHOT UNAVAILABLE`；
+2. 增加真实 data-source call ordering test，令第一次 status 返回无 checkpoint、第二次 inspect
+   返回新建 run；断言 recovery/action 不显示，下一次一致 refresh 才显示新 run；同时覆盖反向
+   transition 或删除/替换 checkpoint 的保守行为；
+3. `_public()` 必须替换 `Cc`、`Cf`、`Zl`、`Zp`，或复用无 runner side effect 的既有 public-text
+   helper；增加 `U+2028/U+2029`、CR/LF、ESC、NUL 和窄终端 regression，保持普通中文可显示；
+4. 保持 data source 只调用 `status`/`inspect`，不读取 raw artifact，不改变 TUI 的只读、非 TTY、
+   curses cleanup、1 秒 refresh、F2 active-time、F5 action/default-deny 和唯一 orchestrator 边界；
+5. 重跑 F6 focused、F2/F3/F5 focused 与完整 ResourceWarning-strict regression，检查 direct import、
+   protected paths、diff、普通 non-force push 和 clean refs。
+
+Independent review verdict：
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
+- verdict：`REJECTED -- NARROW REPAIR REQUIRED`；
+- 当前状态：F6 保持唯一 Active Step，F7 不激活；PT-01 保持 `RESOLVED`，PT-02 保持
+  `+∞ / PERMANENTLY_NON_BLOCKING`；
+- 本次仍是 1PCloop self-application 中“Executor 和完整回归全绿，但独立 Reviewer 发现未覆盖
+  lifecycle/output boundary”的 evidence，不是 F7 smoke 或 P7 fault injection。
+
 ## 9. Next Direction
 
-只执行 F6：实现 config-backed、本地只读 TUI，以 F2 structured progress、F3 operator status/
-inspect 和 F5 Human Gate projection 为唯一状态来源。F1-F5 保持 accepted；不得重写
-orchestrate、自动处理 Human decision、修改 Static/Runtime、运行 F7 real-service smoke 或提前
-实现 F8/P7。F6 完成后停止于 `AWAITING INDEPENDENT REVIEW`。
+只执行 F6 narrow repair：修复 stable no-checkpoint 的跨读取判定和 TUI 最终字符串边界，补充
+启动竞争及 `Zl/Zp` regression。F1-F5 保持 accepted；不得重写 TUI/operator 架构、orchestrate、
+自动处理 Human decision、修改 Static/Runtime、运行 F7 real-service smoke 或提前实现 F8/P7。
+修复完成后停止于 `AWAITING INDEPENDENT RE-REVIEW`。
