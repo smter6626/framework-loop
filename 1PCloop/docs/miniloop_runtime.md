@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Current active engineering task
-= whisper_session_ui_v1 / S1 ACTIVE
+= whisper_session_ui_v1 / S2 ACTIVE
 = 1PCloop/workloads/whisper_session_ui_v1/workload_runtime.md
 
 Overall 1PCloop completion
@@ -82,9 +82,10 @@ unbounded growth.
 
 Human Owner authorized a new two-step external workload without reopening the
 closed foundation_v1 task or paused P7. Step 1 asks 1PCloop to integrate three
-streaming governance/investigation documents into the target `main`; Step 2 is
-queued for the new `codex/session-clipboard-ui-v1` branch based on
-`multiLanguage_v1`. Both steps use separate target worktrees and separate runs.
+streaming governance/investigation documents into the target `main`; that step is
+accepted and pushed at `d0f581bb70379239c3147e5c8469d2285ad6620b`. Step 2 is
+now active on `codex/session-clipboard-ui-v1`, based on `multiLanguage_v1`.
+Both steps use separate target worktrees and separate runs.
 The automatic Reviewer checks code logic and deterministic UI tests; real
 audio-to-transcript black-box testing belongs to the Human Owner. Task-local
 Static/Runtime and current step are at

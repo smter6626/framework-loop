@@ -5,51 +5,52 @@
 - Task ID: `whisper_session_ui_v1`
 - 状态: `ACTIVE`
 - 当前 verdict: `NOT EVALUATED`
-- 唯一 Active Step: `Step 1 -- streaming 文档整理进 main`
-- Step 2: `QUEUED / NOT ACTIVE`
+- 唯一 Active Step: `Step 2 -- 多语言版本上的会话 UI 与剪切板改进`
+- Step 1: `ACCEPTED / TARGET MAIN PUSHED`
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_session_ui_v1/workload_static.md`；SHA-256 `a361cf58b123db786505e12daec1673b39be5b1114d49b62d7b5779fffcc6d08`
-- 当前证据快照: 来源 commit `73891f3a4b07e7d0f9fda3cc2cb1f35475727c84`，target main baseline `b5188ccc6aef591398fd8d31e162a29390b120e4`
+- 当前证据快照: Step 1 target/framework evidence 已发布；Step 2 target branch `codex/session-clipboard-ui-v1`，baseline `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9`
 - 最后更新: 2026-09-18
 
 ## 2. Completed
 
 - 治理启动: Human Owner 授权创建功能分支和中文 Static/Runtime，并明确仓库整理及 UI 实现应由 1PCloop 执行。本项不是 Step 1 的实现或验收。
 - 分支准备: `codex/session-clipboard-ui-v1` 从 `multiLanguage_v1` 的 `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9` 创建；没有 UI 代码提交。原 streaming branch 保持不变。
+- Step 1 -- streaming 文档整理: target commit `d0f581bb70379239c3147e5c8469d2285ad6620b` 将三份固定来源文档逐字节归档到 `main`，增加归档 landing page 与准确导航，不包含代码实现。1PCloop Reviewer `ACCEPT`，machine transition ID `4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f`；framework evidence commit `19b1fa49649d556dd88cf4766d541af4ab15dd23` 已推送。Human-facing independent review 复核三个 source blob/SHA、27/27 链接、7-file allowlist、边界文案和 commit ancestry 后 ACCEPT；target `main` 已普通 non-force push，local/origin/GitHub ref 均为 `d0f581b...`。
 
 ## 3. Active Step
 
-### Step 1 -- streaming 文档整理进 main
+### Step 2 -- 多语言版本上的会话 UI 与剪切板改进
 
-- Objective: 在 main 的合适位置集成来源 commit 的三份 streaming 治理/调查资料，建立准确导航和 provenance，不合并多语言或 streaming 代码。
-- Inputs: `73891f3a4b07e7d0f9fda3cc2cb1f35475727c84` 的 `docs/streaming_backend_upgrade/{static.md,runtime.md,update_plan.md}`；locked plan SHA-256 `ae4566dd27dca2ba96d5beedd8d35ab490a46e51188fa82cbd05eef4d7917c40`；target `/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs`，branch `main`。
-- Permitted changes: 仅 main 的相关 `docs/`、README/repo map 中确有必要的导航与状态说明；由 1PCloop 选择具体文件位置。普通 descendant commit。
-- Prohibited changes: 应用代码、测试、模型、打包、原 streaming branch、framework/workload Static/Runtime、locked plan 正文字节、target push/merge/tag/release/force。
-- Required evidence: 完整 target commit SHA/diff、三个来源及目标文件的 blob/hash、locked plan SHA、链接检查、main clean status；说明“资料入 main”与“backend 已实施”的区别。
-- Acceptance criteria: Static AC-01、分支和权限边界。Reviewer 必须直接核对内容和定位；Executor 的自述不够。
-- Executor self-check: 比对来源与目标字节/hash；检查 Markdown 导航、`git diff --check`、changed-file allowlist 和 target clean；不运行无关音频测试。
-- Stop conditions / Human Gate: 来源 identity 不符、必须改 locked plan 正文、需要整体 merge 代码或 scope 扩大、目标 branch 不符合预期。
-- Executor report: 结果、逐文件变更、固定 commit/hash/locator、自检命令与结果、限制；不宣告最终 ACCEPT。
+- Objective: 在 `multiLanguage_v1` 派生分支实现 Clean 路径复制、新会话清屏、按断点复制新增 Clean 文本，以及中文 `语言/Language` label；保持历史转录文件和既有多语言/转录行为。
+- Inputs: target `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/session-clipboard-ui-v1`，baseline `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9`；现有 PySide6 UI、controller/session event 与 `testCodes` 回归。
+- Permitted changes: 与按钮、Qt clipboard、Clean/Raw 表格会话重置、迟到 event 隔离、计数/复制断点、双语 label 直接相关的 UI/controller 代码和自动测试；必要的中英文使用说明；普通 descendant commit。
+- Prohibited changes: 本 Static/Runtime、framework 治理、streaming backend、Whisper runtime/model pin、转录/语言识别算法、原 streaming branch、target push/merge/tag/release/force，以及删除或改写历史 session 文件。
+- Required evidence: 完整 target commit/diff/changed-file list；Qt offscreen 或等价模拟测试覆盖路径剪切板、新会话成功/失败、Stop 保留、迟到旧 event、首次/增量/空切片/新会话断点、Unicode 和中英文 retranslate；相关及完整可运行 regression 输出的绝对 locator；branch ancestry 和 clean status。
+- Acceptance criteria: Static AC-02 至 AC-07。Reviewer 必须白盒检查 event/session ownership、clipboard 数据源和断点语义，不能把模拟测试表述成真实音频黑盒。
+- Executor self-check: targeted UI tests、现有相关 tests、完整可运行 unittest discovery、Python compilation/import、`git diff --check`、changed-path/protected-path 检查；记录不能运行的检查及原因。
+- Stop conditions / Human Gate: 必须改 Static/Runtime 或 streaming backend、需要真实用户音频/凭据、无法安全区分旧/新 session、需要 merge/release/tag、分支/HEAD/工作树不符。
+- Executor report: 结果、逐文件设计和行为、测试命令/数量/耗时/绝对输出 locator、commit/parent/branch/clean status、已知限制；不得自行 ACCEPT 或宣称真实音频黑盒通过。
 - 完成后停止于: `AWAITING_REVIEW`。
 
 ## 4. Independent Review
 
 | 验收条件 | 直接 evidence | 充分性判断 | 结果 |
 | --- | --- | --- | --- |
-| AC-01 -- main 文档整理 | 尚无目标实现提交 | 尚不可判断 | INSUFFICIENT |
+| AC-02 至 AC-07 -- UI 实现与回归 | 尚无 Step 2 实现提交 | 尚不可判断 | INSUFFICIENT |
 
-- 独立 evidence access: `NOT APPLICABLE -- 尚未执行 Step 1`
+- 独立 evidence access: `NOT APPLICABLE -- 尚未执行 Step 2`
 - 独立 verdict formation: `NOT APPLICABLE`
 - 独立 evidence-sufficiency judgment: `NOT APPLICABLE`
 - Review verdict: `NOT EVALUATED`
-- Review limitations: 真实录音测试不是本步骤要求。
+- Review limitations: 真实录音测试由 Human Owner 后续执行，不是自动 Step 2 ACCEPT 的 claim。
 
 ## 5. State Transition
 
-- Previous state: foundation_v1 已关闭，无当前工程 task。
-- Triggering Human decision: 2026-09-18，Human Owner 规定先由 1PCloop 整理 streaming 文档，再在多语言基础上改 UI；本对话只创建分支和治理初始文件。
-- Current state: `ACTIVE / Step 1`。
-- Meaning: 仅允许编译 Step 1 的 Reviewer/Executor 指令；Step 2 尚未激活。
+- Previous state: `Step 1 COMPLETED / transition disabled`。
+- Triggering evidence and Human decision: Step 1 机器 ACCEPT/evidence publication、Human-facing independent re-review、target main push 全部完成；2026-09-18 Human Owner 明确“可以，启动 S2”。
+- Current state: `ACTIVE / Step 2`。
+- Meaning: 仅允许在预先创建的 `multiLanguage_v1` 派生分支执行 Static 已授权的四项 UI 改动；不重开 Step 1。
 - Transition authorized by: Human Owner。
 
 ## 6. Blockers and Human Decision Gates
@@ -63,9 +64,9 @@
 
 ## 8. Pending Tasks -- Non-blocking Blocks
 
-- 当前顶层 Step: `1`。
+- 当前顶层 Step: `2`。
 - 无需以倒计时管理的非阻塞 block。人工黑盒属于明确的最终 Human 验证门，见第 7 节，不因 Step 1 -> Step 2 迁移而消失。
-- Pending Gate Check: Step 2 激活前必须确认 Step 1 Reviewer ACCEPT、Runtime transition、framework evidence publication、target main 普通 push 和双方 clean/ref identity；缺任一项则阻止激活。
+- Pending Gate Check: Step 2 激活前置项已全部满足，`Gate verdict: CLEAR`。任务最终关闭前仍须披露 Human 黑盒结果为 pending 或已完成。
 
 ## 9. Superseded Decisions
 
@@ -73,16 +74,15 @@
 
 ## 10. Next Direction
 
-- Step 1 独立 ACCEPT 后，由 orchestrator 只把当前机器 Step 标记 `COMPLETED` 并停止。核对 target/framework refs 后，本对话依据已授权范围单独激活 Step 2，用功能分支的独立 config/new run 执行 UI 改动。
-- Step 2 自动 ACCEPT 后，只可报告代码逻辑/自动测试结论并普通 push 功能分支；真实录音黑盒仍待 Human Owner。
+- 使用 `feature_ui.json` 启动新的 config-bound run。Step 2 自动 ACCEPT 后，只可报告代码逻辑/自动测试结论并普通 push 功能分支；真实录音黑盒仍待 Human Owner。
 
 ## 11. Current Executor Handoff
 
-- 本轮唯一任务: 整理三份 streaming 文档进 main，位置由 1PCloop 决定。
-- 必须读取: 本 Static/Runtime、来源 commit 的三个文件、target main 的 README/repo map 和 1PCloop 相关治理。
-- 可以修改: main 中与三份文件集成直接相关的文档与必要导航。
-- 不得修改: 应用代码、测试、streaming source branch、framework/workload 治理、locked plan 正文字节。
-- 必须返回: 完整 target commit、changed-file list、来源/目标 hash、导航及 `git diff --check` 等 evidence locator。
+- 本轮唯一任务: 实现并测试 Static 第 3 节定义的四项会话 UI/剪切板行为。
+- 必须读取: 本 Static/Runtime、`ui_app.py`、controller/session/store 相关代码、现有 UI/output-root tests 与双语 README。
+- 可以修改: Step 2 Permitted changes 内的代码、测试和必要说明。
+- 不得修改: Static/Runtime、streaming backend、模型/语言识别逻辑、原 streaming branch、历史 session/evidence。
+- 必须返回: 完整 target commit、changed-file list、代码/测试 artifact 的绝对 locator 与 SHA、targeted/full regression 结果、branch/parent/clean status和 limitations。
 - 完成后停止于: `AWAITING_REVIEW`。
 
 ## Machine-owned State
@@ -90,17 +90,17 @@
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
-    "id": "S1",
-    "status": "COMPLETED"
+    "id": "S2",
+    "status": "ACTIVE"
   },
-  "last_transition_id": "4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f",
+  "last_transition_id": null,
   "schema_version": 1,
-  "transition_mode": "disabled",
+  "transition_mode": "reviewer_accept_once",
   "workload_id": "whisper_session_ui_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
-该机器块只授权当前 S1 的一次 ACCEPT -> COMPLETED，不会自动激活 S2。S2 启用前需在完整保存 S1 transition record 的前提下，将机器块切换为 `S2/ACTIVE`、`reviewer_accept_once`、`last_transition_id=null`，并单独提交/推送 Runtime；不可在 S1 run 未完成时改动。
+该机器块只授权当前 S2 的一次 ACCEPT -> COMPLETED。下方 S1 transition record 保持历史原文；S2 不得改写、删除或把它重新解释为 UI acceptance。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
