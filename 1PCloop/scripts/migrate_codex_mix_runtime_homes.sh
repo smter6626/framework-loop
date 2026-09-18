@@ -74,6 +74,9 @@ done
 active_processes="$(
   ps -axo pid=,ppid=,command= | awk -v self="$$" -v parent="$PPID" '
     $1 != self && $1 != parent &&
+    tolower($0) !~ /migrate_codex_mix_runtime_homes\.sh/ &&
+    tolower($0) !~ /chatgpt for chrome/ &&
+    tolower($0) !~ /chatgpthelper/ &&
     tolower($0) ~ /(chatgpt|codex|onepcloop|run_mutation_loop\.py)/ { print }
   '
 )"
@@ -145,7 +148,8 @@ SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/1pcloop-migration.XXXXXX")"
 manifest_tree() {
   local root="$1"
   local output="$2"
-  python3 - "$root" "$output" <<'PY'
+  local comparison_mode="${3:-strict}"
+  python3 - "$root" "$output" "$comparison_mode" <<'PY'
 import hashlib
 import json
 import os
@@ -155,6 +159,9 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 output = Path(sys.argv[2])
+comparison_mode = sys.argv[3]
+if comparison_mode not in {"strict", "copy"}:
+    raise SystemExit("invalid manifest comparison mode")
 rows = []
 
 def xattrs(path):
@@ -181,9 +188,10 @@ for path in paths:
         "mode": stat.S_IMODE(info.st_mode),
         "uid": info.st_uid,
         "gid": info.st_gid,
-        "mtime_ns": info.st_mtime_ns,
         "xattrs": xattrs(path),
     }
+    if comparison_mode == "strict":
+        row["mtime_ns"] = info.st_mtime_ns
     if stat.S_ISREG(info.st_mode):
         digest = hashlib.sha256()
         with path.open("rb") as handle:
@@ -257,15 +265,24 @@ ditto --rsrc --extattr --acl "$EXECUTOR_SOURCE" "$STAGE/1pcloop-executor"
 
 manifest_tree "$REVIEWER_SOURCE" "$SCRATCH/reviewer-source-after.jsonl"
 manifest_tree "$EXECUTOR_SOURCE" "$SCRATCH/executor-source-after.jsonl"
-manifest_tree "$STAGE/1pcloop-reviewer" "$SCRATCH/reviewer-target.jsonl"
-manifest_tree "$STAGE/1pcloop-executor" "$SCRATCH/executor-target.jsonl"
+
+# Source stability remains strict, including mtime_ns.
 cmp -s "$SCRATCH/reviewer-source.jsonl" "$SCRATCH/reviewer-source-after.jsonl" \
   || fail "Reviewer source changed during migration"
 cmp -s "$SCRATCH/executor-source.jsonl" "$SCRATCH/executor-source-after.jsonl" \
   || fail "Executor source changed during migration"
-cmp -s "$SCRATCH/reviewer-source.jsonl" "$SCRATCH/reviewer-target.jsonl" \
+
+# Copy equivalence deliberately excludes mtime_ns. ditto may recreate selected
+# cache/tmp files with a new modification timestamp while preserving their
+# actual bytes and all integrity-relevant metadata.
+manifest_tree "$REVIEWER_SOURCE" "$SCRATCH/reviewer-source-copy.jsonl" copy
+manifest_tree "$EXECUTOR_SOURCE" "$SCRATCH/executor-source-copy.jsonl" copy
+manifest_tree "$STAGE/1pcloop-reviewer" "$SCRATCH/reviewer-target.jsonl" copy
+manifest_tree "$STAGE/1pcloop-executor" "$SCRATCH/executor-target.jsonl" copy
+
+cmp -s "$SCRATCH/reviewer-source-copy.jsonl" "$SCRATCH/reviewer-target.jsonl" \
   || fail "Reviewer source/target manifest mismatch"
-cmp -s "$SCRATCH/executor-source.jsonl" "$SCRATCH/executor-target.jsonl" \
+cmp -s "$SCRATCH/executor-source-copy.jsonl" "$SCRATCH/executor-target.jsonl" \
   || fail "Executor source/target manifest mismatch"
 
 python3 "$MIGRATION_HELPER" validate-copy \
