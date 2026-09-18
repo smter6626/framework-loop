@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_session_ui_v1 / S1-S2 AUTOMATED WORK COMPLETE / HUMAN BLACK-BOX PENDING
+= whisper_session_ui_v1 / ACCEPTED / TASK CLOSED WITH FOLLOW-UP UI DEFECT
 = 1PCloop/workloads/whisper_session_ui_v1/workload_runtime.md
 
 Overall 1PCloop completion
@@ -85,9 +85,12 @@ closed foundation_v1 task or paused P7. Step 1 asks 1PCloop to integrate three
 streaming governance/investigation documents into the target `main`; that step is
 accepted and pushed at `d0f581bb70379239c3147e5c8469d2285ad6620b`. Step 2 was
 accepted at target commit `cb4261825b7d51d3ec33a97e083683c50e6b9e82`; its
-framework evidence and target feature branch are pushed. The automated workload now
-has no active machine step and waits only for the Human Owner's real macOS audio and
-clipboard black-box check before any separate merge/release decision.
+framework evidence and target feature branch are pushed. Human Owner subsequently
+reported that the implemented functions work correctly, closing the real-function
+black-box gate. The same test found a separate layout defect: the main window is too
+tall for the available window bounds. That defect is not retroactively part of S2;
+the recommended next workload is bounded window height plus deliberate scrollable
+content placement before any separate merge/release decision.
 Both steps use separate target worktrees and separate runs.
 The automatic Reviewer checks code logic and deterministic UI tests; real
 audio-to-transcript black-box testing belongs to the Human Owner. Task-local
