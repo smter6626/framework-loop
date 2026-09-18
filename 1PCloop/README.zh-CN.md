@@ -379,7 +379,11 @@ Human Gate 已解决，publication 成功也不改变 logical outcome。
 Human Gate projection 不能替 Human 解除 gate。TUI 只显示固定 allowed action 作为说明，
 不提供执行按钮或命令。F7 real-service smoke 已完成独立验收，evidence 见
 [`f7-post-foundation-real-service-smoke-20260918.md`](evidence-summaries/f7-post-foundation-real-service-smoke-20260918.md)。
-当前工程步骤是 F8 evidence-driven foundation disposition。
+独立验收通过的
+[`F8 foundation disposition`](evidence-summaries/f8-foundation-disposition-20260918.md) 已关闭
+`foundation_v1`：GUI 和治理压缩保持 deferred，default-safe raw evidence lifecycle policy 已生效，
+但不授权删除或 cleaner。当前没有 active engineering task；overall 1PCloop 继续为 `ACTIVE`，等待
+Human Owner 作出 global Static 保留的 completion 决定。
 
 ## 本地只读 TUI
 
@@ -412,7 +416,8 @@ resume；`INVALID` 或 `UNAVAILABLE` 时不会给出比 F5 projection 更宽的�
 TUI 不启动或恢复 Agent，不 finalization、repair identity，也不写 checkpoint、evidence、Git 或
 governance。它是单 writer 边界内的本地 dashboard，不是 concurrency protocol 或 GUI。极窄终端
 显示 resize/quit 提示而不显示完整视图。F7 已在真实 PTY 中验证 TUI 且未改变 authoritative
-artifact；F8 将根据使用 evidence 决定是否有必要另建本地 GUI。
+artifact。F8 disposition 决定继续推迟独立本地 GUI，直到有直接 usability/accessibility evidence
+足以支持新增的状态、安全、packaging 和维护 surface。
 
 ## 自动循环语义
 

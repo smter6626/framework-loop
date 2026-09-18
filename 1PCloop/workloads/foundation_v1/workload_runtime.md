@@ -3,15 +3,15 @@
 ## 1. Current Status
 
 - Task ID：`foundation_v1`
-- 状态：`ACTIVE`
-- 当前 verdict：`NOT EVALUATED`
-- 最近接受：`F7 -- ACCEPTED AFTER INDEPENDENT REVIEW`
-- 唯一 Active Step：`F8 -- evidence-driven foundation disposition`
-- 当前顶层 Step：`Step 8`
+- 状态：`ACCEPTED / PHASE CLOSED`
+- 当前 verdict：`ACCEPTED`
+- 最近接受：`F8 -- ACCEPTED AFTER INDEPENDENT REVIEW`
+- 唯一 Active Step：`NONE -- TASK CLOSED`
+- 当前顶层 Step：`Step 8 -- COMPLETED`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
-- 当前执行方式：Human-mediated Reviewer/Executor
+- 当前执行方式：`CLOSED -- NEW OBJECTIVES REQUIRE NEW OR EXPLICITLY REOPENED GOVERNANCE`
 - 最后更新：`2026-09-18`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
@@ -306,9 +306,48 @@ provenance 保留于 §8。F6 文件默认冻结，F7 不重开已接受的 TUI/
 系统清理的 `/private/tmp`，但关键 hash、refs、结论与 provenance 已进入 tracked compact summary。
 F7 不覆盖未自然触发 correction 的事实，也不重新激活 P7。
 
-## 3. Active Step
+### J. F8 -- evidence-driven foundation disposition
 
-### F8 / Step 8 -- evidence-driven foundation disposition
+状态：`ACCEPTED AFTER INDEPENDENT REVIEW`
+
+结果：
+
+- disposition commit `aa2837ab4ec4c891f9886fd91cbf90ca5c37d329` 只新增中文 tracked
+  evidence `1PCloop/evidence-summaries/f8-foundation-disposition-20260918.md`；
+- 简单本地 GUI 为 `DEFER`：F7 已证明 CLI/TUI/Human Gate 可完成真实闭环，目前没有 GUI 缺失
+  导致的失败 evidence，新增 GUI 的状态一致性、安全、packaging 和维护成本不成立为当前必要性；
+- 治理文档压缩为 `DEFER`：Runtime 规模和重复已量化，但没有恢复失败、上下文截断或事实漂移；
+  immutable archive、machine-readable index 和机械无损验证保留为触发后 proposal，未执行迁移；
+- raw evidence lifecycle 为 `IMPLEMENT -- POLICY ONLY`：建立 retention class、最短期限、Human
+  authorization、exact-path dry run、hash/index/privacy 和 raw-missing `UNAVAILABLE` 边界；未删除
+  raw，也未授权/实现自动 cleaner；
+- AC-01 至 AC-11 均为 `COVERED`，已知限制继续显式保留。Disposition 建议 foundation_v1 在独立
+  F8 ACCEPT 后关闭，不创建 F9。
+
+独立 review evidence：
+
+- Reviewer 重算 Runtime、双语 README、两个 smoke summary 的行数、字节数和 SHA-256；inventory
+  与 disposition 一致；`1PCloop/runs/` 的 `164` 个文件与 `1,659,525` bytes 明确只统计 tracked
+  文件，ignored `.DS_Store` 不属于历史 provenance；
+- Reviewer 验证 F1-F7 表中 `26` 个 commit object 均存在、位于 main ancestry，parent/subject 与
+  REJECT -> repair -> ACCEPT chain 一致；
+- AC matrix 恰好覆盖 AC-01 至 AC-11；Runtime 在审核前只有 F8 一个 Active Step；Static SHA-256、
+  7 个 Markdown locator、UTF-8、scope 和 `git diff --check` 通过；
+- post-P6 raw 当前确实 `UNAVAILABLE`，F7 raw 当前 `AVAILABLE`；该差异直接支持 policy，未据 compact
+  summary 猜测恢复缺失 raw；
+- F8 只修改 disposition 文档，未运行 Python regression 是与变更风险相称的选择，不削弱 F6
+  `197 / 197` 或 F7 real-service evidence。
+
+当前语义：PT-02 以本次已接受的 default-safe policy 关闭为 `RESOLVED`。GUI、archive migration
+和 cleaner 均未授权；未来触发条件成立时应建立新 task-local governance 或由 Human Owner 明确
+reopen。foundation_v1 的必需 deliverable 与 AC-01 至 AC-11 均已独立验收，phase closed。
+
+## 3. Closed Final Step Record
+
+### F8 / Step 8 -- evidence-driven foundation disposition -- COMPLETED
+
+Status：`ACCEPTED AFTER INDEPENDENT REVIEW`。以下内容保留 F8 执行和审核边界，不表示仍有
+Active Step。
 
 #### Objective
 
@@ -411,30 +450,29 @@ Executor 不得自行关闭 foundation_v1、修改本 Runtime 或宣告 F8 accep
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无已知 F8 read-only disposition blocker。
-- 实际 GUI、raw evidence 删除/自动清理、权威历史 archive 或新增 Static criterion 均需要 disposition
-  先证明必要，并在实施前进入 Human Decision Gate；本轮不得自行执行。
-- F7 已关闭真实 service smoke gap；未自然触发 correction、single-writer/no-concurrency 和非
-  self-hosting 仍是明确限制，不是 F8 disposition blocker。
+- foundation_v1 无未关闭 blocker 或 Active Step。
+- overall 1PCloop 是否从 `ACTIVE` 迁移为 `COMPLETED` 是全局 Static 保留给 Human Owner 的独立决定，
+  不由 task-local F8 verdict 自动完成。
+- GUI、raw evidence 实际删除/自动清理、权威历史 archive、P7、self-hosting 或 concurrency 均未
+  激活；未来若需要，必须使用新 task-local governance 或 Human Owner 明确 reopen。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`8`
+当前顶层 Step：`8 -- COMPLETED`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | PT-01 | 默认中文 Prompt 模板尚未规范化 | Step 1 | Step 5 | 0 | `RESOLVED` | F4 commit `eeb75e11480ecc245e040862bd42a952ec008c97` 记录固定来源 hash、tracked 模板、测试与独立 Reviewer acceptance |
-| PT-02 | raw evidence 长期清理/保留策略未确定 | Step 1 | +∞ | +∞ | `PERMANENTLY_NON_BLOCKING` | F8 或未来 Human decision 记录 retention policy 与实际使用 evidence |
+| PT-02 | raw evidence 长期清理/保留策略未确定 | Step 1 | +∞ | 0 | `RESOLVED` | F8 accepted disposition 定义 retention classes、最短期限、Human-only exact-path cleanup gate、tracked tombstone/privacy 和 raw-missing `UNAVAILABLE` 语义；不授权删除器 |
 
 ### Pending Gate Check
 
-- 下一状态：foundation_v1 closure 或 Human-authorized bounded follow-up；当前无自动 `Step 9`。
-- closure 前必须处理的 Pending Task：PT-02 必须得到明确 disposition；可以形成安全 policy 并
-  `RESOLVED`，也可以说明为何继续 `PERMANENTLY_NON_BLOCKING`，但不能静默遗漏。
-- Gate verdict：`CLEAR`
+- 下一状态：`NONE -- FOUNDATION_V1 PHASE CLOSED`；当前无自动 `Step 9`。
+- closure 前必须处理的 Pending Task：无；PT-01 和 PT-02 均为 `RESOLVED`。
+- Gate verdict：`CLOSED / CLEAR`
 - 支持 evidence：F4 implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`
-  与 §8 F4 独立 review；PT-02 保持 `+∞`。
-- GUI：在 F8 基于 F6/F7 使用 evidence 明确 `IMPLEMENT / DEFER / NO-GO`；当前不预设实现。
+  与 §8 F4 独立 review；PT-02 由 accepted F8 raw lifecycle policy 关闭。
+- GUI：F8 disposition 为 `DEFER`；未来仅在记录到直接使用缺口或 Human Owner 改变产品目标时重评。
 
 ## 7. State Transition
 
@@ -537,6 +575,20 @@ F7 -> F8 transition（当前状态）：
   `PERMANENTLY_NON_BLOCKING` 的安全理由；没有自动 Step 9；
 - Meaning：AC-01 至 AC-11 均已有直接 evidence。F8 不预设新增功能，只基于这些 evidence 决定
   GUI、治理压缩、raw lifecycle 以及 foundation closure/extension；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
+
+F8 -> foundation_v1 closure transition（当前状态）：
+
+- Previous step state：F8 `ACTIVE / NOT EVALUATED`；
+- Triggering evidence：disposition commit `aa2837ab4ec4c891f9886fd91cbf90ca5c37d329`、独立
+  inventory/provenance/link/AC/policy review 和 F1-F7 已接受 evidence；
+- Verdict：F8 `ACCEPTED AFTER INDEPENDENT REVIEW`；
+- Current task state：foundation_v1 `ACCEPTED / PHASE CLOSED`，Active Step `NONE`；
+- Pending update：PT-01、PT-02 均为 `RESOLVED`；不存在自动 F9；
+- Disposition：GUI `DEFER`，governance compression `DEFER`，raw lifecycle
+  `IMPLEMENT -- POLICY ONLY`；实际 GUI/archive/cleaner 均未授权；
+- Overall boundary：该 task closure 不自动把 overall 1PCloop 从 `ACTIVE` 改为 `COMPLETED`；全局
+  Static 要求 Human Owner 另行决定；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
 
 ## 8. Independent Review
@@ -1247,11 +1299,43 @@ Review limitations：本次 bounded run 未自然触发 F1 correction；raw fixt
 `/private/tmp`；系统仍是 single-writer/no-concurrency 且不 self-host。这些限制均被明确记录，
 不阻塞 F7 AC-10，但属于 F8 disposition 的输入。
 
+### 2026-09-18 F8 independent review：`ACCEPTED`
+
+审核对象：disposition commit `aa2837ab4ec4c891f9886fd91cbf90ca5c37d329`，parent 为激活 F8
+的 governance commit `18d296b22cd1b635500e42f11c9b97997f0ee47f`。唯一 diff 是
+`1PCloop/evidence-summaries/f8-foundation-disposition-20260918.md`，SHA-256
+`5451acc5d0715d1a83e0a1f5720e9b142a42e32abee07de601e185da4abdff3b`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| GUI disposition | F3/F5/F6 contract、F7 real PTY、failure history、cost/revisit triggers | 当前没有 GUI 缺失导致的失败；DEFER 不隐藏已有 friction，触发条件明确 | PASS |
+| compression disposition | 精确 file inventory、Runtime 结构计数、无损 archive/index proposal | 规模问题真实但尚无恢复/截断故障；DEFER 与 migration 风险相称，proposal 不被误称已实现 | PASS |
+| raw lifecycle policy | post-P6 raw 缺失、F7 raw/transition review、retention classes、cleanup gate | policy default-safe、Human-only、exact-path、no active deletion、missing remains UNAVAILABLE；足以关闭策略型 PT-02 | PASS |
+| AC coverage/closure | AC-01 至 AC-11 matrix、26 commit provenance、F1-F7 accepted evidence | 每项有直接 locator 与限制；CLOSE recommendation 不隐去 correction/concurrency/self-hosting/tmp 边界 | PASS |
+| authority/scope | 单文件 diff、Runtime/Static unchanged、no deletion/cleaner/GUI/F9 | Executor 未自验收或越权实施；最终 transition 仍由独立 Reviewer/Human authority 承担 | PASS |
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Reviewer 重算 5 个 inventory 文件的 line/byte/SHA-256，结果精确一致；tracked
+  `1PCloop/runs/` 为 `164` files / `1,659,525` bytes，ignored `.DS_Store` 不计入 provenance；
+- 表中 `26` 个 source commit 均为有效 commit object、位于 main ancestry，parent/subject 与
+  recorded REJECT/repair/acceptance chain 一致；
+- post-P6 raw 为 `UNAVAILABLE`，F7 raw 为 `AVAILABLE`；所有 7 个 Markdown locator、11 个 AC row、
+  单一 F8 Active Step、Static identity、UTF-8、allowlist 和 `git diff --check` 通过；
+- Reviewer verdict：`ACCEPTED`；PT-02 `RESOLVED`；foundation recommendation `CLOSE`；
+- 未运行 Python regression：审核对象仅新增 disposition 文档，没有代码、schema、tests 或 runtime
+  execution contract 变化；该选择与风险相称。
+
+Review limitations：GUI/archive/cleaner 仍未实现且未授权；policy 不等于已执行任何 destructive
+cleanup；F7 未自然触发 correction；single-writer/no-concurrency、非 self-hosting 和 `/tmp`
+非持久边界继续成立。它们是 accepted scope limits，不是未披露 blocker。
+
 ## 9. Next Direction
 
-只执行 F8 evidence-driven disposition：审计 F1-F7 和实际使用 evidence，分别决定 GUI、治理压缩和
-raw evidence lifecycle 的 `IMPLEMENT / DEFER / NO-GO`，完成 AC-01 至 AC-11 coverage matrix、PT-02
-disposition 与 foundation `CLOSE / EXTEND` recommendation。首轮不得直接实现 GUI、删除 raw evidence、
-迁移权威历史或创建 F9；需要新功能或不可逆操作时停在 Human Decision Gate。F1-F7 保持 accepted，
-P7/self-hosting/concurrency 不激活。完成后停止于 `AWAITING INDEPENDENT F8 REVIEW` 或明确
-`HUMAN DECISION REQUIRED`。
+foundation_v1 已关闭，没有 Active Step 或自动下一阶段。等待 Human Owner 依据全局 Static 决定
+overall 1PCloop 是否从 `ACTIVE` 迁移为 `COMPLETED`。该决定不自动重新激活 P7、GUI、治理压缩、
+cleaner、self-hosting 或 concurrency。未来新目标默认创建新的 task-local Static/Runtime；如需
+reopen foundation_v1，必须明确记录 Human authority、scope 和新的 acceptance gate。

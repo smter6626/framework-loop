@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / AWAITING HUMAN OWNER OVERALL COMPLETION DECISION`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -38,9 +38,15 @@ P7 controlled REJECT -> REPAIR fault injection
 = PAUSED BY HUMAN OWNER / NOT ACTIVE
 = MAY RESUME ONLY AFTER EXPLICIT HUMAN REACTIVATION
 
-Current engineering task
-= foundation_v1 / AUTHORITATIVE ACTIVE TASK
+Most recently closed engineering task
+= foundation_v1 / ACCEPTED / PHASE CLOSED
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
+
+Current active engineering task
+= NONE
+
+Overall 1PCloop completion
+= AWAITING EXPLICIT HUMAN OWNER DECISION
 
 Framework-as-paper
 = PAUSED AFTER THREE-ROUND NOVELTY AUDIT
@@ -63,10 +69,27 @@ French live transcription, accepted the explicitly recorded residual manual-cove
 limits, and closed the `multiLanguage_v1` workload phase. No run #3 is required.
 Target push and merge remain separate Human-controlled integration actions.
 
-Overall 1PCloop remains `ACTIVE` under the Static Completion Definition. Detailed
-foundation progress is maintained only in the task-local Runtime at
-`1PCloop/workloads/foundation_v1/workload_runtime.md`; this global Runtime retains
-the phase pointer and high-level transitions to avoid further unbounded growth.
+foundation_v1 is `ACCEPTED / PHASE CLOSED`: F1-F8 and task-local AC-01 through
+AC-11 have independent evidence, and the task has no Active Step. Overall 1PCloop
+remains `ACTIVE` only because the Static Completion Definition reserves the final
+`ACTIVE -> COMPLETED` decision for the Human Owner. The closed task-local Runtime at
+`1PCloop/workloads/foundation_v1/workload_runtime.md` is frozen by default; this
+global Runtime retains the phase pointer and high-level transitions to avoid further
+unbounded growth.
+
+### 2026-09-18 -- foundation_v1 phase closure
+
+Status: `ACCEPTED / PHASE CLOSED -- AWAITING OVERALL HUMAN OWNER DECISION`
+
+- F1-F7 implementation and real-service evidence are independently accepted;
+- F8 disposition is independently accepted: local GUI `DEFER`, governance compression
+  `DEFER`, raw evidence lifecycle `IMPLEMENT -- POLICY ONLY`;
+- PT-01 and PT-02 are `RESOLVED`; foundation_v1 has no Active Step and no automatic F9;
+- compact F7 and F8 evidence are tracked at
+  `1PCloop/evidence-summaries/f7-post-foundation-real-service-smoke-20260918.md` and
+  `1PCloop/evidence-summaries/f8-foundation-disposition-20260918.md`;
+- P7 remains paused, and GUI/archive/cleaner/self-hosting/concurrency remain inactive;
+- this phase closure does not itself declare overall 1PCloop `COMPLETED`.
 
 ## Lossless Historical Compaction
 
@@ -330,8 +353,9 @@ Reason and scope:
 - P4–P6 accepted results remain valid and frozen; P6 is not reopened;
 - P7 is retained as optional future reliability coverage but is not active and may
   run only after explicit Human reactivation;
-- `foundation_v1` is the sole current engineering task. Its stable contract and
-  detailed state are task-local:
+- at this `2026-09-12` transition, `foundation_v1` became the sole current engineering
+  task. Its stable contract and detailed state are task-local; the `2026-09-18`
+  closure record above now supersedes its active status:
   - `1PCloop/workloads/foundation_v1/workload_static.md`;
   - `1PCloop/workloads/foundation_v1/workload_runtime.md`;
 - the durable compact post-P6 observation is
@@ -1754,5 +1778,6 @@ Reviewer detects defect
 The injected commit, actor, timing, expected defect and experiment boundary must be
 recorded so the result is not misreported as a naturally occurring Executor error.
 No defect has been introduced and no P7 fault injection has been completed. While P7
-is paused, its objective is retained only as historical/future scope; foundation_v1
-is the sole current engineering task.
+is paused, its objective is retained only as historical/future scope. foundation_v1
+was the sole current engineering task from its `2026-09-12` activation through its
+`2026-09-18` accepted phase closure; there is now no active engineering task.

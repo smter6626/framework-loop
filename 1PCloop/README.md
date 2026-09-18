@@ -406,7 +406,12 @@ publication does not change the logical outcome.
 The Human Gate projection cannot resolve a gate. The TUI displays its fixed actions as guidance,
 not buttons or commands. The independently accepted F7 real-service smoke is recorded in
 [`f7-post-foundation-real-service-smoke-20260918.md`](evidence-summaries/f7-post-foundation-real-service-smoke-20260918.md).
-F8 evidence-driven foundation disposition is the current engineering step.
+The independently accepted
+[`F8 foundation disposition`](evidence-summaries/f8-foundation-disposition-20260918.md) closes
+`foundation_v1`: GUI and governance compression are deferred, while the default-safe raw evidence
+lifecycle policy is active without authorizing deletion or a cleaner. There is no current
+engineering task; overall 1PCloop remains `ACTIVE` until the Human Owner makes the completion
+decision reserved by the global Static.
 
 ## Local read-only TUI
 
@@ -443,8 +448,9 @@ advice than the F5 projection.
 The TUI never starts or resumes an Agent, finalizes evidence, repairs identity, or writes
 checkpoint, evidence, Git, or governance state. It is a single-writer local dashboard, not a
 concurrency protocol or GUI. A very narrow terminal shows a resize/quit notice rather than the
-full view. F7 exercised this TUI in a real PTY without changing authoritative artifacts; F8 now
-decides from usage evidence whether a separate local GUI is justified.
+full view. F7 exercised this TUI in a real PTY without changing authoritative artifacts. The F8
+disposition defers a separate local GUI until direct usability or accessibility evidence justifies
+its additional state, security, packaging, and maintenance surface.
 
 ## Automatic loop semantics
 
