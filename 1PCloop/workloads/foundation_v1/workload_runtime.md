@@ -5,9 +5,9 @@
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
 - 当前 verdict：`NOT EVALUATED`
-- 最近接受：`F6 -- ACCEPTED AFTER SECOND INDEPENDENT RE-REVIEW`
-- 唯一 Active Step：`F7 -- post-foundation real-service smoke`
-- 当前顶层 Step：`Step 7`
+- 最近接受：`F7 -- ACCEPTED AFTER INDEPENDENT REVIEW`
+- 唯一 Active Step：`F8 -- evidence-driven foundation disposition`
+- 当前顶层 Step：`Step 8`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
@@ -267,128 +267,159 @@ repair/re-review 链保留于 §8；F5 文件默认冻结，F6 不重开其 cont
 当前语义：Static AC-09 已满足；两次 REJECT、两次 repair 和全部测试全绿后仍被独立审核打回的
 provenance 保留于 §8。F6 文件默认冻结，F7 不重开已接受的 TUI/control contract。
 
+### I. F7 -- 完整 post-foundation real-service smoke
+
+状态：`ACCEPTED AFTER INDEPENDENT REVIEW`
+
+结果：
+
+- source evidence commit `e2c472c9bcaa43188b9d9df4d8d59d28b953fe3a` 只新增 tracked
+  compact summary `1PCloop/evidence-summaries/f7-post-foundation-real-service-smoke-20260918.md`；
+- 在 `/private/tmp/1pcloop-f7-smoke.RBbAa8` 的 disposable target/framework 及各自 bare remote 中，
+  使用不同已登录 profile 完成真实 Reviewer -> Executor -> 原 Reviewer resume loop；三份 process
+  receipt 均成功，最终 schema-valid verdict 为机械验证的 `ACCEPT`，未触发 correction；
+- target 形成直接后继 commit `259046fef6823c0de309a01c1a04dd5c8260f597`，只改
+  `smoke_value.py`，独立测试 `1 / 1` 通过；target bare ref 保持 baseline
+  `0e4bcc50b04ba8a2425298481f70d4c61714535d`，未发生 target push；
+- 唯一 Runtime transition ID 为
+  `bea0f37639a523592863d79f832a2a9ce3f03bd101abcdafd49ebc086ba69851`，将
+  `S1/ACTIVE` 改为 `S1/COMPLETED`；disposable framework evidence commit
+  `4bb32caab152a59662f225c204f0f52dcc65e944` 已普通 push 至其 bare remote；
+- 最终三层状态为 `RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED`，不是以 process success、
+  Reviewer 自述或 publication 单独替代 logical success。
+
+独立 review evidence：
+
+- Reviewer 直接读取 raw receipts、verdict、checkpoint、manifest、56 条 control events、transition
+  record、三条 tracked summary entry、两个 Git object 和四个 repo/ref identity；
+- Reviewer 重算 verdict/file/commit/artifact hashes，并从 parent Runtime、verdict hash、Runtime path
+  与记录时间重建 transition；transition ID、postimage SHA-256 及最终 Runtime bytes 逐项一致；
+- Reviewer 独立运行 target unittest `1 / 1`、`status`、`inspect`、`human-gate`；inspect 的
+  checkpoint/manifest/observation/summary/framework commit/push/target/evidence 检查全部 PASS，
+  Human Gate 为 `NOT_APPLICABLE / NO_ACTION`；
+- Reviewer 在真实 PTY 中再次打开 TUI、执行 `r` 并以 `q` 正常退出；前后 checkpoint、manifest、
+  events、live status、Runtime、summary 和 Git refs/hash 不变；
+- source branch/local/origin/GitHub main 在审核时均为 evidence commit，工作树 clean；Static、Runtime
+  和 F1-F6 代码未被 Executor smoke commit 修改。
+
+当前语义：Static AC-10 已满足；AC-01 至 AC-11 现均具有已记录 evidence。Raw fixture 位于可能被
+系统清理的 `/private/tmp`，但关键 hash、refs、结论与 provenance 已进入 tracked compact summary。
+F7 不覆盖未自然触发 correction 的事实，也不重新激活 P7。
+
 ## 3. Active Step
 
-### F7 / Step 7 -- 完整 post-foundation real-service smoke
+### F8 / Step 8 -- evidence-driven foundation disposition
 
 #### Objective
 
-在 disposable target/framework Git 仓库和本地 bare remotes 中，使用真实 Codex service 与
-不同 Reviewer/Executor profile 运行 bounded mutation loop，验证 F1-F6 集成后的合法 `ACCEPT`
-闭环。Static AC-10 的核心结果是 authoritative Runtime transition、framework summary commit/push
-均完成，target remote 保持原 baseline。F7 是真实服务验证，不是 P7 fault injection 或 self-hosting。
+基于 F1-F7 的实现、自然 REJECT/re-reviews、真实 service smoke 与实际 operator 使用 evidence，
+分别决定：是否需要简单本地 GUI、foundation Runtime/治理记录如何在不损失 provenance 的情况下
+压缩、raw evidence 应采用什么生命周期。F8 首先是 disposition，不预设三项都必须实现；没有直接
+evidence 支持的功能应明确 `DEFER/NO-GO`，而不是为完成阶段而增加代码。
 
 #### Inputs 及固定 identity
 
 - Static：`1PCloop/workloads/foundation_v1/workload_static.md`，SHA-256
   `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`；
-- F1-F6 accepted implementation、当前双语 README、`onepcloop.py` help/config contract、
-  `run_mutation_loop.py` 和相应 machine Runtime transition/evidence publication contract；
-- post-P6 失败闭环的对照 evidence：
-  `1PCloop/evidence-summaries/post-p6-foundation-smoke-20260912.md`；
-- 已存在且不同的本机 Reviewer/Executor Codex profiles；profile credential/auth 内容不进入 tracked
-  evidence。实际 CLI 选项由本机 `--help` 和代码确认，不在本 Runtime 中猜测。
+- 本 Runtime 中 F1-F7 的 accepted evidence、自然 REJECT 链、known limitations 和 pending items；
+- `1PCloop/evidence-summaries/post-p6-foundation-smoke-20260912.md` 与
+  `f7-post-foundation-real-service-smoke-20260918.md`；
+- F2 timer/events、F3 CLI、F5 Human Gate、F6 TUI 的当前 README/operator contract；
+- Static AC-01 至 AC-11、Evidence Boundary、Open Decisions 和 PT-02。
 
 #### Permitted changes
 
-- 在经确认的 disposable 路径创建小型 target/framework repos、bare remotes、workload config、
-  machine Runtime 和最小目标任务；保留 raw evidence 于本地 ignored/disposable storage；
-- 在 framework 源仓库新增一份不含 prompt、secret、stderr 或完整 raw payload 的 compact smoke
-  evidence summary，并提交、普通 non-force push；如 source repo 不需要修改，不得为了提交而修改；
-- 运行只读 `doctor/preflight/status/inspect/human-gate` 和适用的 TUI 验证，必要时对同一 run
-  使用既有安全 `resume`；按最终状态保留失败证据与精确 blocker。
+- 只读审计 F1-F7 Runtime、README、compact/raw evidence locator、tracked history 和当前文件规模；
+- 新增一份 tracked 中文 F8 disposition 文档，逐项给出 `IMPLEMENT / DEFER / NO-GO`、直接 evidence、
+  tradeoff、触发重新评估的条件和对 foundation closure 的影响；
+- 如治理压缩已有充分 evidence，可提出具体 archive/索引方案与无损性验证逻辑；如 raw retention
+  policy 已可决定，可提出默认保留、清理授权、hash/index 和缺失后的 `UNAVAILABLE` 语义；
+- 更新双语 README 的阶段状态或已决定边界。任何实际功能实现必须先在 disposition 中证明必要，
+  且不能把不同风险的 GUI、压缩和清理混成一个不可审核提交。
 
 #### Prohibited changes
 
-- 修改全局/task-local Static/Runtime、已接受的 F1-F6 代码/测试/README、schema、roles、templates、
-  closed workload 或真实 target；若真实 smoke 暴露 bug，停止并报告，不在 F7 smoke 内顺手修复；
-- 向 target remote push、对 source GitHub remote 做测试 push、force push、history rewrite、
-  人为注入 REJECT/错误、kill-9 或 P7 fault injection；
-- 把 raw Codex event、prompt、peer payload、credential、hidden reasoning、stderr 或完整 checkpoint
-  内容写入 tracked summary；把 `PUSHED` 当作 logical success；
-- 扩大成 concurrency、GUI automation、self-hosting 或 F8 决策。
+- 未经 disposition evidence 直接实现 GUI、raw evidence 自动删除器或大范围治理重写；
+- 删除/覆盖现有 Runtime REJECT、repair、acceptance provenance，改写 Git history，或把 raw payload、
+  credential、hidden reasoning、prompt/stderr 加入 tracked 文件；
+- 修改已接受的 F1-F7 control behavior、P7/fault injection、self-hosting、Codex GUI automation、
+  concurrency 或生产 Web UI；
+- 把 `/tmp` 当前仍存在当作永久 retention policy，或在没有恢复/审计路径时自动清理 raw evidence；
+- 把压缩等同于删除信息，或将 README 当作新的 authoritative Runtime。
 
 #### Required evidence
 
-- preflight 固定两个 disposable repo/remote 的 branch、HEAD、cleanliness、远端 URL 和初始 refs；
-  source framework repo 与真实 target 不被 smoke mutation；
-- 真实 Reviewer -> Executor -> Reviewer process/receipt、thread/profile separation、schema-valid
-  最终 verdict、合法 evidence locator 与最终 logical outcome；若 F1 correction 自然触发，记录其
-  同线程与 Executor 不重跑 evidence，但不人为制造；
-- transition 前后 machine Runtime bytes/hash、唯一 transition ID/record、target commit/HEAD、
-  framework summary entry/commit/remote ref、target remote baseline 不变；
-- F2 `PROGRESS`/event/status 的 active-time 与终态、F3 `status/inspect`、F5 `human-gate` 的一致
-  只读观察；F6 TUI 在真实交互终端中能打开、刷新和退出时记录观察，如终端不可用则明确记为
-  `UNVERIFIED`，不伪造结果；
-- Git-ignored raw locator/hash 与 tracked compact summary 形成可审计映射；关键长期结论不只留
-  在可能被清理的 `/tmp` 路径；必要的安全恢复不能重复已完成 Agent turn、transition 或 commit/push。
+- 三个 decision track 分别列出支持和反对 evidence，不以偏好或“可以做”代替必要性；
+- 对 GUI 至少比较 CLI/TUI 已满足的使用场景、F7 真实 PTY 结果、仍存在的 Human friction、维护和
+  security surface；没有实际缺口时应 DEFER/NO-GO；
+- 对治理压缩量化当前 Runtime/README/evidence 文件规模和重复结构，明确哪些是 authority、哪些可
+  archive/index；证明压缩前后 active state、transition/rejection provenance、pending deadline 和
+  evidence locator 可机械恢复；
+- 对 raw lifecycle 区分 tracked compact summary、Git-ignored raw 和 disposable `/tmp`，定义默认
+  retention、人工授权、清理后 `UNAVAILABLE`、不得删除 active/recovery evidence 等边界；
+- foundation AC-01 至 AC-11 coverage matrix、remaining limitations、PT-02 disposition 和明确的
+  close/extend recommendation。
 
 #### Acceptance criteria
 
-1. 真实 service 完成有记录的合法 `ACCEPT`，不是只完成三个 process 或让 Reviewer 自述通过；
-   evidence locator、verdict 与最终 target HEAD 满足既有机械合同。
-2. machine Runtime transition 被实际应用，只有一条权威 transition record，Active Step 按
-   fixture 的明示合同推进；`logical_outcome`、`runtime_transition`、`evidence_publication` 独立可见。
-3. framework summary commit 已形成并普通 non-force push 至 disposable framework remote，
-   remote ref 精确等于预期 commit；target remote 仍等于 preflight baseline。
-4. F2-F6 operator projections 对同一 run 一致，`inspect` 为可解释的 PASS，read-only 命令/TUI
-   不修改 authoritative artifacts；TUI 真实终端验证如不可行须明确限制，不能谎称完成。
-5. 保存 raw locator/hash 与 tracked compact summary、精确 commit/remote identities，并由独立
-   Reviewer 直接复核；失败闭环必须如实记为失败，不靠修改 verdict/Runtime 或重新跑成功 turn
-   制造通过。
+1. GUI、治理压缩、raw lifecycle 三项各有独立 disposition、直接 evidence 和重新评估触发条件；
+   `DEFER/NO-GO` 是合法结果，不因没有新代码而失败。
+2. AC-01 至 AC-11 有 compact coverage matrix；F7 后仍存在的限制不会被 foundation closure 隐藏。
+3. 如建议压缩，方案必须保留单一当前状态、全部 REJECT/repair/ACCEPT provenance、transition、
+   pending gate 和 durable evidence locator，并提供可机械验证的 pre/post inventory。
+4. 如决定 retention policy，必须 default-safe、不可自动删除 active/recovery evidence，明确 raw
+   缺失后的 inspect 语义，并将 PT-02 关闭或记录继续永久 non-blocking 的具体理由。
+5. 给出 foundation_v1 `CLOSE / EXTEND` recommendation；任何扩展必须是 evidence 支持的独立
+   deliverable，不得静默扩大 Static。最终 disposition 经独立 Reviewer 接受后才能关闭阶段。
 
 #### Tests
 
-- 先做只读 `doctor/preflight` 与仓库/remote identity 检查；再进行有界真实服务运行；
-- 结束后执行 `status/inspect/human-gate` 与安全可行的 TUI 观察，比较所有关键 bytes/hash/refs；
-- 若仅增加 evidence summary，则不要求重复全量 Python regression；若任何代码发生变化，必须
-  另立窄修复与相应回归，不能作为 F7 smoke 隐含变更。
+- 文档 inventory/hash/link/status consistency checks 和 `git diff --check`；
+- 若只新增 disposition/README，不重复完整 Python regression，但必须验证所有 locator、状态和
+  AC matrix；若发生代码变更则停止并先拆出经授权实现步骤及相应测试；
+- 对任何候选压缩先在临时副本或 proposal 层验证，不在初次 disposition 中直接删除权威历史。
 
 #### Stop conditions / Human Gate
 
-- service/preflight/auth/profile 不满足真实运行条件，disposable remote/target 边界不明确，或
-  source framework/真实 target 可能被 mutation；
-- 真实 run 进入 `FAILED_CLOSED`、需要 Human Gate 或出现 identity/locator/transition/summary
-  不一致；先保存 evidence、报告精确原因，不绕过校验，不重复尝试消耗服务直到原因明确；
-- 必须更改已接受代码、Static/Runtime、外部 Tools、真实 target 或 Human decision 才能继续。
+- disposition 需要新增 Static criterion、实际 GUI/清理器实现、删除 raw evidence 或不可逆 archive；
+- AC coverage、Runtime authority、tracked/raw identity 或 F7 evidence 出现冲突；
+- 无法证明治理压缩无损，或 GUI/retention 取舍需要 Human Owner 的产品偏好而非现有 evidence。
 
 #### Executor report format
 
 ```text
-F7 real-service smoke status: PASS / FAILED_CLOSED / BLOCKED
-branch / source baseline / evidence-summary commit / final refs / working-tree state
-disposable repo and remote identities, preflight baseline, profile separation
-real Codex turn receipts, final verdict and exact evidence locator
-logical outcome / Runtime transition / evidence publication
-target commit and unchanged target remote; framework summary commit and pushed remote
-status / inspect / human-gate / TUI observations and read-only comparison
-raw locator + hashes, compact tracked summary, limitations and blocker
-recommended Runtime evidence summary; no self-ACCEPT or F8 activation
+F8 disposition status: COMPLETE / HUMAN DECISION REQUIRED / BLOCKED
+branch / baseline / commit / final refs / working-tree state
+GUI decision + evidence + revisit trigger
+governance compression decision + quantified inventory + losslessness test
+raw evidence lifecycle decision + PT-02 disposition + safety boundary
+AC-01..AC-11 coverage matrix and remaining limitations
+foundation CLOSE / EXTEND recommendation
+changed files and validation; recommended Runtime summary
 ```
 
-Executor 不得宣告 F7 accepted，也不得推进本 Runtime。真实 service 未完成合法闭环时必须报告
-失败的真实状态，不能用 deterministic suite 替代。
+Executor 不得自行关闭 foundation_v1、修改本 Runtime 或宣告 F8 accepted。若 evidence 支持新增
+实现，只形成明确 proposal 并停在 Human/Reviewer gate，不在同一轮静默实现。
 
 ## 4. Queued
 
-| Step | Deliverable | 状态 |
-| --- | --- | --- |
-| F8 / Step 8 | GUI/治理压缩/evidence lifecycle 的 evidence-driven 决策 | `QUEUED` |
+当前没有 queued 顶层 step。F8 disposition 决定 foundation_v1 是关闭，还是经 Human Owner 明确
+授权后增加独立 bounded follow-up；不得自行创建 F9。
 
 顶层映射固定为：`F1 = Step 1`、`F2 = Step 2`、`F3 = Step 3`、`F4 = Step 4`、
 `F5 = Step 5`、`F6 = Step 6`、`F7 = Step 7`、`F8 = Step 8`。
 
 ## 5. Blockers and Human Decision Gates
 
-- 当前无已知 F7 blocker；真实 service、profile、disposable repo/remote 仍须在 run 前通过明确
-  preflight，不能把“尚未验证”写成“已通过”。
-- F6 stable no-checkpoint blocker 已由 second repair 关闭；single-writer 顺序观察不是并发协议。
-- framework/target overlap 禁止使 foundation 自身实现继续采用 Human-mediated workflow；F7
-  仅在独立 disposable framework/target 中跑 loop，不做 self-hosting。
+- 当前无已知 F8 read-only disposition blocker。
+- 实际 GUI、raw evidence 删除/自动清理、权威历史 archive 或新增 Static criterion 均需要 disposition
+  先证明必要，并在实施前进入 Human Decision Gate；本轮不得自行执行。
+- F7 已关闭真实 service smoke gap；未自然触发 correction、single-writer/no-concurrency 和非
+  self-hosting 仍是明确限制，不是 F8 disposition blocker。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`7`
+当前顶层 Step：`8`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -397,12 +428,13 @@ Executor 不得宣告 F7 accepted，也不得推进本 Runtime。真实 service 
 
 ### Pending Gate Check
 
-- 下一顶层 Step：`Step 8 / F8`
-- 激活前必须关闭的 Pending Task：无；PT-01 已在其 Step 5 deadline gate 前关闭。
+- 下一状态：foundation_v1 closure 或 Human-authorized bounded follow-up；当前无自动 `Step 9`。
+- closure 前必须处理的 Pending Task：PT-02 必须得到明确 disposition；可以形成安全 policy 并
+  `RESOLVED`，也可以说明为何继续 `PERMANENTLY_NON_BLOCKING`，但不能静默遗漏。
 - Gate verdict：`CLEAR`
 - 支持 evidence：F4 implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`
   与 §8 F4 独立 review；PT-02 保持 `+∞`。
-- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F7 blocker。
+- GUI：在 F8 基于 F6/F7 使用 evidence 明确 `IMPLEMENT / DEFER / NO-GO`；当前不预设实现。
 
 ## 7. State Transition
 
@@ -478,7 +510,7 @@ F5 -> F6 transition（历史状态）：
   F6 不重开 F5 control semantics；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
 
-F6 -> F7 transition（当前状态）：
+F6 -> F7 transition（历史状态）：
 
 - Previous step state：F6 `REJECTED -- SECOND NARROW REPAIR REQUIRED`，两次拒绝和两轮全绿
   测试历史保留于 §8；
@@ -491,6 +523,20 @@ F6 -> F7 transition（当前状态）：
   下一 Step 8 gate 为 `CLEAR`；
 - Meaning：F6 的 no-checkpoint 顺序确认和公共单行输出作为稳定只读 operator 能力；F7 现在
   验证真实 service 的合法 ACCEPT/transition/publication 闭环；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
+
+F7 -> F8 transition（当前状态）：
+
+- Previous step state：F7 `ACTIVE / NOT EVALUATED`；
+- Triggering evidence：source compact evidence commit
+  `e2c472c9bcaa43188b9d9df4d8d59d28b953fe3a`、真实三 turn receipts、机械 ACCEPT、
+  Runtime transition 重建、target no-push、framework evidence push、operator/TUI 独立复核；
+- Verdict：F7 `ACCEPTED AFTER INDEPENDENT REVIEW`；
+- Current step：F8 / Step 8 `ACTIVE / NOT EVALUATED`；
+- Pending update：PT-01 保持 `RESOLVED`；PT-02 必须在 F8 disposition 中明确关闭或说明继续
+  `PERMANENTLY_NON_BLOCKING` 的安全理由；没有自动 Step 9；
+- Meaning：AC-01 至 AC-11 均已有直接 evidence。F8 不预设新增功能，只基于这些 evidence 决定
+  GUI、治理压缩、raw lifecycle 以及 foundation closure/extension；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
 
 ## 8. Independent Review
@@ -1162,11 +1208,50 @@ Acceptance mapping：
 与 Reviewer 全绿后仍发现边界缺口”的 provenance。这属于 Human-mediated self-application，
 不是 P7 fault injection。
 
+### 2026-09-18 F7 independent review：`ACCEPTED`
+
+审核对象：source evidence commit `e2c472c9bcaa43188b9d9df4d8d59d28b953fe3a`，parent 为激活
+F7 的 Runtime commit `975ecf6820d2d561759870a1d813e0974ec5da2a`。唯一 source diff 是
+`1PCloop/evidence-summaries/f7-post-foundation-real-service-smoke-20260918.md`，SHA-256
+`284bb8b652de19547ce9e0c1d357929b6131725dcde2570052844042b96ac3e1`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| 真实 service 与角色关系 | 三份 raw process receipt、CLI command、thread/profile/session 字段 | 三 turn exit 0；review resume 原 Reviewer thread；Executor 使用不同 ephemeral thread/profile | PASS |
+| authoritative ACCEPT | 最终 verdict bytes/hash、schema、target commit/file locator | verdict hash、完整 commit object/hash/reachability、绝对 file path/hash 与 target HEAD 均匹配 | PASS |
+| Runtime transition | parent Runtime bytes、verdict hash、Runtime path、transition record/timestamp | 独立重建 transition ID 和完整 postimage，与唯一 record 和最终 Runtime 逐字节一致 | PASS |
+| framework publication 与 target no-push | 两个 local repo/bare refs、framework commit diff、三条 summary | framework bare ref 等于 evidence commit；target bare ref 保持 baseline；三层终态独立 | PASS |
+| operator/TUI/read-only | status/inspect/human-gate、真实 PTY refresh/quit、前后 hash/ref snapshot | inspect 全项 PASS、56 events、target evidence VALID；TUI code 0；authoritative bytes/refs 不变 | PASS |
+| durable/privacy boundary | tracked compact summary 与 raw locator/hash inventory | 关键结论和 identity durable；raw payload/credential/hidden reasoning 未复制到 tracked summary | PASS |
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Reviewer 重算 config、verdict、manifest、events、status、checkpoint、Runtime、generated summary、
+  target file 与 raw commit bytes hash；均与 compact summary/checkpoint 一致；
+- target commit `259046fef6823c0de309a01c1a04dd5c8260f597` 的唯一 parent 为 baseline，独立
+  unittest `1 / 1` 通过；target remote 仍为 baseline；
+- Runtime preimage/postimage 分别为 `940da8a9302b007c2cd02495b73c478c39bc4265fd9ac0a689355072d721c88a`
+  与 `bf3c0624737e1635405687f278c93636268b9e3ef69d5421eef6ec072f5f843a`；重建
+  transition ID 与记录中的
+  `bea0f37639a523592863d79f832a2a9ce3f03bd101abcdafd49ebc086ba69851` 一致；
+- Reviewer 独立执行 `status/inspect/human-gate` 及真实 PTY TUI，前后六项 artifact hash 和两个
+  repo/bare refs 保持不变；
+- branch/local HEAD/origin/GitHub main 均为 evidence commit，审核前工作树 clean，Static hash
+  `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e` 不变；
+- Reviewer verdict：`ACCEPTED`；Static AC-10 满足。
+
+Review limitations：本次 bounded run 未自然触发 F1 correction；raw fixture 位于可能被系统清理的
+`/private/tmp`；系统仍是 single-writer/no-concurrency 且不 self-host。这些限制均被明确记录，
+不阻塞 F7 AC-10，但属于 F8 disposition 的输入。
+
 ## 9. Next Direction
 
-只执行 F7 post-foundation real-service smoke：先验证 disposable repo/remote 与真实 Codex profiles，
-再用有界真实 Reviewer -> Executor -> Reviewer loop 取得合法 `ACCEPT`、machine Runtime transition 和
-framework summary commit/push，并证明 target remote 未被推送。tracked compact summary 必须能让
-独立 Reviewer 复核 raw locator/hash 与 Git identity；失败则如实保留失败状态，不能用测试全绿或
-publication success 代替闭环。F1-F6 保持 accepted；不得修改 Static/Runtime 或已接受代码，
-不得提前实施 F8/P7。完成后停止于 `AWAITING INDEPENDENT F7 REVIEW`。
+只执行 F8 evidence-driven disposition：审计 F1-F7 和实际使用 evidence，分别决定 GUI、治理压缩和
+raw evidence lifecycle 的 `IMPLEMENT / DEFER / NO-GO`，完成 AC-01 至 AC-11 coverage matrix、PT-02
+disposition 与 foundation `CLOSE / EXTEND` recommendation。首轮不得直接实现 GUI、删除 raw evidence、
+迁移权威历史或创建 F9；需要新功能或不可逆操作时停在 Human Decision Gate。F1-F7 保持 accepted，
+P7/self-hosting/concurrency 不激活。完成后停止于 `AWAITING INDEPENDENT F8 REVIEW` 或明确
+`HUMAN DECISION REQUIRED`。
