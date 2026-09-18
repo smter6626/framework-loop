@@ -9,7 +9,7 @@
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_window_layout_v1/workload_static.md`; SHA-256 `916a44790e67af5f3023d5b36e52fd14097b45348d50e857c9fa56abd753521b`
 - Target identity: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`; branch `codex/bounded-scrollable-main-window-v1`; baseline `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34`
-- 当前 evidence snapshot: 前序 `whisper_session_ui_v1` 已关闭并有人类功能黑盒 PASS；Human Owner 同次测试确认主窗口过高；新 branch 已从 target-side change record commit 精确创建，尚无 layout 实现 commit
+- 当前 evidence snapshot: 前序 `whisper_session_ui_v1` 已关闭并有人类功能黑盒 PASS；Human Owner 同次测试确认主窗口过高；新 branch 已从 target-side change record commit 精确创建；新 config 的 doctor 8/8 和 preflight 均 PASS；尚无 layout 实现 commit
 - 最后更新: 2026-09-18
 
 ## 2. Completed
@@ -18,6 +18,7 @@
 - Target-side provenance: target commit `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34` 增加 `docs/change_records/session_clipboard_ui_v1.md` 与 repo map 更新，是本任务固定 baseline。
 - Branch preparation: `codex/bounded-scrollable-main-window-v1` 已从 `fb7e38e...` 创建。为避免重复安装约 3 GB 本地依赖，现有 `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui` worktree 已切换到该 branch，并复用 Git-ignored `.venv`、`.tools` 和 `external/whisper.cpp`；tracked worktree 保持 clean。
 - Governance initialization: Human Owner 明确授权准备下一轮窗口高度修复及中文 Static/Runtime。本 task 与旧 S2 分离，只有 L1 一个顶层 Step。
+- Operator readiness: framework commit `029f4484cb51cc2afe73f0a6e29a0ee5facc0701` 上运行 `window_layout.json` 的 doctor 8/8 PASS、preflight PASS。Config raw SHA-256 为 `3ff05a6d78d88aafe4516ea69e4bb369a9c2b68c69fd02c122b3bceb5488e745`，resolved SHA-256 为 `95527396a4e4eaa4bd00ee39583c4ff74733daeb7be1072b4d07de6c752c9019`；target clean 且精确位于 `fb7e38e...`，framework local/origin main 同步。该检查没有调用 Agent 或修改 target。
 
 ## 3. Active Step
 
@@ -76,7 +77,7 @@
 
 ## 10. Next Direction
 
-- 治理 commit 推送且 doctor/preflight PASS 后，使用 `window_layout.json` 启动一次 config-bound 1PCloop run。
+- 使用已通过 doctor/preflight 的 `window_layout.json` 启动一次 config-bound 1PCloop run。
 - 若自动 Reviewer ACCEPT，仅关闭代码/模拟 UI gate并由 Human-facing reviewer普通 push target branch；随后提供真实 macOS人工 checklist。若 REJECT，沿同一 L1 repair cycle处理，不扩大合同。
 
 ## 11. Current Executor Handoff
