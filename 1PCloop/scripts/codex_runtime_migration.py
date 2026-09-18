@@ -195,13 +195,48 @@ def publish_runtime_root(
             raise MigrationSafetyError("runtime publish stage is incomplete or aliased")
     if runtime_root.exists() or runtime_root.is_symlink():
         raise MigrationSafetyError("runtime publish root already exists")
-    if stage_root.stat().st_dev != runtime_root.parent.stat().st_dev:
+
+    stage_stat = stage_root.stat()
+    stage_identity = (stage_stat.st_dev, stage_stat.st_ino)
+
+    if stage_stat.st_dev != runtime_root.parent.stat().st_dev:
         raise MigrationSafetyError("runtime stage and target are not on one filesystem")
+
     try:
         rename(stage_root, runtime_root)
     except BaseException as exc:
+        stage_present = stage_root.exists() or stage_root.is_symlink()
+        runtime_present = runtime_root.exists() or runtime_root.is_symlink()
+
+        # rename() may already have committed atomically before Python observed
+        # an interrupt/exception. Reconcile against the original staging inode.
+        if runtime_present and not stage_present:
+            if runtime_root.is_symlink() or not runtime_root.is_dir():
+                raise MigrationSafetyError(
+                    "atomic runtime-root publication state is ambiguous; Human review required"
+                ) from exc
+
+            published_stat = runtime_root.stat()
+            if (published_stat.st_dev, published_stat.st_ino) != stage_identity:
+                raise MigrationSafetyError(
+                    "atomic runtime-root publication state is ambiguous; Human review required"
+                ) from exc
+
+            for child in ("1pcloop-reviewer", "1pcloop-executor"):
+                selected = runtime_root / child
+                if not selected.is_dir() or selected.is_symlink():
+                    raise MigrationSafetyError(
+                        "atomic runtime-root publication state is ambiguous; Human review required"
+                    ) from exc
+            return
+
+        if stage_present and not runtime_present:
+            raise MigrationSafetyError(
+                "atomic runtime-root publish failed; staged state remains unpublished"
+            ) from exc
+
         raise MigrationSafetyError(
-            "atomic runtime-root publish failed; staged state remains unpublished"
+            "atomic runtime-root publication state is ambiguous; Human review required"
         ) from exc
 
 
