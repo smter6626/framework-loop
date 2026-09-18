@@ -24,6 +24,7 @@ ACTIVE_ROOT = REPO_ROOT / "1PCloop"
 DEFAULT_RUNS_ROOT = ACTIVE_ROOT / "runs"
 DEFAULT_REVIEWER_HOME = Path.home() / ".codex-mix/.mix/runtimes/1pcloop-reviewer"
 DEFAULT_EXECUTOR_HOME = Path.home() / ".codex-mix/.mix/runtimes/1pcloop-executor"
+ROLE_RUNTIME_ROOT = Path.home() / ".codex-mix/.mix/runtimes"
 RETIRED_CODEX_HOMES = (Path.home() / ".codex-A", Path.home() / ".codex-B")
 PEER_MARKER = b"\n\n--- BEGIN VERBATIM PEER PAYLOAD ---\n"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -1335,8 +1336,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     runs_root = args.runs_root.resolve()
     reviewer_home = args.reviewer_home.resolve()
     executor_home = args.executor_home.resolve()
-    if reviewer_home == executor_home:
-        raise SystemExit("Reviewer and Executor profiles must be distinct")
+    runtime_root = ROLE_RUNTIME_ROOT.resolve()
+    for role, selected in (("Reviewer", reviewer_home), ("Executor", executor_home)):
+        if selected == runtime_root or runtime_root not in selected.parents:
+            raise SystemExit(
+                f"{role} CODEX_HOME must resolve inside the dedicated runtime root"
+            )
+    if (
+        reviewer_home == executor_home
+        or reviewer_home in executor_home.parents
+        or executor_home in reviewer_home.parents
+    ):
+        raise SystemExit(
+            "Reviewer and Executor profiles must be distinct and non-nested"
+        )
     for role, selected in (("Reviewer", reviewer_home), ("Executor", executor_home)):
         if any(
             selected == retired.resolve() or retired.resolve() in selected.parents

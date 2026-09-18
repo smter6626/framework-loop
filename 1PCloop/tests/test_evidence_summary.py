@@ -179,7 +179,9 @@ class EvidenceSummaryTests(unittest.TestCase):
                 "--workload-id", args.workload_id,
                 "--preflight-only",
             ]
-            with redirect_stdout(io.StringIO()) as output:
+            with patch.object(
+                M.CONTRACTS, "ROLE_RUNTIME_ROOT", args.role_runtime_root
+            ), redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(M.main(argv), 0)
             report = json.loads(output.getvalue())
             self.assertEqual(report["evidence_finalization"]["repo"], str(framework.resolve()))

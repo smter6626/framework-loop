@@ -167,6 +167,18 @@ class MutationContractTests(unittest.TestCase):
             ),
             (allowed_reviewer.resolve(), allowed_executor.resolve()),
         )
+        with self.assertRaisesRegex(
+            CONTRACTS.InvariantViolation, "dedicated runtime root"
+        ):
+            CONTRACTS.validate_role_runtime_homes(
+                Path("/tmp/outside-reviewer"), allowed_executor
+            )
+        with self.assertRaisesRegex(
+            CONTRACTS.InvariantViolation, "non-nested"
+        ):
+            CONTRACTS.validate_role_runtime_homes(
+                allowed_reviewer, allowed_reviewer / "nested-executor"
+            )
         for retired in CONTRACTS.RETIRED_CODEX_HOMES:
             with self.subTest(retired=retired), self.assertRaisesRegex(
                 CONTRACTS.InvariantViolation, "retired account home"

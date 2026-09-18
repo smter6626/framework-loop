@@ -453,6 +453,8 @@ class RuntimeTransitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             args, _ = self.fixture(Path(tmp))
             args.reviewer_home = Path.home() / ".codex-B"
+            args.executor_home = Path.home() / "allowed-executor-home"
+            args.role_runtime_root = Path.home()
             with self.assertRaisesRegex(M.InvariantViolation, "retired account home"):
                 M.validate_preflight(args)
 

@@ -58,6 +58,7 @@ def _load_runner() -> ModuleType:
 
 
 RUNNER = _load_runner()
+ROLE_RUNTIME_ROOT = RUNNER.CONTRACTS.ROLE_RUNTIME_ROOT
 
 
 def _load_human_gate() -> ModuleType:
@@ -268,6 +269,7 @@ def load_config(path: Path) -> WorkloadConfig:
         RUNNER.validate_role_runtime_homes(
             Path(resolved["profiles"]["reviewer_home"]),
             Path(resolved["profiles"]["executor_home"]),
+            runtime_root=ROLE_RUNTIME_ROOT,
         )
     except RUNNER.InvariantViolation as exc:
         raise OperatorError(str(exc)) from exc
@@ -304,6 +306,7 @@ def build_runner_args(
         progress_interval_seconds=execution["progress_interval_seconds"],
         resume=resume,
         reviewer_home=Path(profiles["reviewer_home"]),
+        role_runtime_root=ROLE_RUNTIME_ROOT,
         run_id=selected_run_id,
         runs_root=Path(evidence["runs_root"]),
         state_root=Path(evidence["state_root"]),
@@ -713,7 +716,9 @@ def doctor(config: WorkloadConfig) -> Dict[str, Any]:
     def profiles_check() -> str:
         try:
             RUNNER.validate_role_runtime_homes(
-                args.reviewer_home, args.executor_home
+                args.reviewer_home,
+                args.executor_home,
+                runtime_root=ROLE_RUNTIME_ROOT,
             )
         except RUNNER.InvariantViolation as exc:
             raise OperatorError(str(exc)) from exc

@@ -52,6 +52,13 @@ class OperatorCliTests(unittest.TestCase):
         config_dir = root / "configuration"
         config_dir.mkdir()
         config_path = config_dir / "workload.json"
+        role_runtime_root = root / "role-runtimes"
+        role_runtime_root.mkdir()
+        args.reviewer_home = role_runtime_root / "reviewer-home"
+        args.executor_home = role_runtime_root / "executor-home"
+        args.reviewer_home.mkdir()
+        args.executor_home.mkdir()
+        OP.ROLE_RUNTIME_ROOT = role_runtime_root
 
         def relative(path):
             return os.path.relpath(str(Path(path)), str(config_dir))
@@ -157,6 +164,8 @@ class OperatorCliTests(unittest.TestCase):
             version = json.loads(json.dumps(original)); version["schema_version"] = 2; invalid_values.append(version)
             wrong = json.loads(json.dumps(original)); wrong["execution"]["max_cycles"] = True; invalid_values.append(wrong)
             home = json.loads(json.dumps(original)); home["profiles"]["executor_home"] = home["profiles"]["reviewer_home"]; invalid_values.append(home)
+            nested = json.loads(json.dumps(original)); nested["profiles"]["executor_home"] = nested["profiles"]["reviewer_home"] + "/nested"; invalid_values.append(nested)
+            outside = json.loads(json.dumps(original)); outside["profiles"]["executor_home"] = "/tmp/outside-role-runtime"; invalid_values.append(outside)
             retired = json.loads(json.dumps(original)); retired["profiles"]["reviewer_home"] = str(Path.home() / ".codex-B"); invalid_values.append(retired)
             secret = json.loads(json.dumps(original)); secret["token"] = "do-not-store"; invalid_values.append(secret)
             tilde = json.loads(json.dumps(original)); tilde["target"]["repo"] = "~/target"; invalid_values.append(tilde)
@@ -194,7 +203,7 @@ class OperatorCliTests(unittest.TestCase):
             config_path, value, *_ = self.fixture(Path(temporary))
             cases = (
                 ("codex", lambda v: v["execution"].__setitem__("codex_bin", "missing-codex")),
-                ("profiles", lambda v: v["profiles"].__setitem__("reviewer_home", "missing-profile")),
+                ("profiles", lambda v: v["profiles"].__setitem__("reviewer_home", "../role-runtimes/missing-profile")),
                 ("framework_remote", lambda v: v["framework_git"].__setitem__("remote", "missing-remote")),
                 ("storage_preflight", lambda v: v["evidence"].__setitem__("runs_root", "../framework/visible-runs")),
             )

@@ -41,13 +41,19 @@ Executor CODEX_HOME:
 1PCloop 在解析 workload config 和 mutation runner preflight 两层执行 fail-closed validation：
 
 - Reviewer 和 Executor runtime home 必须不同；
+- 两者解析后都必须是 `~/.codex-mix/.mix/runtimes/` 的严格后代；
+- 两个 home 不得相同，也不得互为父子目录；
 - 任一路径只要解析为 `~/.codex-A`、`~/.codex-B` 或其内部路径，启动必须失败；
 - symlink 或其他 alias 不能绕过该检查；
 - 目标 runtime 不存在时，`doctor` / preflight 必须失败，不能回退到 A/B。
 
 每个 Codex child process 会同时将 `CODEX_HOME` 和 `CODEX_SQLITE_HOME` 设置为同一个 role runtime，
 避免父 shell 中残留的 SQLite override 把 state DB/WAL 写到 canonical 或退休 home。process receipt 同时
-记录这两个解析后的路径。
+记录这两个解析后的路径。不过
+[OpenAI 官方文档](https://developers.openai.com/docs/config-file/environment-variables)规定
+`config.toml` 的 `sqlite_home` 优先于 `CODEX_SQLITE_HOME`，因此 migration 还会检查 copied config：
+`sqlite_home` 只能缺省，或精确解析到对应的新 role runtime；相对路径、旧 A/B 或任何其他目录都会
+fail closed。
 
 当前 tracked workload config 已指向新 runtime，但本次变更没有创建或复制这些目录。执行迁移前，
 1PCloop 暂时处于有意的 fail-closed 状态。
@@ -77,13 +83,19 @@ Executor CODEX_HOME:
 - ChatGPT、Codex 或 1PCloop 相关进程存在时拒绝运行；
 - canonical home 或 A/B source 下有打开文件时拒绝运行；
 - 仅当两个目标都不存在时运行；
+- source A 的 `account_id` 必须与 vault A 相同，source B 必须与 vault B 相同，A/B 必须互不相同；
 - 使用 macOS `ditto --rsrc --extattr --acl` 完整 cold-copy B -> Reviewer、A -> Executor；
 - 复制 regular files、directories、symlinks、SQLite/WAL、session、auth、config，并保留权限、时间、
   xattr、resource fork 和 ACL；
 - 在 publish 前比较 source/target 的路径、类型、权限、owner、group、时间、大小、SHA-256、symlink
   target 和 xattr manifest；
 - 目标必须是独立 inode，不得是 source alias；
-- 迁移前后核对 canonical auth/config、state DB、history、sessions 和 account vault 未变化；
+- copy 后再次验证 Reviewer target 保留 B identity、Executor target 保留 A identity，且二者 distinct；
+- 两个 role home 先共同写入一个 staging root，再以一次同文件系统 rename 原子发布整个
+  `runtimes/` 根目录。正式根目录必须事先不存在；publish 失败时 staging 保持未发布状态，
+  不会出现只发布一个 role home 的半迁移状态；
+- 迁移前后核对 canonical 顶层全部 `*.sqlite*`、`.codex-global-state.json`、`sessions/`、
+  `archived_sessions/`、`installation_id`、auth/config、history 和 `.mix/accounts` 未变化；
 - 不删除 A/B，不修改 framework checkpoint，不修改 canonical history/session，不 rebaseline。
 
 脚本不会输出 credential 内容，也不会把 manifest 持久写入任何 Codex home。

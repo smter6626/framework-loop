@@ -57,13 +57,14 @@ def _same_or_descendant(path: Path, boundary: Path) -> bool:
 
 
 def validate_role_runtime_homes(
-    reviewer_home: Path, executor_home: Path
+    reviewer_home: Path,
+    executor_home: Path,
+    *,
+    runtime_root: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
     """Resolve role homes and reject retired account-identity directories."""
     reviewer = reviewer_home.resolve()
     executor = executor_home.resolve()
-    if reviewer == executor:
-        raise InvariantViolation("Reviewer and Executor profiles must be distinct")
     for role, selected in (("Reviewer", reviewer), ("Executor", executor)):
         for retired in RETIRED_CODEX_HOMES:
             retired_resolved = retired.resolve()
@@ -71,6 +72,18 @@ def validate_role_runtime_homes(
                 raise InvariantViolation(
                     f"{role} CODEX_HOME resolves inside a retired account home"
                 )
+    selected_root = (runtime_root or ROLE_RUNTIME_ROOT).resolve()
+    for role, selected in (("Reviewer", reviewer), ("Executor", executor)):
+        if selected == selected_root or selected_root not in selected.parents:
+            raise InvariantViolation(
+                f"{role} CODEX_HOME must resolve inside the dedicated runtime root"
+            )
+    if _same_or_descendant(reviewer, executor) or _same_or_descendant(
+        executor, reviewer
+    ):
+        raise InvariantViolation(
+            "Reviewer and Executor profiles must be distinct and non-nested"
+        )
     return reviewer, executor
 
 

@@ -83,7 +83,9 @@ class TextLoopTests(unittest.TestCase):
             for path in (repo, retired, executor):
                 path.mkdir()
             original = MODULE.RETIRED_CODEX_HOMES
+            original_root = MODULE.ROLE_RUNTIME_ROOT
             MODULE.RETIRED_CODEX_HOMES = (retired, root / "retired-B")
+            MODULE.ROLE_RUNTIME_ROOT = root
             try:
                 with self.assertRaisesRegex(SystemExit, "retired account home"):
                     MODULE.main([
@@ -94,12 +96,16 @@ class TextLoopTests(unittest.TestCase):
                     ])
             finally:
                 MODULE.RETIRED_CODEX_HOMES = original
+                MODULE.ROLE_RUNTIME_ROOT = original_root
 
     def run_fake_loop(self, root, *, binary_name="codex", session_mode=None):
         repo_root = root / "repo"
         runs_root = root / "runs"
-        reviewer_home = root / "reviewer-home"
-        executor_home = root / "executor-home"
+        role_runtime_root = root / "role-runtimes"
+        role_runtime_root.mkdir()
+        reviewer_home = role_runtime_root / "reviewer-home"
+        executor_home = role_runtime_root / "executor-home"
+        MODULE.ROLE_RUNTIME_ROOT = role_runtime_root
         for directory in (repo_root, reviewer_home, executor_home):
             directory.mkdir()
         docs_root = repo_root / "1PCloop/docs"

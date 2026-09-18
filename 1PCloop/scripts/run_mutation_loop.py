@@ -2196,7 +2196,11 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
     validate_json_schema({}, {"type": "object"})
     for name in TURN_SCHEMAS:
         strict_json(schema_path(name).read_bytes())
-    validate_role_runtime_homes(args.reviewer_home, args.executor_home)
+    validate_role_runtime_homes(
+        args.reviewer_home,
+        args.executor_home,
+        runtime_root=getattr(args, "role_runtime_root", None),
+    )
     if getattr(args, "enable_runtime_transition", False):
         validate_runtime_destination(args)
     for label, home in (

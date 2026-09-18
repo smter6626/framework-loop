@@ -200,6 +200,7 @@ class MutationLoopTests(unittest.TestCase):
             framework_static=governance_paths[MODULE.FRAMEWORK_STATIC],
             max_cycles=1,
             reviewer_home=reviewer_home,
+            role_runtime_root=root,
             resume=False,
             run_id=run_id,
             runs_root=root / "runs",

@@ -6,6 +6,9 @@ set -euo pipefail
 
 umask 077
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd -P)"
+MIGRATION_HELPER="$SCRIPT_DIR/codex_runtime_migration.py"
+
 MODE="${1:---check-only}"
 if [[ "$MODE" != "--check-only" && "$MODE" != "--execute" ]]; then
   echo "usage: $0 [--check-only|--execute]" >&2
@@ -27,9 +30,11 @@ fail() {
   exit 1
 }
 
-for command in python3 ps awk lsof ditto cmp find mktemp mkdir mv stat sed rm rmdir wc tr; do
+for command in python3 ps awk lsof ditto cmp dirname find mktemp mkdir mv pwd stat sed rm rmdir wc tr; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is unavailable: $command"
 done
+[[ -f "$MIGRATION_HELPER" && ! -L "$MIGRATION_HELPER" ]] \
+  || fail "migration safety helper is missing or aliased"
 
 [[ -d "$CANONICAL_HOME" && ! -L "$CANONICAL_HOME" ]] \
   || fail "canonical ~/.codex-mix directory is missing or aliased"
@@ -61,6 +66,8 @@ done
 for target in "$REVIEWER_TARGET" "$EXECUTOR_TARGET"; do
   [[ ! -e "$target" && ! -L "$target" ]] || fail "target already exists: $target"
 done
+[[ ! -e "$RUNTIME_ROOT" && ! -L "$RUNTIME_ROOT" ]] \
+  || fail "dedicated runtime root must be absent for atomic publication"
 
 # Process-name checks are intentionally broad. False positives require the
 # operator to close the process or inspect it manually; the script never guesses.
@@ -98,6 +105,14 @@ check_no_open_files "$CANONICAL_HOME"
 check_no_open_files "$REVIEWER_SOURCE"
 check_no_open_files "$EXECUTOR_SOURCE"
 
+python3 "$MIGRATION_HELPER" validate-source \
+  --source-a "$EXECUTOR_SOURCE" \
+  --source-b "$REVIEWER_SOURCE" \
+  --vault-a "$MIX_ROOT/accounts/A/auth.json" \
+  --vault-b "$MIX_ROOT/accounts/B/auth.json" \
+  --reviewer-home "$REVIEWER_TARGET" \
+  --executor-home "$EXECUTOR_TARGET"
+
 echo "Readiness PASS: applications are closed, sources are valid, targets do not exist."
 echo "Reviewer: $REVIEWER_SOURCE -> $REVIEWER_TARGET"
 echo "Executor: $EXECUTOR_SOURCE -> $EXECUTOR_TARGET"
@@ -107,26 +122,24 @@ if [[ "$MODE" == "--check-only" ]]; then
   exit 0
 fi
 
-mkdir -p "$RUNTIME_ROOT"
-[[ ! -L "$RUNTIME_ROOT" ]] || fail "runtime root must not be a symlink"
-LOCK="$RUNTIME_ROOT/.1pcloop-migration.lock"
+LOCK="$MIX_ROOT/.1pcloop-runtimes-migration.lock"
 mkdir "$LOCK" 2>/dev/null || fail "another runtime-home migration may be active"
 STAGE=""
 SCRATCH=""
 
 cleanup() {
-  if [[ -n "${STAGE:-}" && -d "$STAGE" && "$STAGE" == "$RUNTIME_ROOT"/.1pcloop-migration.* ]]; then
+  if [[ -n "${STAGE:-}" && -d "$STAGE" && "$STAGE" == "$MIX_ROOT"/.1pcloop-runtimes-stage.* ]]; then
     rm -rf -- "$STAGE"
   fi
   if [[ -n "${SCRATCH:-}" && -d "$SCRATCH" && "$SCRATCH" == "${TMPDIR:-/tmp}"/1pcloop-migration.* ]]; then
     rm -rf -- "$SCRATCH"
   fi
-  if [[ -n "${LOCK:-}" && -d "$LOCK" && "$LOCK" == "$RUNTIME_ROOT/.1pcloop-migration.lock" ]]; then
+  if [[ -n "${LOCK:-}" && -d "$LOCK" && "$LOCK" == "$MIX_ROOT/.1pcloop-runtimes-migration.lock" ]]; then
     rmdir "$LOCK" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM
-STAGE="$(mktemp -d "$RUNTIME_ROOT/.1pcloop-migration.XXXXXX")"
+STAGE="$(mktemp -d "$MIX_ROOT/.1pcloop-runtimes-stage.XXXXXX")"
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/1pcloop-migration.XXXXXX")"
 
 manifest_tree() {
@@ -201,8 +214,17 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 output = Path(sys.argv[2])
-selected = [root / "auth.json", root / "config.toml", root / "history.jsonl", root / "sessions", root / ".mix/accounts"]
-selected.extend(root.glob("state*.sqlite*"))
+selected = [
+    root / "auth.json",
+    root / "config.toml",
+    root / ".codex-global-state.json",
+    root / "history.jsonl",
+    root / "installation_id",
+    root / "sessions",
+    root / "archived_sessions",
+    root / ".mix/accounts",
+]
+selected.extend(sorted(root.glob("*.sqlite*")))
 rows = []
 for base in selected:
     if not base.exists() and not base.is_symlink():
@@ -246,6 +268,16 @@ cmp -s "$SCRATCH/reviewer-source.jsonl" "$SCRATCH/reviewer-target.jsonl" \
 cmp -s "$SCRATCH/executor-source.jsonl" "$SCRATCH/executor-target.jsonl" \
   || fail "Executor source/target manifest mismatch"
 
+python3 "$MIGRATION_HELPER" validate-copy \
+  --source-a "$EXECUTOR_SOURCE" \
+  --source-b "$REVIEWER_SOURCE" \
+  --vault-a "$MIX_ROOT/accounts/A/auth.json" \
+  --vault-b "$MIX_ROOT/accounts/B/auth.json" \
+  --target-reviewer "$STAGE/1pcloop-reviewer" \
+  --target-executor "$STAGE/1pcloop-executor" \
+  --reviewer-home "$REVIEWER_TARGET" \
+  --executor-home "$EXECUTOR_TARGET"
+
 reviewer_source_files="$(find "$REVIEWER_SOURCE" -type f | wc -l | tr -d ' ')"
 reviewer_target_files="$(find "$STAGE/1pcloop-reviewer" -type f | wc -l | tr -d ' ')"
 executor_source_files="$(find "$EXECUTOR_SOURCE" -type f | wc -l | tr -d ' ')"
@@ -264,13 +296,11 @@ manifest_protected_canonical_state "$SCRATCH/canonical-after.jsonl"
 cmp -s "$SCRATCH/canonical-before.jsonl" "$SCRATCH/canonical-after.jsonl" \
   || fail "canonical auth/config/state/history/sessions changed during migration"
 
-for target in "$REVIEWER_TARGET" "$EXECUTOR_TARGET"; do
-  [[ ! -e "$target" && ! -L "$target" ]] \
-    || fail "target appeared during migration: $target"
-done
-mv "$STAGE/1pcloop-reviewer" "$REVIEWER_TARGET"
-mv "$STAGE/1pcloop-executor" "$EXECUTOR_TARGET"
-rmdir "$STAGE"
+[[ ! -e "$RUNTIME_ROOT" && ! -L "$RUNTIME_ROOT" ]] \
+  || fail "dedicated runtime root appeared during migration"
+python3 "$MIGRATION_HELPER" publish-root \
+  --stage-root "$STAGE" \
+  --runtime-root "$RUNTIME_ROOT"
 STAGE=""
 
 reviewer_count="$(wc -l <"$SCRATCH/reviewer-target.jsonl" | tr -d ' ')"
