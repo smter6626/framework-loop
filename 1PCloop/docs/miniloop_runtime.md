@@ -91,6 +91,9 @@ black-box gate. The same test found a separate layout defect: the main window is
 tall for the available window bounds. That defect is not retroactively part of S2;
 the recommended next workload is bounded window height plus deliberate scrollable
 content placement before any separate merge/release decision.
+Target commit `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34` adds a compact
+target-side change record and updates the repository map, while this framework repo
+retains the authoritative orchestration Runtime and detailed evidence.
 Both steps use separate target worktrees and separate runs.
 The automatic Reviewer checks code logic and deterministic UI tests; real
 audio-to-transcript black-box testing belongs to the Human Owner. Task-local
