@@ -91,11 +91,11 @@
 {
   "active_step": {
     "id": "S2",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "b8e789c2331be4c34ffa1a2f18fa035206de32110e86cf732a1aa249fdcee2a5",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_session_ui_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
@@ -175,5 +175,71 @@
   "target_head": "d0f581bb70379239c3147e5c8469d2285ad6620b",
   "timestamp": "2026-09-18T12:37:41.143+00:00",
   "transition_id": "4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f"
+}
+```
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "3e1bae436c41eaee9b081d9e45121dae87d9ebf0cc878e3fb165d9aa34555579",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "cb4261825b7d51d3ec33a97e083683c50e6b9e82",
+      "sha256": "fe122dd6132b2eaecc8634654c3a22363ed1e4cf9570ac2b3f3e967df3a6e4f5"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/ui_app.py",
+      "sha256": "2f148857e38583e5372165c72d217566c65c69b72805f6821df6578b13ef75b0"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/transcription_controller.py",
+      "sha256": "3221797e4a767f6a4f4d43a4b793f0c210cae32c7d73728db68a4b0e062c88df"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/testCodes/test_session_clipboard_ui.py",
+      "sha256": "7eb1e47edbd47ec8ea91f774b1b2802bf3001f95f050289cf4d988bcce72dfc0"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260918T125410Z-30917/cycle-01/executor/events.jsonl",
+      "sha256": "81dab58b9dd2e8f4f4bba2f958c1c88d285f370e7af068174963e26c6959c64d"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260918T125410Z-30917/cycle-01/executor/process.json",
+      "sha256": "05e43c03f1fa54d91cfb5d8b4040d86a034f738e8727433382ec458fd425f537"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "S2",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "b8e789c2331be4c34ffa1a2f18fa035206de32110e86cf732a1aa249fdcee2a5",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_session_ui_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "S2",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_session_ui_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260918T125410Z-30917/cycle-01/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "0c448e1074fe90f42b28e519c29ea7b716ed4fb8367848e36a7fa8549695e9a4",
+  "schema_version": 1,
+  "target_head": "cb4261825b7d51d3ec33a97e083683c50e6b9e82",
+  "timestamp": "2026-09-18T13:10:17.955+00:00",
+  "transition_id": "b8e789c2331be4c34ffa1a2f18fa035206de32110e86cf732a1aa249fdcee2a5"
 }
 ```
