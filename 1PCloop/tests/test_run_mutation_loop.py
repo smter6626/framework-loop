@@ -39,6 +39,7 @@ if args == ["--version"]:
 prompt = sys.stdin.buffer.read()
 output_path = Path(args[args.index("--output-last-message") + 1])
 home = Path(os.environ["CODEX_HOME"])
+assert os.environ["CODEX_SQLITE_HOME"] == str(home)
 scenario = os.environ.get("P5_TEST_SCENARIO", "no-op")
 is_reviewer = home.name == "reviewer-home"
 is_executor = home.name == "executor-home"

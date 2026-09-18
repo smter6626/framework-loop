@@ -157,6 +157,7 @@ class OperatorCliTests(unittest.TestCase):
             version = json.loads(json.dumps(original)); version["schema_version"] = 2; invalid_values.append(version)
             wrong = json.loads(json.dumps(original)); wrong["execution"]["max_cycles"] = True; invalid_values.append(wrong)
             home = json.loads(json.dumps(original)); home["profiles"]["executor_home"] = home["profiles"]["reviewer_home"]; invalid_values.append(home)
+            retired = json.loads(json.dumps(original)); retired["profiles"]["reviewer_home"] = str(Path.home() / ".codex-B"); invalid_values.append(retired)
             secret = json.loads(json.dumps(original)); secret["token"] = "do-not-store"; invalid_values.append(secret)
             tilde = json.loads(json.dumps(original)); tilde["target"]["repo"] = "~/target"; invalid_values.append(tilde)
             for index, value in enumerate(invalid_values):

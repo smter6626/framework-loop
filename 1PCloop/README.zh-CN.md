@@ -87,16 +87,18 @@ evidence 和恢复合同。目标扩展和已实现基础的对应关系见[中�
 默认角色绑定：
 
 ```text
-Reviewer = CODEX_HOME=/Users/smterpro/.codex-B
-Executor = CODEX_HOME=/Users/smterpro/.codex-A
+Reviewer = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer
+Executor = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor
 ```
 
 角色由职责、权限和 session state 定义，不由模型名称定义。Reviewer 和 Executor 可以使用相同或
 不同模型。实际使用中建议 Reviewer 的模型能力和 reasoning effort 不低于 Executor，复杂或高风险
 任务可以给 Reviewer 更强配置；这只是运行建议，不能替代 evidence 和机械校验。
 
-`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不参与 identity 判定。每次 CLI
-invocation 都显式设置目标 `CODEX_HOME`。
+`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不参与 role identity 判定。每次 CLI
+invocation 都显式设置目标 `CODEX_HOME`。A-D 是 account identity，不是 Reviewer/Executor role；历史
+`~/.codex-A` 和 `~/.codex-B` 不再允许作为 live runtime。完整边界和未执行的迁移流程见
+[Codex Mix runtime-home 迁移说明](docs/codex-runtime-homes/README.md)。
 
 ## 安装
 

@@ -11,7 +11,7 @@ import json
 import unicodedata
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 
 SCRIPT_PATH = Path(__file__).resolve()
@@ -38,9 +38,40 @@ FINAL_RESULT_FIELDS = (
     "run_root",
 )
 
+CANONICAL_CODEX_HOME = Path.home() / ".codex-mix"
+ROLE_RUNTIME_ROOT = CANONICAL_CODEX_HOME / ".mix" / "runtimes"
+DEFAULT_REVIEWER_HOME = ROLE_RUNTIME_ROOT / "1pcloop-reviewer"
+DEFAULT_EXECUTOR_HOME = ROLE_RUNTIME_ROOT / "1pcloop-executor"
+RETIRED_CODEX_HOMES = (
+    Path.home() / ".codex-A",
+    Path.home() / ".codex-B",
+)
+
 
 class InvariantViolation(RuntimeError):
     """A mechanical invariant failed and the loop must not continue."""
+
+
+def _same_or_descendant(path: Path, boundary: Path) -> bool:
+    return path == boundary or boundary in path.parents
+
+
+def validate_role_runtime_homes(
+    reviewer_home: Path, executor_home: Path
+) -> Tuple[Path, Path]:
+    """Resolve role homes and reject retired account-identity directories."""
+    reviewer = reviewer_home.resolve()
+    executor = executor_home.resolve()
+    if reviewer == executor:
+        raise InvariantViolation("Reviewer and Executor profiles must be distinct")
+    for role, selected in (("Reviewer", reviewer), ("Executor", executor)):
+        for retired in RETIRED_CODEX_HOMES:
+            retired_resolved = retired.resolve()
+            if _same_or_descendant(selected, retired_resolved):
+                raise InvariantViolation(
+                    f"{role} CODEX_HOME resolves inside a retired account home"
+                )
+    return reviewer, executor
 
 
 class ControlErrorCode(str, Enum):

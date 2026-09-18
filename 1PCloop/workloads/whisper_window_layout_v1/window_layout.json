@@ -13,8 +13,8 @@
     "framework_runtime": "../../docs/miniloop_runtime.md"
   },
   "profiles": {
-    "reviewer_home": "/Users/smterpro/.codex-B",
-    "executor_home": "/Users/smterpro/.codex-A"
+    "reviewer_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer",
+    "executor_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor"
   },
   "execution": {
     "codex_bin": "codex",

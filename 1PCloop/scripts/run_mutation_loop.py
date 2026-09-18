@@ -35,8 +35,6 @@ DEFAULT_STATE_ROOT = ACTIVE_ROOT / ".local" / "state"
 DEFAULT_SUMMARY_ROOT = ACTIVE_ROOT / "evidence-summaries"
 DEFAULT_FRAMEWORK_STATIC = ACTIVE_ROOT / "docs/miniloop_static.md"
 DEFAULT_FRAMEWORK_RUNTIME = ACTIVE_ROOT / "docs/miniloop_runtime.md"
-DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
-DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
 RUNTIME_STATE_BEGIN = b"<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->"
 RUNTIME_STATE_END = b"<!-- 1PCLOOP_RUNTIME_STATE_END -->"
 
@@ -102,6 +100,8 @@ def load_contract_helpers() -> ModuleType:
 
 
 CONTRACTS = load_contract_helpers()
+DEFAULT_REVIEWER_HOME = CONTRACTS.DEFAULT_REVIEWER_HOME
+DEFAULT_EXECUTOR_HOME = CONTRACTS.DEFAULT_EXECUTOR_HOME
 SCHEMAS_ROOT = CONTRACTS.SCHEMAS_ROOT
 REVIEWER_INSTRUCTION = CONTRACTS.REVIEWER_INSTRUCTION
 EXECUTOR_RECEIPT = CONTRACTS.EXECUTOR_RECEIPT
@@ -126,6 +126,7 @@ validate_json_schema = CONTRACTS.validate_json_schema
 schema_path = CONTRACTS.schema_path
 validate_turn_payload = CONTRACTS.validate_turn_payload
 validate_verdict_relationships = CONTRACTS.validate_verdict_relationships
+validate_role_runtime_homes = CONTRACTS.validate_role_runtime_homes
 
 
 def load_p4_helpers() -> ModuleType:
@@ -1349,6 +1350,7 @@ def run_codex_turn(
     )
     environment = os.environ.copy()
     environment["CODEX_HOME"] = str(codex_home)
+    environment["CODEX_SQLITE_HOME"] = str(codex_home)
     started_at = P4.utc_now()
     started_monotonic = time.monotonic()
     exit_code: Optional[int] = None
@@ -1440,6 +1442,7 @@ def run_codex_turn(
         "cache_write_input_tokens": event_metadata["cache_write_input_tokens"],
         "cached_input_tokens": event_metadata["cached_input_tokens"],
         "codex_home": str(codex_home),
+        "codex_sqlite_home": str(codex_home),
         "command": command,
         "created_thread_id": created_thread_id,
         "duration_seconds": duration,
@@ -2193,8 +2196,7 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
     validate_json_schema({}, {"type": "object"})
     for name in TURN_SCHEMAS:
         strict_json(schema_path(name).read_bytes())
-    if args.reviewer_home.resolve() == args.executor_home.resolve():
-        raise InvariantViolation("Reviewer and Executor profiles must be distinct")
+    validate_role_runtime_homes(args.reviewer_home, args.executor_home)
     if getattr(args, "enable_runtime_transition", False):
         validate_runtime_destination(args)
     for label, home in (

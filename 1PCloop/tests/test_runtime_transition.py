@@ -450,6 +450,11 @@ class RuntimeTransitionTests(unittest.TestCase):
             args.reviewer_home = args.executor_home
             with self.assertRaisesRegex(M.InvariantViolation, "profiles must be distinct"):
                 M.validate_preflight(args)
+        with tempfile.TemporaryDirectory() as tmp:
+            args, _ = self.fixture(Path(tmp))
+            args.reviewer_home = Path.home() / ".codex-B"
+            with self.assertRaisesRegex(M.InvariantViolation, "retired account home"):
+                M.validate_preflight(args)
 
 
 if __name__ == "__main__":

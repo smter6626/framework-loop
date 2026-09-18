@@ -22,8 +22,9 @@ from typing import Any, Dict, List, Optional, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_ROOT = REPO_ROOT / "1PCloop"
 DEFAULT_RUNS_ROOT = ACTIVE_ROOT / "runs"
-DEFAULT_REVIEWER_HOME = Path("/Users/smterpro/.codex-B")
-DEFAULT_EXECUTOR_HOME = Path("/Users/smterpro/.codex-A")
+DEFAULT_REVIEWER_HOME = Path.home() / ".codex-mix/.mix/runtimes/1pcloop-reviewer"
+DEFAULT_EXECUTOR_HOME = Path.home() / ".codex-mix/.mix/runtimes/1pcloop-executor"
+RETIRED_CODEX_HOMES = (Path.home() / ".codex-A", Path.home() / ".codex-B")
 PEER_MARKER = b"\n\n--- BEGIN VERBATIM PEER PAYLOAD ---\n"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 EXPERIMENT_ID_PATTERN = RUN_ID_PATTERN
@@ -887,6 +888,7 @@ def run_turn(
     )
     environment = os.environ.copy()
     environment["CODEX_HOME"] = str(codex_home)
+    environment["CODEX_SQLITE_HOME"] = str(codex_home)
 
     started_at = utc_now()
     started_monotonic = time.monotonic()
@@ -960,6 +962,7 @@ def run_turn(
     process: Dict[str, Any] = {
         "authoritative_context": authoritative_evidence,
         "codex_home": str(codex_home),
+        "codex_sqlite_home": str(codex_home),
         "created_thread_id": created_thread_id,
         "cache_hit_ratio": event_metadata["cache_hit_ratio"],
         "cache_write_input_tokens": event_metadata["cache_write_input_tokens"],
@@ -1332,6 +1335,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     runs_root = args.runs_root.resolve()
     reviewer_home = args.reviewer_home.resolve()
     executor_home = args.executor_home.resolve()
+    if reviewer_home == executor_home:
+        raise SystemExit("Reviewer and Executor profiles must be distinct")
+    for role, selected in (("Reviewer", reviewer_home), ("Executor", executor_home)):
+        if any(
+            selected == retired.resolve() or retired.resolve() in selected.parents
+            for retired in RETIRED_CODEX_HOMES
+        ):
+            raise SystemExit(
+                f"{role} CODEX_HOME resolves inside a retired account home"
+            )
     experiment: Optional[Dict[str, Any]] = None
     experiment_run_index: Optional[int] = None
     experiment_file: Optional[Path] = None

@@ -94,8 +94,8 @@ The default configuration targets:
 Default role binding:
 
 ```text
-Reviewer = CODEX_HOME=/Users/smterpro/.codex-B
-Executor = CODEX_HOME=/Users/smterpro/.codex-A
+Reviewer = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer
+Executor = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor
 ```
 
 Roles are defined by responsibilities, authority, and session state—not by model names. Reviewer
@@ -105,7 +105,10 @@ high-risk work. This is operational guidance, not a replacement for evidence and
 validation.
 
 The `~/.codex` symlink, the foreground Codex GUI account, and open GUI windows do not select role
-identity. Every invocation binds the intended `CODEX_HOME` explicitly.
+identity. Every invocation binds the intended `CODEX_HOME` explicitly. Account labels A-D are
+credential identities, not Reviewer/Executor roles. Historical `~/.codex-A` and `~/.codex-B`
+homes are rejected as live role runtimes. See the
+[Codex Mix runtime-home migration guide](docs/codex-runtime-homes/README.md).
 
 ## Installation
 

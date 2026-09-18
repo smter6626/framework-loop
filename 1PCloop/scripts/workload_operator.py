@@ -264,10 +264,13 @@ def load_config(path: Path) -> WorkloadConfig:
     }
     if type(resolved["execution"]["enable_runtime_transition"]) is not bool:
         raise OperatorError("execution.enable_runtime_transition must be boolean")
-    if Path(resolved["profiles"]["reviewer_home"]) == Path(
-        resolved["profiles"]["executor_home"]
-    ):
-        raise OperatorError("Reviewer and Executor profiles must be distinct")
+    try:
+        RUNNER.validate_role_runtime_homes(
+            Path(resolved["profiles"]["reviewer_home"]),
+            Path(resolved["profiles"]["executor_home"]),
+        )
+    except RUNNER.InvariantViolation as exc:
+        raise OperatorError(str(exc)) from exc
     push_ref = resolved["framework_git"]["push_ref"]
     if not push_ref.startswith("refs/heads/"):
         raise OperatorError("framework_git.push_ref must name refs/heads")
@@ -708,8 +711,12 @@ def doctor(config: WorkloadConfig) -> Dict[str, Any]:
         return "codex-version-readable"
 
     def profiles_check() -> str:
-        if args.reviewer_home.resolve() == args.executor_home.resolve():
-            raise OperatorError("profiles overlap")
+        try:
+            RUNNER.validate_role_runtime_homes(
+                args.reviewer_home, args.executor_home
+            )
+        except RUNNER.InvariantViolation as exc:
+            raise OperatorError(str(exc)) from exc
         if not args.reviewer_home.is_dir() or not args.executor_home.is_dir():
             raise OperatorError("profile missing")
         return "distinct-profile-directories"

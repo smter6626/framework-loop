@@ -27,6 +27,7 @@ args = sys.argv[1:]
 output_path = Path(args[args.index("--output-last-message") + 1])
 prompt = sys.stdin.buffer.read()
 home = os.environ["CODEX_HOME"]
+assert os.environ["CODEX_SQLITE_HOME"] == home
 binary_name = Path(sys.argv[0]).name
 is_resume = "resume" in args
 
@@ -73,6 +74,27 @@ print(json.dumps({
 
 
 class TextLoopTests(unittest.TestCase):
+    def test_legacy_entrypoint_rejects_retired_runtime_home(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            retired = root / "retired-A"
+            executor = root / "executor"
+            for path in (repo, retired, executor):
+                path.mkdir()
+            original = MODULE.RETIRED_CODEX_HOMES
+            MODULE.RETIRED_CODEX_HOMES = (retired, root / "retired-B")
+            try:
+                with self.assertRaisesRegex(SystemExit, "retired account home"):
+                    MODULE.main([
+                        "--repo-root", str(repo),
+                        "--runs-root", str(root / "runs"),
+                        "--reviewer-home", str(retired),
+                        "--executor-home", str(executor),
+                    ])
+            finally:
+                MODULE.RETIRED_CODEX_HOMES = original
+
     def run_fake_loop(self, root, *, binary_name="codex", session_mode=None):
         repo_root = root / "repo"
         runs_root = root / "runs"

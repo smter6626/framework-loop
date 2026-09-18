@@ -47,6 +47,7 @@ EXTRACTED = (
     "schema_path",
     "validate_turn_payload",
     "validate_verdict_relationships",
+    "validate_role_runtime_homes",
 )
 
 
@@ -156,6 +157,37 @@ class MutationContractTests(unittest.TestCase):
             len(CONTRACTS.bounded_public_reason(secret, "KNOWN")),
             CONTRACTS.MAX_PUBLIC_REASON_CHARS,
         )
+
+    def test_role_runtime_homes_reject_retired_roots_and_aliases(self):
+        allowed_reviewer = Path.home() / ".codex-mix/.mix/runtimes/reviewer"
+        allowed_executor = Path.home() / ".codex-mix/.mix/runtimes/executor"
+        self.assertEqual(
+            CONTRACTS.validate_role_runtime_homes(
+                allowed_reviewer, allowed_executor
+            ),
+            (allowed_reviewer.resolve(), allowed_executor.resolve()),
+        )
+        for retired in CONTRACTS.RETIRED_CODEX_HOMES:
+            with self.subTest(retired=retired), self.assertRaisesRegex(
+                CONTRACTS.InvariantViolation, "retired account home"
+            ):
+                CONTRACTS.validate_role_runtime_homes(
+                    retired, allowed_executor
+                )
+            with self.subTest(descendant=retired), self.assertRaisesRegex(
+                CONTRACTS.InvariantViolation, "retired account home"
+            ):
+                CONTRACTS.validate_role_runtime_homes(
+                    allowed_reviewer, retired / "nested"
+                )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            alias = Path(temporary) / "reviewer-alias"
+            alias.symlink_to(CONTRACTS.RETIRED_CODEX_HOMES[1], target_is_directory=True)
+            with self.assertRaisesRegex(
+                CONTRACTS.InvariantViolation, "retired account home"
+            ):
+                CONTRACTS.validate_role_runtime_homes(alias, allowed_executor)
 
     def test_orchestrate_remains_only_mutation_state_machine(self):
         modules = {
