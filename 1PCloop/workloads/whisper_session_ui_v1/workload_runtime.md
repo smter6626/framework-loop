@@ -3,13 +3,13 @@
 ## 1. Current Status
 
 - Task ID: `whisper_session_ui_v1`
-- 状态: `ACTIVE`
-- 当前 verdict: `NOT EVALUATED`
-- 唯一 Active Step: `Step 2 -- 多语言版本上的会话 UI 与剪切板改进`
+- 状态: `AUTOMATED STEPS COMPLETED / HUMAN BLACK-BOX PENDING`
+- 当前 verdict: `S2 INDEPENDENTLY ACCEPTED`
+- 唯一 Active Step: 无。S1 和 S2 均已完成；当前仅剩 Human Owner 真实音频黑盒验证。
 - Step 1: `ACCEPTED / TARGET MAIN PUSHED`
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_session_ui_v1/workload_static.md`；SHA-256 `a361cf58b123db786505e12daec1673b39be5b1114d49b62d7b5779fffcc6d08`
-- 当前证据快照: Step 1 target/framework evidence 已发布；Step 2 target branch `codex/session-clipboard-ui-v1`，baseline `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9`
+- 当前证据快照: Step 1 target/framework evidence 已发布；Step 2 target commit `cb4261825b7d51d3ec33a97e083683c50e6b9e82` 已由 1PCloop Reviewer ACCEPT，framework evidence 已发布，target branch `codex/session-clipboard-ui-v1` 已推送。
 - 最后更新: 2026-09-18
 
 ## 2. Completed
@@ -17,8 +17,9 @@
 - 治理启动: Human Owner 授权创建功能分支和中文 Static/Runtime，并明确仓库整理及 UI 实现应由 1PCloop 执行。本项不是 Step 1 的实现或验收。
 - 分支准备: `codex/session-clipboard-ui-v1` 从 `multiLanguage_v1` 的 `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9` 创建；没有 UI 代码提交。原 streaming branch 保持不变。
 - Step 1 -- streaming 文档整理: target commit `d0f581bb70379239c3147e5c8469d2285ad6620b` 将三份固定来源文档逐字节归档到 `main`，增加归档 landing page 与准确导航，不包含代码实现。1PCloop Reviewer `ACCEPT`，machine transition ID `4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f`；framework evidence commit `19b1fa49649d556dd88cf4766d541af4ab15dd23` 已推送。Human-facing independent review 复核三个 source blob/SHA、27/27 链接、7-file allowlist、边界文案和 commit ancestry 后 ACCEPT；target `main` 已普通 non-force push，local/origin/GitHub ref 均为 `d0f581b...`。
+- Step 2 -- 会话 UI 与剪切板改进: target commit `cb4261825b7d51d3ec33a97e083683c50e6b9e82` 是授权 baseline `1e0cdd9fda1870a8277a553c3f7af7cc67480fe9` 的唯一直接后继。实现 Clean TXT 绝对路径复制、新会话成功后清屏和旧事件隔离、按成功复制断点复制新增 Clean 文本，以及中文 `语言/Language` label。Executor 报告 focused 9/9、full discovery 117/117 和 UI support 22/22；同一 persistent Reviewer 独立复跑 focused/related 20/20、full discovery 117/117 和 UI support 22/22 后给出 `ACCEPT`。机器 transition ID 为 `b8e789c2331be4c34ffa1a2f18fa035206de32110e86cf732a1aa249fdcee2a5`，framework evidence commit `46461ad0073bdaae8ef32815a31778857fd35933` 已推送。Human-facing final review 另跑 focused UI/language 15/15，核对 branch ancestry、clean worktree、status/inspect PASS 后 ACCEPT；target feature branch 已普通 non-force push，local/origin/GitHub ref 均为 `cb42618...`。
 
-## 3. Active Step
+## 3. Completed Step Definition
 
 ### Step 2 -- 多语言版本上的会话 UI 与剪切板改进
 
@@ -37,26 +38,26 @@
 
 | 验收条件 | 直接 evidence | 充分性判断 | 结果 |
 | --- | --- | --- | --- |
-| AC-02 至 AC-07 -- UI 实现与回归 | 尚无 Step 2 实现提交 | 尚不可判断 | INSUFFICIENT |
+| AC-02 至 AC-07 -- UI 实现与回归 | target commit `cb4261825b7d51d3ec33a97e083683c50e6b9e82`；run `20260918T125410Z-30917`；framework summary `1PCloop/evidence-summaries/20260918T125410Z-30917.md`；自动回归及 Human-facing focused 15/15 | 足以验收代码逻辑和模拟/offscreen UI 行为；不包含真实音频黑盒 | ACCEPT |
 
-- 独立 evidence access: `NOT APPLICABLE -- 尚未执行 Step 2`
-- 独立 verdict formation: `NOT APPLICABLE`
-- 独立 evidence-sufficiency judgment: `NOT APPLICABLE`
-- Review verdict: `NOT EVALUATED`
+- 独立 evidence access: `PASS -- raw evidence available，status/inspect 均 PASS，target evidence VALID`
+- 独立 verdict formation: `PASS -- Reviewer 直接检查 commit、代码、测试与 branch 状态，并独立复跑测试`
+- 独立 evidence-sufficiency judgment: `PASS FOR WHITE-BOX AND SIMULATED UI SCOPE`
+- Review verdict: `ACCEPT S2`
 - Review limitations: 真实录音测试由 Human Owner 后续执行，不是自动 Step 2 ACCEPT 的 claim。
 
 ## 5. State Transition
 
-- Previous state: `Step 1 COMPLETED / transition disabled`。
-- Triggering evidence and Human decision: Step 1 机器 ACCEPT/evidence publication、Human-facing independent re-review、target main push 全部完成；2026-09-18 Human Owner 明确“可以，启动 S2”。
-- Current state: `ACTIVE / Step 2`。
-- Meaning: 仅允许在预先创建的 `multiLanguage_v1` 派生分支执行 Static 已授权的四项 UI 改动；不重开 Step 1。
-- Transition authorized by: Human Owner。
+- Previous state: `Step 2 ACTIVE / reviewer_accept_once`。
+- Triggering evidence and Human decision: Reviewer 对 target commit `cb42618...` 给出 schema-valid `ACCEPT`，Runtime transition 和 framework evidence publication 均成功；Human-facing final review 通过并依 standing authorization 推送 target feature branch。
+- Current state: `S2 COMPLETED / transition disabled / HUMAN BLACK-BOX PENDING`。
+- Meaning: 自动实现和白盒/模拟测试范围已关闭；不得重跑 S2 或将其描述为真实录音黑盒通过。
+- Transition authorized by: S2 machine capability gate、独立 Reviewer verdict 和 Human Owner 的预授权 push 规则。
 
 ## 6. Blockers and Human Decision Gates
 
-- 当前 blocker: 无。
-- Human Gate: 变更 Static/locked plan、扩大 target branch 范围、merge/release/tag/force、改 streaming backend 或需真实音频黑盒结论时暂停并请 Human 决定。
+- 当前 blocker: 无自动实现 blocker。
+- Human Gate: 由 Human Owner 执行真实 macOS 录音和剪贴板黑盒检查；merge、release、tag、force、改 streaming backend 或扩大范围仍须另行授权。
 
 ## 7. Residual Validation Items
 
@@ -64,9 +65,9 @@
 
 ## 8. Pending Tasks -- Non-blocking Blocks
 
-- 当前顶层 Step: `2`。
+- 当前顶层 Step: 无 active machine step；S2 已完成。
 - 无需以倒计时管理的非阻塞 block。人工黑盒属于明确的最终 Human 验证门，见第 7 节，不因 Step 1 -> Step 2 迁移而消失。
-- Pending Gate Check: Step 2 激活前置项已全部满足，`Gate verdict: CLEAR`。任务最终关闭前仍须披露 Human 黑盒结果为 pending 或已完成。
+- Pending Gate Check: `HUMAN BLACK-BOX PENDING`。任务最终关闭前须记录真实录音、重新 Start 清屏、路径复制和增量文本复制结果。
 
 ## 9. Superseded Decisions
 
@@ -74,16 +75,13 @@
 
 ## 10. Next Direction
 
-- 使用 `feature_ui.json` 启动新的 config-bound run。Step 2 自动 ACCEPT 后，只可报告代码逻辑/自动测试结论并普通 push 功能分支；真实录音黑盒仍待 Human Owner。
+- 不再启动新的 S2 run。下一步由 Human Owner 在 target feature branch 构建/启动 App，执行真实录音和剪贴板黑盒；通过后再决定 merge/release，失败则以新缺陷或新 step 明确记录。
 
-## 11. Current Executor Handoff
+## 11. Current Human Handoff
 
-- 本轮唯一任务: 实现并测试 Static 第 3 节定义的四项会话 UI/剪切板行为。
-- 必须读取: 本 Static/Runtime、`ui_app.py`、controller/session/store 相关代码、现有 UI/output-root tests 与双语 README。
-- 可以修改: Step 2 Permitted changes 内的代码、测试和必要说明。
-- 不得修改: Static/Runtime、streaming backend、模型/语言识别逻辑、原 streaming branch、历史 session/evidence。
-- 必须返回: 完整 target commit、changed-file list、代码/测试 artifact 的绝对 locator 与 SHA、targeted/full regression 结果、branch/parent/clean status和 limitations。
-- 完成后停止于: `AWAITING_REVIEW`。
+- 当前任务: 对 `codex/session-clipboard-ui-v1` 的 `cb42618...` 执行真实 macOS 黑盒。
+- 必测行为: 第一次录音产生文字；Stop 后显示保留；第二次 Start 后旧表格自动清空；复制 Clean TXT 路径得到当前 session 的绝对路径；首次复制新增文本得到当前全部 Clean 行，新增行后再次复制只得到新增切片；无新增行时剪贴板保持不变；中英文切换后 label 正确。
+- 必须记录: App 启动方式、测试环境、通过/失败项和可复现问题。真实音频质量本身不属于本次 UI 逻辑的自动 ACCEPT claim。
 
 ## Machine-owned State
 
