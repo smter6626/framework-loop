@@ -4,15 +4,15 @@
 
 - Task ID：`foundation_v1`
 - 状态：`ACTIVE`
-- 当前 verdict：`REJECTED -- SECOND NARROW REPAIR REQUIRED`
-- 最近接受：`F5 -- ACCEPTED AFTER INDEPENDENT RE-REVIEW`
-- 唯一 Active Step：`F6 -- 本地只读 TUI`
-- 当前顶层 Step：`Step 6`
+- 当前 verdict：`NOT EVALUATED`
+- 最近接受：`F6 -- ACCEPTED AFTER SECOND INDEPENDENT RE-REVIEW`
+- 唯一 Active Step：`F7 -- post-foundation real-service smoke`
+- 当前顶层 Step：`Step 7`
 - Static identity：
   - path：`1PCloop/workloads/foundation_v1/workload_static.md`
   - SHA-256：`0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`
 - 当前执行方式：Human-mediated Reviewer/Executor
-- 最后更新：`2026-09-17`
+- 最后更新：`2026-09-18`
 
 本 Runtime 是 foundation_v1 的详细进度权威来源。全局 Runtime 只保留当前 task 指针与高层
 transition。本文件不包含 `1PCLOOP_RUNTIME_STATE` machine block；现有 runner 禁止 framework
@@ -232,113 +232,147 @@ Runtime。Event SHA-256 是 canonical byte identity，不是 keyed authority；c
 当前语义：Static AC-07、AC-08 与 AC-11 在 F5 范围内有充分 evidence。首次 REJECT 与
 repair/re-review 链保留于 §8；F5 文件默认冻结，F6 不重开其 control contract。
 
+### H. F6 -- 本地只读 TUI
+
+状态：`ACCEPTED AFTER TWO REJECTS -> TWO NARROW REPAIRS -> SECOND INDEPENDENT RE-REVIEW`
+
+结果：
+
+- implementation commit `79eacb69f104314b3f6149192c792111b2bb3982` 增加 config-backed
+  `tui`、独立 presenter/data source 和只读本地终端界面；只消费 F2/F3/F5 结构化投影；
+- 第一次独立审核发现 no-checkpoint 启动竞争被误判为稳定缺失，且 Unicode `Zl/Zp` 未转义；首次
+  REJECT 及其全绿测试记录于治理 commit `e2e15f4b68ab95eeefbfad9c7096dd5e621f16e1`；
+- first repair commit `004364290b39d94274b1816c18040fe912f883cf` 关闭 Unicode 和合法
+  new-run 竞争问题，但 `inspect` 的 generic identity failure 仍无法证明 checkpoint 缺失；第二次
+  REJECT 及其全绿测试记录于治理 commit `36ca71ca7e88c79eb8e02ff36c1bfd6207db2b25`；
+- second repair commit `397fb36c86aef02ea28d0f150e27ae826b53a1c5` 仅对精确 no-checkpoint
+  候选增加 `status_before -> inspect -> status_after` 顺序确认。前后 status、config/locator 及
+  inspect 必须一致；generic identity failure 单独不足以证明缺失。任何中途出现的 malformed、
+  identity-invalid 或合法新 run 均显示 `SNAPSHOT UNAVAILABLE` 且隐藏 recovery actions。
+
+独立 second re-review evidence：
+
+- Executor second repair F6 focused `19 / 19`，`6.366s`；F2/F3/F5 focused `76 / 76`，
+  `110.581s`；完整 ResourceWarning-strict regression `197 / 197`，`253.520s`；
+- Reviewer 独立 F6 focused `19 / 19`，`6.030s`；完整 ResourceWarning-strict regression
+  `197 / 197`，`274.691s`；
+- Reviewer 用真实 disposable operator 重放先读 no-checkpoint、随后写入 `{}` checkpoint 的原
+  blocker：读取顺序为三次，第二次 status 返回 `FAIL`，TUI 显示 `SNAPSHOT UNAVAILABLE`，不显示
+  recovery action；原 Unicode 边界仍由 focused suite 覆盖；
+- branch/local HEAD/origin/GitHub ref 在审核时均为 second repair commit，工作树 clean；仅四个
+  授权文件变化，Static hash 与 `git diff --check` 通过；
+- 未运行真实 Codex service；F7 负责完整闭环。三次读取只是 single-writer 边界内的顺序确认，
+  不是原子快照或并发协议，不阻塞 F6 的只读 TUI 验收。
+
+当前语义：Static AC-09 已满足；两次 REJECT、两次 repair 和全部测试全绿后仍被独立审核打回的
+provenance 保留于 §8。F6 文件默认冻结，F7 不重开已接受的 TUI/control contract。
+
 ## 3. Active Step
 
-### F6 / Step 6 -- 本地只读 TUI
+### F7 / Step 7 -- 完整 post-foundation real-service smoke
 
 #### Objective
 
-提供 macOS 本地终端中的可用 TUI dashboard，让 Human operator 不必从原始日志推断运行位置。
-界面只读展示 F2 structured progress、F3 operator status/inspect 和 F5 Human Gate projection；
-可以刷新、切换视图和退出，但不启动或恢复 Agent、不替 Human 选择 gate action。`run`/`resume`
-继续使用现有 CLI。F6 不引入 Codex GUI automation、Web UI 或并发控制。
+在 disposable target/framework Git 仓库和本地 bare remotes 中，使用真实 Codex service 与
+不同 Reviewer/Executor profile 运行 bounded mutation loop，验证 F1-F6 集成后的合法 `ACCEPT`
+闭环。Static AC-10 的核心结果是 authoritative Runtime transition、framework summary commit/push
+均完成，target remote 保持原 baseline。F7 是真实服务验证，不是 P7 fault injection 或 self-hosting。
 
 #### Inputs 及固定 identity
 
 - Static：`1PCloop/workloads/foundation_v1/workload_static.md`，SHA-256
   `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e`；
-- F2 accepted `control-events.jsonl`、`live-status.json`、timer/last-activity semantics；
-- F3 accepted strict workload config、`status`/`inspect` 和 safe-next-action；
-- F5 accepted nested Human Gate projection 和 shared authoritative-integrity checks，repair commit
-  `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0`；
-- `1PCloop/scripts/onepcloop.py`、`workload_operator.py`、`progress_status.py`、`human_gate.py`、
-  双语 README 及相关 tests；
-- Static AC-04、AC-05、AC-09、AC-11。
+- F1-F6 accepted implementation、当前双语 README、`onepcloop.py` help/config contract、
+  `run_mutation_loop.py` 和相应 machine Runtime transition/evidence publication contract；
+- post-P6 失败闭环的对照 evidence：
+  `1PCloop/evidence-summaries/post-p6-foundation-smoke-20260912.md`；
+- 已存在且不同的本机 Reviewer/Executor Codex profiles；profile credential/auth 内容不进入 tracked
+  evidence。实际 CLI 选项由本机 `--help` 和代码确认，不在本 Runtime 中猜测。
 
 #### Permitted changes
 
-- 新增独立 TUI/presenter module 与对应 tests；
-- 在 `onepcloop.py` 增加 config-backed `tui` 入口；必要时增加只读 operator adapter，但不得
-  改变 `status`、`inspect`、`human-gate` 的现有 JSON/output contract；
-- 更新双语 README，说明启动、键位、刷新、非 TTY、缺失 evidence、退出与安全边界；
-- 使用 Python 3.9/macOS 可用的本地终端能力；优先标准库，不新增依赖，除非有直接必要性
-  evidence 并单独说明。
+- 在经确认的 disposable 路径创建小型 target/framework repos、bare remotes、workload config、
+  machine Runtime 和最小目标任务；保留 raw evidence 于本地 ignored/disposable storage；
+- 在 framework 源仓库新增一份不含 prompt、secret、stderr 或完整 raw payload 的 compact smoke
+  evidence summary，并提交、普通 non-force push；如 source repo 不需要修改，不得为了提交而修改；
+- 运行只读 `doctor/preflight/status/inspect/human-gate` 和适用的 TUI 验证，必要时对同一 run
+  使用既有安全 `resume`；按最终状态保留失败证据与精确 blocker。
 
 #### Prohibited changes
 
-- 全局/task-local Static/Runtime、schema、roles、requirements、templates 和历史 evidence；
-- 修改 F1-F5/P4-P6 authoritative behavior、runner state machine、checkpoint/recovery、Runtime
-  transition、evidence publication 或 safe-next-action semantics；
-- 从 raw Codex events、prompt、peer_message、stderr、命令输出或自然语言猜测 UI/control state；
-- TUI 写入 checkpoint、event/status、summary、target/framework Git，或自动运行 `run`/`resume`、
-  finalization、Human Gate action、repair；
-- F7 real-service smoke、F8 GUI/治理压缩、P7、self-hosting、lock/watcher/concurrency、外部 Tools
-  或 closed workload mutation、force push/history rewrite。
+- 修改全局/task-local Static/Runtime、已接受的 F1-F6 代码/测试/README、schema、roles、templates、
+  closed workload 或真实 target；若真实 smoke 暴露 bug，停止并报告，不在 F7 smoke 内顺手修复；
+- 向 target remote push、对 source GitHub remote 做测试 push、force push、history rewrite、
+  人为注入 REJECT/错误、kill-9 或 P7 fault injection；
+- 把 raw Codex event、prompt、peer payload、credential、hidden reasoning、stderr 或完整 checkpoint
+  内容写入 tracked summary；把 `PUSHED` 当作 logical success；
+- 扩大成 concurrency、GUI automation、self-hosting 或 F8 决策。
 
 #### Required evidence
 
-- event-source test 证明 presenter 只消费 F2/F3/F5 的 structured projections，不读取或解析
-  natural-language payload；
-- deterministic rendering/input tests 覆盖无 checkpoint、active turn、Human Gate、failed closed、
-  publication pending/completed、raw unavailable 和 identity INVALID；
-- run/stage elapsed、timeout remaining、last activity、cycle/role/state、target HEAD、logical outcome、
-  Runtime transition、evidence publication 与 gate recovery/action 分层可见；
-- 非 TTY、窄终端、终端 resize、退出/异常清理有明确且可测试行为；刷新有界，不 busy-loop；
-- 两次只读 UI refresh 前后 checkpoint、manifest、events/status、summary 与 target/framework Git
-  状态不变；privacy fixture 不展示 prompt、peer、stderr、internal diagnostic 或 secret；
-- F2/F3/F5 focused regression 与完整 ResourceWarning-strict regression、精确 commit scope。
+- preflight 固定两个 disposable repo/remote 的 branch、HEAD、cleanliness、远端 URL 和初始 refs；
+  source framework repo 与真实 target 不被 smoke mutation；
+- 真实 Reviewer -> Executor -> Reviewer process/receipt、thread/profile separation、schema-valid
+  最终 verdict、合法 evidence locator 与最终 logical outcome；若 F1 correction 自然触发，记录其
+  同线程与 Executor 不重跑 evidence，但不人为制造；
+- transition 前后 machine Runtime bytes/hash、唯一 transition ID/record、target commit/HEAD、
+  framework summary entry/commit/remote ref、target remote baseline 不变；
+- F2 `PROGRESS`/event/status 的 active-time 与终态、F3 `status/inspect`、F5 `human-gate` 的一致
+  只读观察；F6 TUI 在真实交互终端中能打开、刷新和退出时记录观察，如终端不可用则明确记为
+  `UNVERIFIED`，不伪造结果；
+- Git-ignored raw locator/hash 与 tracked compact summary 形成可审计映射；关键长期结论不只留
+  在可能被清理的 `/tmp` 路径；必要的安全恢复不能重复已完成 Agent turn、transition 或 commit/push。
 
 #### Acceptance criteria
 
-1. `onepcloop.py --config <absolute-config> tui` 在可交互 macOS 终端启动、显示并可退出；
-   非 TTY 不发出屏幕控制序列，也不创建 run/checkpoint。
-2. TUI 只从已验证的 structured control/status/checkpoint/event projection 和固定枚举构造显示；
-   raw Codex/free-text payload 不是 UI 的控制或状态来源。
-3. 操作者可区分正在执行、等待 Human、failed closed、evidence finalization、已发布等状态；计时
-   与 F2 active-time 语义一致，不把进程停止期间 wall time 伪装为 run elapsed。
-4. `INVALID`/`UNAVAILABLE` 有显著标识，且不显示比 F5 projection 更宽的允许动作；
-   publication success 不能覆盖 logical failure，terminal gate 不显示为普通 Agent resume。
-5. 至少支持可发现的刷新、视图切换/滚动和退出键；窄终端和 resize 不崩溃；渲染/输入错误后
-   终端状态可恢复。UI 不执行 mutation 或 Human decision。
-6. 重复打开/刷新不修改任何 authoritative artifact 或 Git state；privacy 与完整 strict
-   regression 通过。F7 前不宣称 real-service end-to-end 已验收。
+1. 真实 service 完成有记录的合法 `ACCEPT`，不是只完成三个 process 或让 Reviewer 自述通过；
+   evidence locator、verdict 与最终 target HEAD 满足既有机械合同。
+2. machine Runtime transition 被实际应用，只有一条权威 transition record，Active Step 按
+   fixture 的明示合同推进；`logical_outcome`、`runtime_transition`、`evidence_publication` 独立可见。
+3. framework summary commit 已形成并普通 non-force push 至 disposable framework remote，
+   remote ref 精确等于预期 commit；target remote 仍等于 preflight baseline。
+4. F2-F6 operator projections 对同一 run 一致，`inspect` 为可解释的 PASS，read-only 命令/TUI
+   不修改 authoritative artifacts；TUI 真实终端验证如不可行须明确限制，不能谎称完成。
+5. 保存 raw locator/hash 与 tracked compact summary、精确 commit/remote identities，并由独立
+   Reviewer 直接复核；失败闭环必须如实记为失败，不靠修改 verdict/Runtime 或重新跑成功 turn
+   制造通过。
 
 #### Tests
 
-- pure presenter/data-source tests，不依赖真实 TTY 或 sleep；
-- disposable config-backed read-only TUI integration/snapshot tests；
-- fake terminal/input tests 覆盖键位、窄屏、resize、异常清理和非 TTY；
-- F2 progress、F3 operator、F5 Human Gate 与完整 strict regression。
-
-F6 不运行 real-service Codex smoke；真实可用性和合法 ACCEPT 闭环留到 F7。
+- 先做只读 `doctor/preflight` 与仓库/remote identity 检查；再进行有界真实服务运行；
+- 结束后执行 `status/inspect/human-gate` 与安全可行的 TUI 观察，比较所有关键 bytes/hash/refs；
+- 若仅增加 evidence summary，则不要求重复全量 Python regression；若任何代码发生变化，必须
+  另立窄修复与相应回归，不能作为 F7 smoke 隐含变更。
 
 #### Stop conditions / Human Gate
 
-- TUI 需要改变 F2/F3/F5 accepted contract 或从 peer prose/raw payload 猜测状态；
-- 需要自动 Human decision、mutation/resume、不可逆操作、新 dependency 或 Static 变化；
-- 需要 F7 real-service smoke、F8 GUI、P7 或 concurrency 才能完成当前只读 dashboard。
+- service/preflight/auth/profile 不满足真实运行条件，disposable remote/target 边界不明确，或
+  source framework/真实 target 可能被 mutation；
+- 真实 run 进入 `FAILED_CLOSED`、需要 Human Gate 或出现 identity/locator/transition/summary
+  不一致；先保存 evidence、报告精确原因，不绕过校验，不重复尝试消耗服务直到原因明确；
+- 必须更改已接受代码、Static/Runtime、外部 Tools、真实 target 或 Human decision 才能继续。
 
 #### Executor report format
 
 ```text
-F6 implementation status: IMPLEMENTED / BLOCKED
-branch / implementation commit / parent / working-tree state
-changed files
-TUI entrypoint, data source, screens and keys
-timer/state semantics, INVALID/UNAVAILABLE behavior
-read-only/privacy/non-TTY/resize/terminal-cleanup evidence
-focused regressions and full ResourceWarning-strict regression
-known limitations
-recommended Runtime evidence summary
+F7 real-service smoke status: PASS / FAILED_CLOSED / BLOCKED
+branch / source baseline / evidence-summary commit / final refs / working-tree state
+disposable repo and remote identities, preflight baseline, profile separation
+real Codex turn receipts, final verdict and exact evidence locator
+logical outcome / Runtime transition / evidence publication
+target commit and unchanged target remote; framework summary commit and pushed remote
+status / inspect / human-gate / TUI observations and read-only comparison
+raw locator + hashes, compact tracked summary, limitations and blocker
+recommended Runtime evidence summary; no self-ACCEPT or F8 activation
 ```
 
-Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
+Executor 不得宣告 F7 accepted，也不得推进本 Runtime。真实 service 未完成合法闭环时必须报告
+失败的真实状态，不能用 deterministic suite 替代。
 
 ## 4. Queued
 
 | Step | Deliverable | 状态 |
 | --- | --- | --- |
-| F7 / Step 7 | post-foundation real-service smoke | `QUEUED` |
 | F8 / Step 8 | GUI/治理压缩/evidence lifecycle 的 evidence-driven 决策 | `QUEUED` |
 
 顶层映射固定为：`F1 = Step 1`、`F2 = Step 2`、`F3 = Step 3`、`F4 = Step 4`、
@@ -346,16 +380,15 @@ Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
 
 ## 5. Blockers and Human Decision Gates
 
-- F6 acceptance 当前仍被 stable no-checkpoint 的证据不足阻塞：`inspect` 对 checkpoint 不存在和
-  checkpoint 已出现但 malformed/identity-invalid 使用同一个 generic failure；presenter 将后者仍
-  误判为 stable absence。上一轮的合法 new-run 竞争和 Unicode `Zl/Zp` 边界已经修复。
-- 剩余项属于 F6 只读 snapshot protocol 的窄修复，不需要 Human Owner 作新的产品或合同决定。
-- framework/target overlap 禁止使实现采用 Human-mediated workflow；这是已知 self-hosting
-  limitation，不是 F6 blocker。
+- 当前无已知 F7 blocker；真实 service、profile、disposable repo/remote 仍须在 run 前通过明确
+  preflight，不能把“尚未验证”写成“已通过”。
+- F6 stable no-checkpoint blocker 已由 second repair 关闭；single-writer 顺序观察不是并发协议。
+- framework/target overlap 禁止使 foundation 自身实现继续采用 Human-mediated workflow；F7
+  仅在独立 disposable framework/target 中跑 loop，不做 self-hosting。
 
 ## 6. Pending Tasks — Non-blocking Blocks
 
-当前顶层 Step：`6`
+当前顶层 Step：`7`
 
 | ID | 非阻塞性 block | 引入于 | 截止 Step | 剩余安全迁移次数 | 当前状态 | 关闭条件与所需 evidence |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -364,12 +397,12 @@ Executor 不得宣告 F6 accepted，也不得推进本 Runtime。
 
 ### Pending Gate Check
 
-- 下一顶层 Step：`Step 7 / F7`
+- 下一顶层 Step：`Step 8 / F8`
 - 激活前必须关闭的 Pending Task：无；PT-01 已在其 Step 5 deadline gate 前关闭。
 - Gate verdict：`CLEAR`
 - 支持 evidence：F4 implementation commit `eeb75e11480ecc245e040862bd42a952ec008c97`
-  与本次独立 review；PT-02 保持 `+∞`。
-- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F6 blocker。
+  与 §8 F4 独立 review；PT-02 保持 `+∞`。
+- GUI：仅在 F8 基于使用 evidence 决定；当前不是已承诺交付，也不是 F7 blocker。
 
 ## 7. State Transition
 
@@ -432,7 +465,7 @@ F4 -> F5 transition（历史状态）：
   默认冻结；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 的自动收尾授权。
 
-F5 -> F6 transition（当前状态）：
+F5 -> F6 transition（历史状态）：
 
 - Previous step state：F5 `REJECTED -- NARROW REPAIR REQUIRED`，首次拒绝及原始复现保留于 §8；
 - Triggering evidence：repair commit `9262f9754d0632a555a4bbe8f821c1c7ccc5e4f0`、Reviewer
@@ -443,6 +476,21 @@ F5 -> F6 transition（当前状态）：
   下一 Step 7 gate 为 `CLEAR`；
 - Meaning：F5 的共享只读 identity check 与嵌套 Human Gate projection 成为 F6 TUI 的稳定输入；
   F6 不重开 F5 control semantics；
+- Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
+
+F6 -> F7 transition（当前状态）：
+
+- Previous step state：F6 `REJECTED -- SECOND NARROW REPAIR REQUIRED`，两次拒绝和两轮全绿
+  测试历史保留于 §8；
+- Triggering evidence：second repair commit `397fb36c86aef02ea28d0f150e27ae826b53a1c5`、
+  Reviewer 真实 `{}` checkpoint 原阻塞路径独立复测、F6 focused `19 / 19` 与完整 strict
+  `197 / 197`；
+- Verdict：F6 `ACCEPTED AFTER SECOND INDEPENDENT RE-REVIEW`；
+- Current step：F7 / Step 7 `ACTIVE / NOT EVALUATED`；
+- Pending update：PT-01 保持 `RESOLVED`，PT-02 保持 `+∞ / PERMANENTLY_NON_BLOCKING`，
+  下一 Step 8 gate 为 `CLEAR`；
+- Meaning：F6 的 no-checkpoint 顺序确认和公共单行输出作为稳定只读 operator 能力；F7 现在
+  验证真实 service 的合法 ACCEPT/transition/publication 闭环；
 - Transition authorized by：独立 Reviewer verdict 与 Human Owner 既有自动收尾授权。
 
 ## 8. Independent Review
@@ -1005,7 +1053,7 @@ Independent review verdict：
 - 独立 verdict formation：`SATISFIED`；
 - 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
 - verdict：`REJECTED -- NARROW REPAIR REQUIRED`；
-- 当前状态：F6 保持唯一 Active Step，F7 不激活；PT-01 保持 `RESOLVED`，PT-02 保持
+- 当时状态：F6 保持唯一 Active Step，F7 不激活；PT-01 保持 `RESOLVED`，PT-02 保持
   `+∞ / PERMANENTLY_NON_BLOCKING`；
 - 本次仍是 1PCloop self-application 中“Executor 和完整回归全绿，但独立 Reviewer 发现未覆盖
   lifecycle/output boundary”的 evidence，不是 F7 smoke 或 P7 fault injection。
@@ -1078,14 +1126,47 @@ Independent re-review verdict：
 - 独立 verdict formation：`SATISFIED`；
 - 独立 evidence-sufficiency judgment：`SATISFIED FOR REJECTION`；
 - verdict：`REJECTED -- SECOND NARROW REPAIR REQUIRED`；
-- 当前状态：F6 继续唯一 Active Step，F7 不激活；PT-01 `RESOLVED`，PT-02
+- 当时状态：F6 继续唯一 Active Step，F7 不激活；PT-01 `RESOLVED`，PT-02
   `+∞ / PERMANENTLY_NON_BLOCKING`；
 - 第一次 repair 的成功内容保留，不要求回退或重写；剩余 blocker 仅限 absence proof。
 
+### 2026-09-18 F6 second independent re-review：`ACCEPTED`
+
+审核对象：second repair commit `397fb36c86aef02ea28d0f150e27ae826b53a1c5`，parent 为
+保存第二次 F6 REJECT 的 Runtime commit `36ca71ca7e88c79eb8e02ff36c1bfd6207db2b25`。
+
+Acceptance mapping：
+
+| Criterion | Direct evidence | Sufficiency judgment | Result |
+| --- | --- | --- | --- |
+| 原 `{}` checkpoint blocker | Reviewer 使用真实 disposable operator 在第一次 status 后写入 `{}`，再读取 inspect/第二次 status | 调用顺序 `status -> inspect -> status`，第二次 status 为 FAIL；TUI 显示 `SNAPSHOT UNAVAILABLE`，无 recovery action | PASS |
+| stable absence 与合法 new run | exact no-checkpoint candidate bracket、四态 disposable test matrix 和调用次数断言 | 只有前后 status 同一缺失投影且 inspect 无 run 投影才显示缺失；普通已有 run 仍仅两次读取 | PASS |
+| public row boundary | 先前修复的 `escape_public_text` 与 F6 focused Unicode tests | `Cc/Cf/Zl/Zp` 不再形成额外终端行；普通中文可读 | PASS |
+| readonly/scope/regression | `OperatorDataSource`、四文件 commit diff、focused/full suite、Static hash | 不读取 raw checkpoint，不改 operator/runner、checkpoint、Git 或已接受合同 | PASS |
+
+- 独立 evidence access：`SATISFIED`；
+- 独立 verdict formation：`SATISFIED`；
+- 独立 evidence-sufficiency judgment：`SATISFIED`；
+- Executor F6 focused `19 / 19`，`6.366s`；F2/F3/F5 focused `76 / 76`，`110.581s`；
+  完整 ResourceWarning-strict regression `197 / 197`，`253.520s`；
+- Reviewer 独立 F6 focused `19 / 19`，`6.030s`；完整 ResourceWarning-strict regression
+  `197 / 197`，`274.691s`；
+- branch/local HEAD/origin/GitHub main 均为 second repair commit；审核前工作树 clean；
+  `git diff --check`、授权四文件 scope 与 Static SHA-256
+  `0995a0374205a7116b59aeb5ec20a468de22458a24066a9f0f5d71e32f07506e` 通过；
+- Reviewer verdict：`ACCEPTED`；
+- Review limitation：顺序读取不是原子并发快照；真实 Codex service/full-loop smoke 尚未执行，
+  留至 F7。两者不阻塞 F6 deterministic acceptance。
+
+本次 ACCEPT supersede §8 中 F6 的当前第二次拒绝状态，但保留两次 REJECT、两次窄修复及“Executor
+与 Reviewer 全绿后仍发现边界缺口”的 provenance。这属于 Human-mediated self-application，
+不是 P7 fault injection。
+
 ## 9. Next Direction
 
-只执行 F6 second narrow repair：为 stable no-checkpoint 增加不依赖 generic identity failure 的
-结构化 absence proof，覆盖 malformed/identity-invalid checkpoint 在顺序读取期间出现。保留已经
-通过的合法 new-run race 和 Unicode 修复；F1-F5 保持 accepted；不得读取 raw checkpoint、重写
-operator/orchestrate、修改 Static/Runtime、运行 F7 smoke 或提前实现 F8/P7。修复后停止于
-`AWAITING SECOND INDEPENDENT RE-REVIEW`。
+只执行 F7 post-foundation real-service smoke：先验证 disposable repo/remote 与真实 Codex profiles，
+再用有界真实 Reviewer -> Executor -> Reviewer loop 取得合法 `ACCEPT`、machine Runtime transition 和
+framework summary commit/push，并证明 target remote 未被推送。tracked compact summary 必须能让
+独立 Reviewer 复核 raw locator/hash 与 Git identity；失败则如实保留失败状态，不能用测试全绿或
+publication success 代替闭环。F1-F6 保持 accepted；不得修改 Static/Runtime 或已接受代码，
+不得提前实施 F8/P7。完成后停止于 `AWAITING INDEPENDENT F7 REVIEW`。
