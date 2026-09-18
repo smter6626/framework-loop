@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / AWAITING HUMAN OWNER OVERALL COMPLETION DECISION`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_SESSION_UI_V1 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Current active engineering task
-= NONE
+= whisper_session_ui_v1 / S1 ACTIVE
+= 1PCloop/workloads/whisper_session_ui_v1/workload_runtime.md
 
 Overall 1PCloop completion
 = AWAITING EXPLICIT HUMAN OWNER DECISION
@@ -76,6 +77,18 @@ remains `ACTIVE` only because the Static Completion Definition reserves the fina
 `1PCloop/workloads/foundation_v1/workload_runtime.md` is frozen by default; this
 global Runtime retains the phase pointer and high-level transitions to avoid further
 unbounded growth.
+
+### 2026-09-18 -- external workload `whisper_session_ui_v1` activated
+
+Human Owner authorized a new two-step external workload without reopening the
+closed foundation_v1 task or paused P7. Step 1 asks 1PCloop to integrate three
+streaming governance/investigation documents into the target `main`; Step 2 is
+queued for the new `codex/session-clipboard-ui-v1` branch based on
+`multiLanguage_v1`. Both steps use separate target worktrees and separate runs.
+The automatic Reviewer checks code logic and deterministic UI tests; real
+audio-to-transcript black-box testing belongs to the Human Owner. Task-local
+Static/Runtime and current step are at
+`1PCloop/workloads/whisper_session_ui_v1/`.
 
 ### 2026-09-18 -- foundation_v1 phase closure
 

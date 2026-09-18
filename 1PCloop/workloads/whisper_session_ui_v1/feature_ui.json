@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "workload_id": "whisper_session_ui_v1",
+  "target": {
+    "repo": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui",
+    "branch": "codex/session-clipboard-ui-v1"
+  },
+  "governance": {
+    "workload_static": "workload_static.md",
+    "workload_runtime": "workload_runtime.md",
+    "framework_repo": "/Users/smterpro/Workspace/framework-loop",
+    "framework_static": "../../docs/miniloop_static.md",
+    "framework_runtime": "../../docs/miniloop_runtime.md"
+  },
+  "profiles": {
+    "reviewer_home": "/Users/smterpro/.codex-B",
+    "executor_home": "/Users/smterpro/.codex-A"
+  },
+  "execution": {
+    "codex_bin": "codex",
+    "max_cycles": 4,
+    "timeout_seconds": 1200,
+    "progress_interval_seconds": 15,
+    "enable_runtime_transition": true
+  },
+  "evidence": {
+    "runs_root": "../../.local/runs",
+    "state_root": "../../.local/state/whisper_session_ui_feature",
+    "summary_root": "../../evidence-summaries"
+  },
+  "framework_git": {
+    "branch": "main",
+    "remote": "origin",
+    "push_ref": "refs/heads/main"
+  }
+}
