@@ -427,8 +427,12 @@ control state, target HEAD, F2 active-time elapsed/timeout/activity, observation
 availability, and the three independent logical/Runtime/publication states. It does not add
 offline wall time to F2 elapsed values. When observation is unavailable, unverified progress is
 hidden. If consecutive `status` and `inspect` reads disagree, recovery actions are hidden until
-refresh. `NO CHECKPOINT` is displayed only when both projections contain no real run state and
-the inspect side has the exact F3 checkpoint-missing shape. Final terminal rows escape Unicode
+refresh. For a no-checkpoint candidate, the data source reads `status -> inspect -> status`;
+ordinary existing runs use only `status -> inspect`. `NO CHECKPOINT` requires identical exact
+no-checkpoint status projections before and after inspect, matching config and checkpoint
+locators, and no real run projection from inspect. Inspect's generic checkpoint identity failure
+alone does not prove absence. A changed or invalid bracket displays `SNAPSHOT UNAVAILABLE`
+without recovery guidance until a consistent refresh. Final terminal rows escape Unicode
 `Cc`, `Cf`, `Zl`, and `Zp` characters before width bounding, so embedded line or paragraph
 separators cannot forge another row. `PUSHED` is only publication, not logical success; a terminal
 Human Gate is never shown as ordinary Agent resume. `INVALID` or `UNAVAILABLE` never gets broader

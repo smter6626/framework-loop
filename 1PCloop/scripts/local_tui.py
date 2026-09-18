@@ -59,10 +59,12 @@ class OperatorDataSource:
         self.config = config
 
     def read(self) -> Dict[str, Mapping[str, Any]]:
-        return {
-            "status": self.operator.status(self.config),
-            "inspect": self.operator.inspect_run(self.config),
-        }
+        status = self.operator.status(self.config)
+        inspect = self.operator.inspect_run(self.config)
+        snapshot = {"status": status, "inspect": inspect}
+        if _no_checkpoint_candidate(_mapping(status)):
+            snapshot["status_after"] = self.operator.status(self.config)
+        return snapshot
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -101,15 +103,47 @@ def _has_run_projection(result: Mapping[str, Any]) -> bool:
     return any(result.get(name) is not None for name in RUN_PROJECTION_FIELDS)
 
 
+def _no_checkpoint_candidate(status: Mapping[str, Any]) -> bool:
+    """Accept only the exact F3 status projection for an absent checkpoint."""
+    result = _mapping(status.get("result"))
+    gate = _mapping(result.get("human_gate_projection"))
+    identity = _mapping(status.get("config_identity"))
+    artifacts = _mapping(status.get("artifacts"))
+    return (
+        status.get("schema_version") == 1
+        and status.get("command") == "status"
+        and status.get("overall_status") == "PASS"
+        and status.get("checks") == []
+        and set(result) == {
+            "workload_id", "run_id", "checkpoint_state", "safe_next_action",
+            "observation_availability", "human_gate_projection",
+        }
+        and result.get("workload_id") == identity.get("workload_id")
+        and isinstance(result.get("workload_id"), str)
+        and not _has_run_projection(result)
+        and result.get("safe_next_action") == "START_NEW_RUN_ALLOWED"
+        and result.get("observation_availability") == "UNAVAILABLE"
+        and gate.get("gate_status") == "NOT_APPLICABLE"
+        and gate.get("reason_code") == "NO_CHECKPOINT"
+        and gate.get("recovery_mode") == "NO_ACTION"
+        and gate.get("allowed_actions") == ["NO_AUTOMATIC_REPAIR"]
+        and gate.get("evidence_availability") == "UNAVAILABLE"
+        and isinstance(artifacts.get("checkpoint"), str)
+        and bool(artifacts.get("checkpoint"))
+        and isinstance(artifacts.get("config"), str)
+        and bool(artifacts.get("config"))
+        and artifacts.get("config") == identity.get("config_path")
+    )
+
+
 def _stable_no_checkpoint(
     status: Mapping[str, Any],
     inspect: Mapping[str, Any],
-    result: Mapping[str, Any],
+    status_after: Mapping[str, Any],
     inspect_result: Mapping[str, Any],
-    gate: Mapping[str, Any],
     inspect_gate: Mapping[str, Any],
 ) -> bool:
-    """Recognize the exact F3 no-checkpoint pair, not an arbitrary inspect FAIL."""
+    """Bracket generic inspect failure with two identical absence projections."""
     checks = inspect.get("checks")
     checkpoint_check = (
         checks[0]
@@ -120,14 +154,12 @@ def _stable_no_checkpoint(
     status_artifacts = _mapping(status.get("artifacts"))
     inspect_artifacts = _mapping(inspect.get("artifacts"))
     return (
-        not _has_run_projection(result)
-        and gate.get("gate_status") == "NOT_APPLICABLE"
-        and gate.get("reason_code") == "NO_CHECKPOINT"
-        and gate.get("recovery_mode") == "NO_ACTION"
-        and gate.get("allowed_actions") == ["NO_AUTOMATIC_REPAIR"]
-        and gate.get("evidence_availability") == "UNAVAILABLE"
-        and result.get("safe_next_action") == "START_NEW_RUN_ALLOWED"
+        _no_checkpoint_candidate(status)
+        and _no_checkpoint_candidate(status_after)
+        and status == status_after
         and not _has_run_projection(inspect_result)
+        and set(inspect_result) == {"safe_next_action", "human_gate_projection"}
+        and inspect.get("schema_version") == status.get("schema_version")
         and inspect.get("overall_status") == "FAIL"
         and checkpoint_check.get("name") == "checkpoint_identity"
         and checkpoint_check.get("status") == "FAIL"
@@ -144,6 +176,7 @@ def _stable_no_checkpoint(
         and inspect_result.get("safe_next_action") == "STATE_UNAVAILABLE"
         and status.get("config_identity") == inspect.get("config_identity")
         and status_artifacts.get("checkpoint") == inspect_artifacts.get("checkpoint")
+        and status_artifacts.get("config") == inspect_artifacts.get("config")
     )
 
 
@@ -152,13 +185,14 @@ def _snapshot_parts(
 ) -> Tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any], bool, bool]:
     status = _mapping(snapshot.get("status"))
     inspect = _mapping(snapshot.get("inspect"))
+    status_after = _mapping(snapshot.get("status_after"))
     result = _mapping(status.get("result"))
     inspect_result = _mapping(inspect.get("result"))
     gate = _mapping(result.get("human_gate_projection"))
     inspect_gate = _mapping(inspect_result.get("human_gate_projection"))
     actions = gate.get("allowed_actions")
     no_checkpoint = _stable_no_checkpoint(
-        status, inspect, result, inspect_result, gate, inspect_gate
+        status, inspect, status_after, inspect_result, inspect_gate
     )
     basic_contract = (
         status.get("command") == "status"

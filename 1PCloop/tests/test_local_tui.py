@@ -3,6 +3,7 @@
 import contextlib
 import copy
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -42,9 +43,11 @@ def snapshot(
     }
     return {
         "status": {
+            "schema_version": 1,
             "command": "status",
-            "config_identity": {"workload_id": "fixture"},
-            "artifacts": {"checkpoint": "/fixture/checkpoint.json"},
+            "config_identity": {"workload_id": "fixture", "config_path": "/fixture/workload.json"},
+            "artifacts": {"config": "/fixture/workload.json", "checkpoint": "/fixture/checkpoint.json"},
+            "checks": [],
             "overall_status": "FAIL" if gate_status == "INVALID" else "PASS",
             "result": {
                 "run_id": "run-1",
@@ -67,9 +70,10 @@ def snapshot(
             "raw_codex_events": "secret-event-payload",
         },
         "inspect": {
+            "schema_version": 1,
             "command": "inspect",
-            "config_identity": {"workload_id": "fixture"},
-            "artifacts": {"checkpoint": "/fixture/checkpoint.json"},
+            "config_identity": {"workload_id": "fixture", "config_path": "/fixture/workload.json"},
+            "artifacts": {"config": "/fixture/workload.json", "checkpoint": "/fixture/checkpoint.json"},
             "overall_status": inspect_status,
             "result": {
                 "run_id": "run-1",
@@ -88,7 +92,7 @@ def snapshot(
 
 def no_checkpoint_snapshot():
     value = snapshot()
-    identity = {"workload_id": "fixture"}
+    identity = {"workload_id": "fixture", "config_path": "/fixture/workload.json"}
     checkpoint = "/fixture/checkpoint.json"
     no_checkpoint_gate = {
         "gate_status": "NOT_APPLICABLE",
@@ -110,9 +114,10 @@ def no_checkpoint_snapshot():
     }
     value["status"].update({
         "config_identity": identity,
-        "artifacts": {"checkpoint": checkpoint},
+        "artifacts": {"config": "/fixture/workload.json", "checkpoint": checkpoint},
         "overall_status": "PASS",
         "result": {
+            "workload_id": "fixture",
             "run_id": None,
             "checkpoint_state": None,
             "observation_availability": "UNAVAILABLE",
@@ -122,7 +127,7 @@ def no_checkpoint_snapshot():
     })
     value["inspect"].update({
         "config_identity": identity,
-        "artifacts": {"checkpoint": checkpoint},
+        "artifacts": {"config": "/fixture/workload.json", "checkpoint": checkpoint},
         "overall_status": "FAIL",
         "checks": [{
             "name": "checkpoint_identity",
@@ -135,6 +140,7 @@ def no_checkpoint_snapshot():
             "human_gate_projection": invalid_gate,
         },
     })
+    value["status_after"] = copy.deepcopy(value["status"])
     return value
 
 
@@ -308,7 +314,9 @@ class LocalTuiTests(unittest.TestCase):
 
         class SequencedOperator:
             def __init__(self):
-                self.statuses = [stable_none["status"], stable_run["status"]]
+                self.statuses = [
+                    stable_none["status"], stable_run["status"], stable_run["status"]
+                ]
                 self.inspections = [stable_run["inspect"], stable_run["inspect"]]
                 self.calls = []
 
@@ -325,7 +333,9 @@ class LocalTuiTests(unittest.TestCase):
         source = TUI.OperatorDataSource(operator, config)
         first = source.read()
         self.assertEqual(
-            operator.calls, [("status", config), ("inspect", config)]
+            operator.calls, [
+                ("status", config), ("inspect", config), ("status", config)
+            ]
         )
         first_text = rendered(first)
         self.assertIn("SNAPSHOT UNAVAILABLE", first_text)
@@ -336,7 +346,7 @@ class LocalTuiTests(unittest.TestCase):
         self.assertEqual(
             operator.calls,
             [
-                ("status", config), ("inspect", config),
+                ("status", config), ("inspect", config), ("status", config),
                 ("status", config), ("inspect", config),
             ],
         )
@@ -344,6 +354,114 @@ class LocalTuiTests(unittest.TestCase):
         self.assertNotIn("SNAPSHOT UNAVAILABLE", second_text)
         self.assertIn("Run: new-run", second_text)
         self.assertIn("Allowed actions:", second_text)
+
+    def test_absence_requires_second_exact_status_projection(self):
+        stable = no_checkpoint_snapshot()
+        cases = {
+            "missing_status_after": None,
+            "invalid_status_after": {"overall_status": "FAIL"},
+            "run_appeared": {"result": {"run_id": "new-run"}},
+            "config_changed": {"config_identity": {"workload_id": "other"}},
+            "locator_changed": {"artifacts": {"checkpoint": "/other/checkpoint.json"}},
+        }
+        for name, changes in cases.items():
+            with self.subTest(name=name):
+                value = copy.deepcopy(stable)
+                if changes is None:
+                    del value["status_after"]
+                else:
+                    for key, fields in changes.items():
+                        if isinstance(fields, dict) and key in value["status_after"]:
+                            value["status_after"][key].update(fields)
+                        else:
+                            value["status_after"][key] = fields
+                self.assertIn("SNAPSHOT UNAVAILABLE", rendered(value))
+                self.assertNotIn("Allowed actions:", rendered(value))
+
+    def test_real_operator_absence_bracket_and_mid_read_checkpoint_changes(self):
+        for case in ("stable_absence", "malformed", "identity_invalid", "new_run"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                helper = operator_tests.OperatorCliTests()
+                config_path, _value, _args, *_ = helper.fixture(
+                    Path(temporary), run_id=f"tui-{case.replace('_', '-')}"
+                )
+                config = OP.load_config(config_path)
+                checkpoint = OP.checkpoint_path(config)
+
+                def inject():
+                    if case == "stable_absence":
+                        return
+                    if case == "new_run":
+                        code, _run_root = helper.run_config(config)
+                        self.assertEqual(code, 0)
+                        return
+                    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+                    value = {} if case == "malformed" else {
+                        "schema_version": 1,
+                        "state": "FRAMEWORK_EVIDENCE_PUSHED",
+                        "configuration": {"operator_config_identity": {"wrong": True}},
+                    }
+                    checkpoint.write_text(json.dumps(value) + "\n", encoding="utf-8")
+
+                class BoundaryOperator:
+                    def __init__(self):
+                        self.calls = []
+                        self.pending_injection = True
+
+                    def status(self, selected):
+                        self.calls.append("status")
+                        return OP.status(selected)
+
+                    def inspect_run(self, selected):
+                        self.calls.append("inspect")
+                        if self.pending_injection:
+                            self.pending_injection = False
+                            inject()
+                        return OP.inspect_run(selected)
+
+                operator = BoundaryOperator()
+                source = TUI.OperatorDataSource(operator, config)
+                first = source.read()
+                self.assertEqual(operator.calls, ["status", "inspect", "status"])
+                self.assertEqual(first["status"]["result"]["run_id"], None)
+                self.assertEqual(first["status"]["result"]["human_gate_projection"]["reason_code"], "NO_CHECKPOINT")
+                text = rendered(first)
+                if case == "stable_absence":
+                    self.assertIn("NO CHECKPOINT -- no run was opened", text)
+                    self.assertNotIn("SNAPSHOT UNAVAILABLE", text)
+                    self.assertFalse(checkpoint.exists())
+                else:
+                    self.assertIn("SNAPSHOT UNAVAILABLE", text)
+                    self.assertNotIn("NO CHECKPOINT --", text)
+                    self.assertNotIn("Allowed actions:", text)
+                    if case in {"malformed", "identity_invalid"}:
+                        self.assertEqual(first["inspect"]["checks"][0]["code"], "CHECKPOINT_IDENTITY_FAILED")
+                        self.assertEqual(first["status_after"]["result"]["human_gate_projection"]["gate_status"], "INVALID")
+                    else:
+                        self.assertIsInstance(first["inspect"]["result"]["run_id"], str)
+                        self.assertEqual(
+                            first["inspect"]["result"]["run_id"],
+                            first["status_after"]["result"]["run_id"],
+                        )
+
+                if case in {"malformed", "identity_invalid"}:
+                    checkpoint.unlink()
+                before = len(operator.calls)
+                second = source.read()
+                expected = (
+                    ["status", "inspect"] if case == "new_run"
+                    else ["status", "inspect", "status"]
+                )
+                self.assertEqual(operator.calls[before:], expected)
+                second_text = rendered(second)
+                self.assertNotIn("SNAPSHOT UNAVAILABLE", second_text)
+                if case == "new_run":
+                    self.assertIn(
+                        f"Run: {second['status']['result']['run_id']}",
+                        second_text,
+                    )
+                else:
+                    self.assertIn("NO CHECKPOINT -- no run was opened", second_text)
 
     def test_disagreeing_operator_projections_fail_closed_in_presenter(self):
         value = snapshot()
