@@ -89,15 +89,91 @@
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
-  "schema_version": 1,
-  "workload_id": "whisper_session_ui_v1",
-  "transition_mode": "reviewer_accept_once",
   "active_step": {
     "id": "S1",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null
+  "last_transition_id": "4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f",
+  "schema_version": 1,
+  "transition_mode": "disabled",
+  "workload_id": "whisper_session_ui_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
 该机器块只授权当前 S1 的一次 ACCEPT -> COMPLETED，不会自动激活 S2。S2 启用前需在完整保存 S1 transition record 的前提下，将机器块切换为 `S2/ACTIVE`、`reviewer_accept_once`、`last_transition_id=null`，并单独提交/推送 Runtime；不可在 S1 run 未完成时改动。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "9178ecd5b128c54c7da914ac29dbedc039980c6f9597b26e5764f4a10feb7e7a",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "d0f581bb70379239c3147e5c8469d2285ad6620b",
+      "sha256": "af6accc5520f82e526b7ae2812f624112dff13ec3d62fdac4efae396c3012372"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/docs/streaming_backend_upgrade/README.md",
+      "sha256": "8c49658866eca0cee0460e9162486542e2543c4b27f62197adb976eaeff5f245"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/docs/streaming_backend_upgrade/static.md",
+      "sha256": "fa7ad06ff04d039dc0c76da11d647ccff537000d6ef3aa24fad64a791a80aa05"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/docs/streaming_backend_upgrade/runtime.md",
+      "sha256": "9354f271f905c895f9e477264bee19a9c47f18c82bc9ab417a815f3cf5c060b5"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/docs/streaming_backend_upgrade/update_plan.md",
+      "sha256": "ae4566dd27dca2ba96d5beedd8d35ab490a46e51188fa82cbd05eef4d7917c40"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/README.md",
+      "sha256": "ef2953b61c2942fa7767e96c9f7afe289d2abbb09ec004cdc249bb2826958492"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/README.zh-CN.md",
+      "sha256": "6e6f003f78b5b0a0e51c8306c520c298728b74ecfea1b2116797c25cc717452c"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-main-docs/docs/repo_map.md",
+      "sha256": "40d215d5138a70bc566cb827d86c654264fef08253b5e14d6222ae8be8651474"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "S1",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_session_ui_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "S1",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_session_ui_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260918T123000Z-29001/cycle-01/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "272f4650d4ddcb365a70ab67e290810df655ed1191debb17d41732a6b4d6a622",
+  "schema_version": 1,
+  "target_head": "d0f581bb70379239c3147e5c8469d2285ad6620b",
+  "timestamp": "2026-09-18T12:37:41.143+00:00",
+  "transition_id": "4030e8b7620a7debfe04484394ef7a7923a8d6128ee97a388fda52bdd6b0d41f"
+}
+```
