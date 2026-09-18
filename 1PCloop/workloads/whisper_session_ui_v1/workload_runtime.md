@@ -79,11 +79,11 @@
 
 ## 10. Next Direction
 
-- 不再启动新的 S2 run。下一工作负载建议以 `cb4261825b7d51d3ec33a97e083683c50e6b9e82` 为 target baseline，限定主窗口在常见 macOS 可用高度内，并设计单一、明确、键盘和滚轮均可用的滚动边界；不得顺带改转录、session 或 clipboard 语义。
+- 不再启动新的 S2 run。后继 `whisper_window_layout_v1` 已以 target-side documentation commit `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34` 为 baseline 独立初始化；其 Static/Runtime 位于 `1PCloop/workloads/whisper_window_layout_v1/`。本 closed task 只作为历史和产品语义输入，不再承担后续 Active Step。
 
 ## 11. Follow-up Handoff
 
-- 推荐任务: 主窗口高度约束与垂直滚动可达性。
+- 后继任务: `whisper_window_layout_v1` -- 主窗口高度约束与垂直滚动可达性。
 - 需要先确定: 目标可用屏幕高度/缩放条件、哪些控制区固定可见、哪个容器负责滚动、滚轮/触控板/键盘行为，以及 transcript tables 自身滚动与外层滚动如何避免冲突。
 - 明确边界: 不修改 streaming backend、Whisper runtime、模型/语言算法、session ownership 或 clipboard 断点语义；不得将简单缩小字体当作唯一解决方案。
 

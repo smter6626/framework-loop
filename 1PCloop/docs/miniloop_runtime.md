@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_SESSION_UI_V1 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_WINDOW_LAYOUT_V1 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,8 +43,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_session_ui_v1 / ACCEPTED / TASK CLOSED WITH FOLLOW-UP UI DEFECT
-= 1PCloop/workloads/whisper_session_ui_v1/workload_runtime.md
+= whisper_window_layout_v1 / L1 ACTIVE
+= 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Overall 1PCloop completion
 = AWAITING EXPLICIT HUMAN OWNER DECISION
@@ -99,6 +99,18 @@ The automatic Reviewer checks code logic and deterministic UI tests; real
 audio-to-transcript black-box testing belongs to the Human Owner. Task-local
 Static/Runtime and current step are at
 `1PCloop/workloads/whisper_session_ui_v1/`.
+
+### 2026-09-18 -- external workload `whisper_window_layout_v1` activated
+
+Human Owner accepted the preceding session/clipboard functionality and identified a
+separate real-UI defect: the main window is taller than the available window bounds.
+A new task-local Static/Runtime now owns that follow-up without reopening or changing
+the accepted S2 contract. Target branch `codex/bounded-scrollable-main-window-v1`
+starts exactly at target-side documentation commit
+`fb7e38e4248b1b6fcf58a14193dbfe9315f90f34`. L1 is the only active step and is
+limited to screen-aware window geometry, deliberate scroll/focus accessibility,
+regression coverage, and target-side documentation. Real macOS visual and trackpad
+acceptance remains a Human Owner gate after automatic review.
 
 ### 2026-09-18 -- foundation_v1 phase closure
 
