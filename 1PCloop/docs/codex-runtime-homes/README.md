@@ -69,6 +69,8 @@ role runtime 与额度账号是两个独立维度：
 - run 启动后账号 identity 被固定。若 Codex Mix 在两个 turn 之间或 turn 期间切换账号，当前 run
   必须 fail closed，不能让同一 run 混用多个额度账号；
 - access token 的剩余寿命必须至少覆盖 turn timeout 加 300 秒；
+- preflight 和每个 turn 前后都会把 A/B 当前全树与保存的 21,091-entry retirement snapshot 精确比较；
+  任意文件新增、删除、内容、类型、路径、mode、size 或 mtime 变化都会 fail closed；
 - role runtime 原有 `auth.json` 只作为迁移历史缓存，不再决定 1PCloop 的额度来源。每个 turn 前后
   校验该文件 SHA-256 不变；若 Codex 在 ephemeral 模式下仍改写它，则恢复原字节并 fail closed。
 

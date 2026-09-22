@@ -88,6 +88,15 @@ class CodexMixAccountTests(unittest.TestCase):
             ) + "\n",
             encoding="utf-8",
         )
+        paths.retired_snapshot.parent.mkdir(parents=True)
+        paths.retired_snapshot.write_text(
+            json.dumps(
+                ACCOUNT.capture_retired_tree(paths),
+                indent=2,
+                sort_keys=True,
+            ) + "\n",
+            encoding="utf-8",
+        )
 
         reviewer = paths.runtime_root / "1pcloop-reviewer"
         executor = paths.runtime_root / "1pcloop-executor"
@@ -130,6 +139,16 @@ class CodexMixAccountTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(
                 ACCOUNT.AccountBindingError, "marker.*vault"
+            ):
+                ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
+
+    def test_full_retirement_snapshot_rejects_non_sentinel_drift(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paths, _reviewer, _executor = self.fixture(Path(temporary))
+            ordinary = paths.user_home / ".codex-A" / "ordinary-cache.txt"
+            ordinary.write_text("new file\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ACCOUNT.AccountBindingError, "full-tree snapshot changed"
             ):
                 ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
 

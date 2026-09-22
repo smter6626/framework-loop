@@ -68,6 +68,7 @@ class CodexMixPaths:
     active_marker: Path
     switch_lock: Path
     baseline_file: Path
+    retired_snapshot: Path
     codex_route: Path
     runtime_root: Path
 
@@ -85,6 +86,11 @@ class CodexMixPaths:
             active_marker=control / "active.json",
             switch_lock=control / "switch.lock",
             baseline_file=control / "original-baseline.json",
+            retired_snapshot=(
+                control
+                / "forensics/runtime-cutover-20260918"
+                / "retired-ab-final-snapshot.json"
+            ),
             codex_route=home / ".codex",
             runtime_root=control / "runtimes",
         )
@@ -206,6 +212,63 @@ def capture_original_baseline(paths: CodexMixPaths) -> Dict[str, Any]:
     return result
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def capture_retired_tree(paths: CodexMixPaths) -> list:
+    """Recreate the preserved A/B retirement snapshot byte-for-byte."""
+    rows = []
+    for root in (
+        paths.user_home / ".codex-A",
+        paths.user_home / ".codex-B",
+    ):
+        if not root.is_dir() or root.is_symlink():
+            raise AccountBindingError("retired account home is missing or aliased")
+        for path in [root, *sorted(root.rglob("*"))]:
+            info = path.lstat()
+            row: Dict[str, Any] = {
+                "root": str(root),
+                "path": "." if path == root else path.relative_to(root).as_posix(),
+                "mode": stat.S_IMODE(info.st_mode),
+                "size": info.st_size,
+                "mtime_ns": info.st_mtime_ns,
+            }
+            if stat.S_ISREG(info.st_mode):
+                row.update(type="file", sha256=_sha256_file(path))
+            elif stat.S_ISDIR(info.st_mode):
+                row["type"] = "dir"
+            elif stat.S_ISLNK(info.st_mode):
+                row.update(type="symlink", target=os.readlink(path))
+            else:
+                row["type"] = "other"
+            rows.append(row)
+    return rows
+
+
+def validate_retired_snapshot(paths: CodexMixPaths) -> None:
+    expected = _read_object_or_list(
+        paths.retired_snapshot, "retired A/B snapshot"
+    )
+    if not isinstance(expected, list):
+        raise AccountBindingError("retired A/B snapshot must contain a list")
+    if capture_retired_tree(paths) != expected:
+        raise AccountBindingError("retired A/B full-tree snapshot changed")
+
+
+def _read_object_or_list(path: Path, label: str) -> Any:
+    if not path.is_file() or path.is_symlink():
+        raise AccountBindingError(f"{label} is missing, not regular, or aliased")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise AccountBindingError(f"{label} is not valid JSON") from exc
+
+
 def validate_original_baseline(paths: CodexMixPaths) -> None:
     expected = _read_object(paths.baseline_file, "Codex Mix original baseline")
     actual = capture_original_baseline(paths)
@@ -294,6 +357,7 @@ def _active_state(
             "Codex Mix active access token lifetime is shorter than the turn timeout"
         )
     validate_original_baseline(paths)
+    validate_retired_snapshot(paths)
     return ActiveAccountBinding(alias, _account_digest(canonical_id), expiry), access_token
 
 
