@@ -100,6 +100,26 @@ def load_contract_helpers() -> ModuleType:
 
 
 CONTRACTS = load_contract_helpers()
+
+
+def load_codex_mix_account_helpers() -> ModuleType:
+    """Load active-account helpers without creating an operator dependency."""
+    name = "codex_mix_account"
+    path = SCRIPT_PATH.with_name("codex_mix_account.py")
+    existing = sys.modules.get(name)
+    existing_path = getattr(existing, "__file__", None)
+    if existing_path is not None and Path(existing_path).resolve() == path.resolve():
+        return existing
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load Codex Mix account helper: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+MIX_ACCOUNT = load_codex_mix_account_helpers()
 DEFAULT_REVIEWER_HOME = CONTRACTS.DEFAULT_REVIEWER_HOME
 DEFAULT_EXECUTOR_HOME = CONTRACTS.DEFAULT_EXECUTOR_HOME
 SCHEMAS_ROOT = CONTRACTS.SCHEMAS_ROOT
@@ -1013,6 +1033,7 @@ def build_codex_command(
     session_mode: str,
     resume_target_thread_id: Optional[str],
     output_schema: Path = SCHEMAS_ROOT / "reviewer_instruction.schema.json",
+    ephemeral_access_token: bool = False,
 ) -> List[str]:
     if session_mode not in (FRESH_EPHEMERAL, NEW_PERSISTENT, RESUME):
         raise ValueError(f"unknown session mode: {session_mode}")
@@ -1021,6 +1042,13 @@ def build_codex_command(
     if session_mode != RESUME and resume_target_thread_id is not None:
         raise ValueError("resume target is only valid for resume mode")
     command = [codex_bin, "exec"]
+    if ephemeral_access_token:
+        for override in (
+            MIX_ACCOUNT.EPHEMERAL_CREDENTIAL_OVERRIDE,
+            MIX_ACCOUNT.AUTH_ENVIRONMENT_EXCLUDE_OVERRIDE,
+            MIX_ACCOUNT.NOTIFY_DISABLED_OVERRIDE,
+        ):
+            command.extend(["--config", override])
     if session_mode == FRESH_EPHEMERAL:
         command.append("--ephemeral")
     command.extend(
@@ -1271,6 +1299,7 @@ def run_codex_turn(
     progress_interval_seconds: float = 15.0,
     progress_label: Optional[str] = None,
     message_type: str = REVIEWER_INSTRUCTION,
+    account_binding: Optional[Any] = None,
 ) -> TurnResult:
     if (role == "executor" and message_type != EXECUTOR_RECEIPT) or (
         role == "reviewer" and message_type not in (REVIEWER_INSTRUCTION, REVIEWER_VERDICT)
@@ -1347,10 +1376,12 @@ def run_codex_turn(
         session_mode=session_mode,
         resume_target_thread_id=resume_target_thread_id,
         output_schema=output_schema,
+        ephemeral_access_token=account_binding is not None,
     )
     environment = os.environ.copy()
     environment["CODEX_HOME"] = str(codex_home)
     environment["CODEX_SQLITE_HOME"] = str(codex_home)
+    account_binding_evidence: Optional[Dict[str, Any]] = None
     started_at = P4.utc_now()
     started_monotonic = time.monotonic()
     exit_code: Optional[int] = None
@@ -1368,25 +1399,50 @@ def run_codex_turn(
             "turn_started", role=role, timeout_seconds=timeout_seconds
         )
         progress_turn_started = True
-        exit_code, stdout, stderr, process_failure = stream_subprocess(
-            command=command,
-            workspace=workspace,
-            environment=environment,
-            prompt=prompt,
-            events_path=events_path,
-            stderr_path=stderr_path,
-            timeout_seconds=timeout_seconds,
-            progress_interval_seconds=progress_interval_seconds,
-            progress_label=(
-                progress_label or f"role={role} turn={turn_dir.name}"
-            ),
-        )
-        if process_failure is not None:
-            failure = process_failure
+        try:
+            if account_binding is None:
+                exit_code, stdout, stderr, process_failure = stream_subprocess(
+                    command=command,
+                    workspace=workspace,
+                    environment=environment,
+                    prompt=prompt,
+                    events_path=events_path,
+                    stderr_path=stderr_path,
+                    timeout_seconds=timeout_seconds,
+                    progress_interval_seconds=progress_interval_seconds,
+                    progress_label=(
+                        progress_label or f"role={role} turn={turn_dir.name}"
+                    ),
+                )
+            else:
+                with MIX_ACCOUNT.active_account_environment(
+                    environment,
+                    binding=account_binding,
+                    role_home=codex_home,
+                    timeout_seconds=timeout_seconds,
+                ) as (bound_environment, account_binding_evidence):
+                    exit_code, stdout, stderr, process_failure = stream_subprocess(
+                        command=command,
+                        workspace=workspace,
+                        environment=bound_environment,
+                        prompt=prompt,
+                        events_path=events_path,
+                        stderr_path=stderr_path,
+                        timeout_seconds=timeout_seconds,
+                        progress_interval_seconds=progress_interval_seconds,
+                        progress_label=(
+                            progress_label or f"role={role} turn={turn_dir.name}"
+                        ),
+                    )
+            if process_failure is not None:
+                failure = process_failure
+        except MIX_ACCOUNT.AccountBindingError as exc:
+            failure = f"Codex Mix account binding failed: {exc}"
 
     duration = round(time.monotonic() - started_monotonic, 3)
-    if validation_failure is not None:
+    if validation_failure is not None or not events_path.is_file():
         events_path.write_bytes(stdout)
+    if validation_failure is not None or not stderr_path.is_file():
         stderr_path.write_bytes(stderr)
     event_metadata = P4.extract_event_metadata(events_path.read_bytes())
     final_message = final_path.read_bytes() if final_path.is_file() else b""
@@ -1435,6 +1491,12 @@ def run_codex_turn(
         failure = f"{failure}; {exc}" if failure else str(exc)
 
     process = {
+        "account_binding": account_binding_evidence,
+        "account_source": (
+            MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE
+            if account_binding is not None
+            else MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME
+        ),
         "authoritative_context": authoritative_evidence,
         "approval_policy": "bypassed",
         "approvals_and_sandbox_bypassed": True,
@@ -1497,6 +1559,7 @@ def invoke_reviewer(
     timeout_seconds: int,
     progress_interval_seconds: float = 15.0,
     review: bool = False,
+    account_binding: Optional[Any] = None,
 ) -> TurnResult:
     policy = choose_freshness_policy(governance, state)
     authoritative = build_authoritative_prompt(
@@ -1529,6 +1592,7 @@ def invoke_reviewer(
             f"run={run_root.name} cycle={cycle_number} role=reviewer "
             f"state=running target_head={target.head} turn={turn_dir.name}"
         ),
+        account_binding=account_binding,
     )
     reviewer_invariant_failure: Optional[str] = None
     target_after: Optional[TargetState] = None
@@ -1768,6 +1832,11 @@ def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
 def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
     configuration = {
+        "account_source": getattr(
+            args,
+            "account_source",
+            MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
+        ),
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "executor_home": str(args.executor_home.resolve()),
         "enable_runtime_transition": bool(getattr(args, "enable_runtime_transition", False)),
@@ -1792,6 +1861,11 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         "workload_runtime": str(args.workload_runtime.resolve()),
         "workload_static": str(args.workload_static.resolve()),
     }
+    binding = getattr(args, "codex_mix_account_binding", None)
+    if binding is not None:
+        configuration["codex_mix_account_binding"] = (
+            binding.identity_metadata()
+        )
     if p63_enabled(args):
         settings = framework_settings(args)
         configuration.update({
@@ -2201,6 +2275,24 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
         args.executor_home,
         runtime_root=getattr(args, "role_runtime_root", None),
     )
+    account_source = getattr(
+        args,
+        "account_source",
+        MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
+    )
+    if account_source == MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE:
+        for home in (args.reviewer_home, args.executor_home):
+            MIX_ACCOUNT.validate_role_runtime_config(home)
+        args.codex_mix_account_binding = MIX_ACCOUNT.inspect_active_account(
+            minimum_ttl_seconds=(
+                int(args.timeout_seconds)
+                + MIX_ACCOUNT.TOKEN_EXPIRY_MARGIN_SECONDS
+            )
+        )
+    elif account_source == MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME:
+        args.codex_mix_account_binding = None
+    else:
+        raise InvariantViolation("unsupported Codex account source")
     if getattr(args, "enable_runtime_transition", False):
         validate_runtime_destination(args)
     for label, home in (
@@ -2265,6 +2357,7 @@ def ensure_instruction_fresh(
     reviewer_home: Path,
     timeout_seconds: int,
     progress_interval_seconds: float = 15.0,
+    account_binding: Optional[Any] = None,
 ) -> Tuple[
     TurnResult,
     GovernanceSnapshot,
@@ -2295,6 +2388,7 @@ def ensure_instruction_fresh(
         reviewer_home=reviewer_home,
         timeout_seconds=timeout_seconds,
         progress_interval_seconds=progress_interval_seconds,
+        account_binding=account_binding,
     )
     freshness["refresh_performed"] = refresh.success
     freshness["replacement_instruction_path"] = (
@@ -3121,6 +3215,11 @@ def orchestrate(
             if evidence_finalization_enabled else None
         )
         run_configuration = {
+            "account_source": getattr(
+                args,
+                "account_source",
+                MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
+            ),
             "approval_policy": "bypassed",
             "approvals_and_sandbox_bypassed": True,
             "checkpoint_path": str(checkpoint_store.path.resolve()),
@@ -3145,6 +3244,11 @@ def orchestrate(
             "timeout_seconds": args.timeout_seconds,
             "workload_id": workload_id_for_args(args),
         }
+        binding = getattr(args, "codex_mix_account_binding", None)
+        if binding is not None:
+            run_configuration["codex_mix_account_binding"] = (
+                binding.identity_metadata()
+            )
         if evidence_finalization_enabled:
             run_configuration["evidence_finalization"] = {
                 **framework_settings(args),
@@ -3758,6 +3862,9 @@ def orchestrate(
                         reviewer_home=args.reviewer_home.resolve(),
                         timeout_seconds=args.timeout_seconds,
                         progress_interval_seconds=progress_interval,
+                        account_binding=getattr(
+                            args, "codex_mix_account_binding", None
+                        ),
                     )
                 if not recovered.success:
                     record_turn_summary(
@@ -3802,6 +3909,9 @@ def orchestrate(
                         reviewer_home=args.reviewer_home.resolve(),
                         timeout_seconds=args.timeout_seconds,
                         progress_interval_seconds=progress_interval,
+                        account_binding=getattr(
+                            args, "codex_mix_account_binding", None
+                        ),
                     )
                 )
                 instruction_reference = turn_reference(instruction, run_root)
@@ -3929,6 +4039,9 @@ def orchestrate(
                             f"run={run_id} cycle={cycle_number} role=executor "
                             f"state=running target_head={target_before.head} "
                             f"turn={turn_dir.name}"
+                        ),
+                        account_binding=getattr(
+                            args, "codex_mix_account_binding", None
                         ),
                     )
                 executor = recovered
@@ -4074,6 +4187,9 @@ def orchestrate(
                         reviewer_home=args.reviewer_home.resolve(),
                         timeout_seconds=args.timeout_seconds,
                         progress_interval_seconds=progress_interval,
+                        account_binding=getattr(
+                            args, "codex_mix_account_binding", None
+                        ),
                     )
                 if not recovered.success:
                     record_turn_summary(
@@ -4228,6 +4344,9 @@ def orchestrate(
                         timeout_seconds=args.timeout_seconds,
                         progress_interval_seconds=progress_interval,
                         review=True,
+                        account_binding=getattr(
+                            args, "codex_mix_account_binding", None
+                        ),
                     )
                 else:
                     reviewer_state = recover_reviewer_state_from_turn(recovered)
@@ -4576,6 +4695,11 @@ def preflight_report(
     target: TargetState, governance: GovernanceSnapshot, args: argparse.Namespace
 ) -> Dict[str, Any]:
     report = {
+        "account_source": getattr(
+            args,
+            "account_source",
+            MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
+        ),
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "execution_policy": {
             "approval_policy": "bypassed",
@@ -4599,6 +4723,9 @@ def preflight_report(
             "working_tree_clean": target.clean,
         },
     }
+    binding = getattr(args, "codex_mix_account_binding", None)
+    if binding is not None:
+        report["codex_mix_account_binding"] = binding.preflight_metadata()
     if p63_enabled(args):
         report["evidence_finalization"] = {
             **framework_settings(args),

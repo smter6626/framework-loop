@@ -13,6 +13,7 @@
     "framework_runtime": "../../docs/miniloop_runtime.md"
   },
   "profiles": {
+    "account_source": "codex_mix_active",
     "reviewer_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer",
     "executor_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor"
   },

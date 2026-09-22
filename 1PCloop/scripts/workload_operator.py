@@ -205,7 +205,9 @@ def load_config(path: Path) -> WorkloadConfig:
         "governance",
     )
     profiles = _require_object(
-        top["profiles"], ("reviewer_home", "executor_home"), "profiles"
+        top["profiles"],
+        ("reviewer_home", "executor_home", "account_source"),
+        "profiles",
     )
     execution = _require_object(
         top["execution"],
@@ -237,8 +239,15 @@ def load_config(path: Path) -> WorkloadConfig:
             )
         },
         "profiles": {
-            name: str(_resolved_path(base, profiles[name], f"profiles.{name}"))
-            for name in ("reviewer_home", "executor_home")
+            **{
+                name: str(
+                    _resolved_path(base, profiles[name], f"profiles.{name}")
+                )
+                for name in ("reviewer_home", "executor_home")
+            },
+            "account_source": _require_string(
+                profiles["account_source"], "profiles.account_source"
+            ),
         },
         "execution": {
             "codex_bin": str(_resolved_path(base, execution["codex_bin"], "execution.codex_bin"))
@@ -265,6 +274,11 @@ def load_config(path: Path) -> WorkloadConfig:
     }
     if type(resolved["execution"]["enable_runtime_transition"]) is not bool:
         raise OperatorError("execution.enable_runtime_transition must be boolean")
+    if (
+        resolved["profiles"]["account_source"]
+        not in RUNNER.MIX_ACCOUNT.ACCOUNT_SOURCES
+    ):
+        raise OperatorError("profiles.account_source is unsupported")
     try:
         RUNNER.validate_role_runtime_homes(
             Path(resolved["profiles"]["reviewer_home"]),
@@ -292,6 +306,7 @@ def build_runner_args(
     selected_run_id = run_id or RUNNER.P4.default_run_id()
     RUNNER.P4.validate_run_id(selected_run_id)
     return argparse.Namespace(
+        account_source=profiles["account_source"],
         codex_bin=execution["codex_bin"],
         enable_runtime_transition=execution["enable_runtime_transition"],
         executor_home=Path(profiles["executor_home"]),
@@ -726,6 +741,20 @@ def doctor(config: WorkloadConfig) -> Dict[str, Any]:
             raise OperatorError("profile missing")
         return "distinct-profile-directories"
 
+    def account_source_check() -> Any:
+        if args.account_source == RUNNER.MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME:
+            return {"account_source": args.account_source}
+        binding = RUNNER.MIX_ACCOUNT.inspect_active_account(
+            minimum_ttl_seconds=(
+                int(args.timeout_seconds)
+                + RUNNER.MIX_ACCOUNT.TOKEN_EXPIRY_MARGIN_SECONDS
+            )
+        )
+        return {
+            "account_source": args.account_source,
+            **binding.preflight_metadata(),
+        }
+
     def git_check() -> str:
         completed = subprocess.run(
             ["git", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -768,6 +797,7 @@ def doctor(config: WorkloadConfig) -> Dict[str, Any]:
         _check("python_dependencies", python_check),
         _check("codex", codex_check),
         _check("profiles", profiles_check),
+        _check("account_source", account_source_check),
         _check("git", git_check),
         _check("target", target_check),
         _check("governance_schemas", governance_check),

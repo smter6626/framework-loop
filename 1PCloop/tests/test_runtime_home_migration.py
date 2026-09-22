@@ -172,6 +172,9 @@ class RuntimeHomeMigrationTests(unittest.TestCase):
         for path in CONFIGS:
             with self.subTest(path=path):
                 profiles = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+                self.assertEqual(
+                    profiles["account_source"], "codex_mix_active"
+                )
                 self.assertEqual(profiles["reviewer_home"], REVIEWER)
                 self.assertEqual(profiles["executor_home"], EXECUTOR)
 
@@ -185,6 +188,9 @@ class RuntimeHomeMigrationTests(unittest.TestCase):
             "checkpoint.run_configuration.reviewer_home",
             "reviewer_state.reviewer_thread_id",
             "不得改写旧 process receipt",
+            '"account_source": "codex_mix_active"',
+            "CODEX_ACCESS_TOKEN",
+            'cli_auth_credentials_store="ephemeral"',
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)

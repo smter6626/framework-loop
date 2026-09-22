@@ -47,6 +47,38 @@ Executor CODEX_HOME:
 - symlink 或其他 alias 不能绕过该检查；
 - 目标 runtime 不存在时，`doctor` / preflight 必须失败，不能回退到 A/B。
 
+所有 tracked workload 还必须设置：
+
+```json
+"account_source": "codex_mix_active"
+```
+
+role runtime 与额度账号是两个独立维度：
+
+- Reviewer/Executor 的 `CODEX_HOME` 继续固定在两个 dedicated runtime，用于隔离配置、session、skills、
+  SQLite 和 persistent Reviewer thread；
+- 每个新 run 在 preflight 时读取 `~/.codex-mix/.mix/active.json`，并验证 marker、
+  `~/.codex-mix/auth.json` 和对应 A-D vault 的 `account_id` 一致；
+- run 只记录账号别名和 `account_id` 的 SHA-256，不保存原始 account ID 或 token；
+- 每个 `codex exec` 通过 `CODEX_ACCESS_TOKEN` 接收当前 projected credential，并强制
+  `cli_auth_credentials_store="ephemeral"`；
+- 子进程环境会移除 `CODEX_API_KEY`、`OPENAI_API_KEY` 和 workload identity 覆盖，避免额度来源被
+  其他环境变量替换；
+- CLI override 将所有认证环境变量从 Agent shell environment 中排除，并为该 turn 设置
+  `notify=[]`，避免 access token 传给 shell tool、项目脚本或通知进程；
+- run 启动后账号 identity 被固定。若 Codex Mix 在两个 turn 之间或 turn 期间切换账号，当前 run
+  必须 fail closed，不能让同一 run 混用多个额度账号；
+- access token 的剩余寿命必须至少覆盖 turn timeout 加 300 秒；
+- role runtime 原有 `auth.json` 只作为迁移历史缓存，不再决定 1PCloop 的额度来源。每个 turn 前后
+  校验该文件 SHA-256 不变；若 Codex 在 ephemeral 模式下仍改写它，则恢复原字节并 fail closed。
+
+[OpenAI 官方认证文档](https://learn.chatgpt.com/docs/auth?translationFallback=zh-Hans)说明基于文件的
+登录缓存通常位于 `CODEX_HOME/auth.json`，并应像密码一样保护。
+[OpenAI 官方环境变量文档](https://learn.chatgpt.com/docs/config-file/environment-variables)
+明确把 `CODEX_ACCESS_TOKEN` 定义为可信自动化可使用的 ChatGPT/Codex access token。这里使用环境
+注入而不是在两个 runtime 之间复制 refresh token，避免 Reviewer/Executor 分别轮换同一 refresh
+token 后产生 credential lineage 分叉。
+
 每个 Codex child process 会同时将 `CODEX_HOME` 和 `CODEX_SQLITE_HOME` 设置为同一个 role runtime，
 避免父 shell 中残留的 SQLite override 把 state DB/WAL 写到 canonical 或退休 home。process receipt 同时
 记录这两个解析后的路径。不过
@@ -55,10 +87,24 @@ Executor CODEX_HOME:
 `sqlite_home` 只能缺省，或精确解析到对应的新 role runtime；相对路径、旧 A/B 或任何其他目录都会
 fail closed。
 
-当前 tracked workload config 已指向新 runtime，但本次变更没有创建或复制这些目录。执行迁移前，
-1PCloop 暂时处于有意的 fail-closed 状态。
+当前 tracked workload config 已指向新 runtime，两个 runtime 已完成 cold-copy 和 post-migration
+validation。迁移种子仍是 Reviewer=B、Executor=A，但这只说明历史 state/session 来源，不再决定后续
+1PCloop 的额度账号。额度账号始终来自每次 run 启动时的 Codex Mix active projection。
 
-## Cold-copy migration script
+两个 runtime 的 `config.toml` 也已清除可执行的 A/B 回链：`notify` 改用
+`~/.codex-mix/computer-use/...`，迁移遗留的 A/B project trust 条目已移除。日常检查可运行：
+
+```bash
+rg -n '/Users/smterpro/\.codex-[AB]|~/.codex-[AB]' \
+  ~/.codex-mix/.mix/runtimes/1pcloop-reviewer/config.toml \
+  ~/.codex-mix/.mix/runtimes/1pcloop-executor/config.toml
+```
+
+预期无输出。历史 session/evidence 中仍可出现 A/B provenance 文本，但不得作为新进程的配置路径。
+`codex_mix_active` preflight 会执行同样的拒绝检查，并额外要求 `sqlite_home` 缺省或精确指向当前
+role runtime；因此之后重新引入任何 A/B config 回链都会阻止 1PCloop 启动。
+
+## 已执行的 cold-copy migration
 
 脚本位置：
 
@@ -66,17 +112,19 @@ fail closed。
 1PCloop/scripts/migrate_codex_mix_runtime_homes.sh
 ```
 
-默认只检查，不迁移：
+脚本默认只检查，不迁移：
 
 ```bash
 ./1PCloop/scripts/migrate_codex_mix_runtime_homes.sh --check-only
 ```
 
-未来经 Human 明确授权后才可执行：
+历史迁移曾在 Human 明确授权后使用：
 
 ```bash
 ./1PCloop/scripts/migrate_codex_mix_runtime_homes.sh --execute
 ```
+
+当前目标 runtime 已存在，因此脚本会 fail closed。不要为了日常运行再次执行 migration。
 
 脚本的 fail-closed 边界：
 
@@ -112,10 +160,12 @@ Codex storage 层最大限度保留 `codex exec resume <thread-id>` 所需材料
    `configuration.operator_config_identity`；
 2. `checkpoint.configuration.reviewer_home` 和 `executor_home` 必须与当前 invocation 精确相同；
 3. `checkpoint.run_configuration` 也保存两个 home 和 operator config identity；
-4. `reviewer_state.reviewer_thread_id` 决定后续 Reviewer 必须恢复哪个 thread；
-5. 已完成 turn 的 `process.json.codex_home` 是历史 authority evidence，当前恢复校验要求它与 invocation
+4. 新 run 还保存 `account_source=codex_mix_active`、active alias 和 account ID SHA-256；resume 时当前
+   Codex Mix identity 必须与 checkpoint 完全一致；
+5. `reviewer_state.reviewer_thread_id` 决定后续 Reviewer 必须恢复哪个 thread；
+6. 已完成 turn 的 `process.json.codex_home` 是历史 authority evidence，当前恢复校验要求它与 invocation
    home 相符；
-6. manifest 和 raw process receipt 是历史证据，不能为了迁移而静默改写。
+7. manifest 和 raw process receipt 是历史证据，不能为了迁移而静默改写。
 
 因此：
 
@@ -156,10 +206,16 @@ touch /tmp/1pcloop-retired-home-marker
 RUN=/absolute/path/to/1PCloop/.local/runs/<new-run-id>
 find "$RUN" -name process.json -exec jq -e '
   select(has("codex_home")) |
-  (.codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer" or
-   .codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor")
+  ((.codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer" or
+    .codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor") and
+   .account_source == "codex_mix_active" and
+   .account_binding.role_auth_unchanged == true)
 ' {} +
 ```
+
+同一 run 的所有 receipt 还必须记录相同的 `account_binding.account_alias`，并与 run 启动前
+`codex-switch.py status` 的 `marker` 相同。receipt 只能保存 alias 和 account ID SHA-256，不能出现 access
+token、refresh token 或 ID token。
 
 最后证明退休 home 没有新增或修改 regular file，同时新 runtime 产生了 session/activity：
 
@@ -170,6 +226,6 @@ find ~/.codex-mix/.mix/runtimes/1pcloop-reviewer \
      -type f -newer /tmp/1pcloop-retired-home-marker -print
 ```
 
-第一条 `find` 必须无输出；第二条应只在两个 dedicated runtime 下显示新 activity。smoke 期间不得切换
-Codex Mix interactive account 来解释 role identity，因为 interactive credential projection 与 1PCloop
-runtime home 是不同维度。
+第一条 `find` 必须无输出；第二条应只在两个 dedicated runtime 下显示新 activity。Codex Mix interactive
+account 决定本次 run 的额度来源，runtime home 决定 role state。运行期间如果尝试切换账号，switch lock
+或下一 turn 的 identity check 必须使操作 fail closed，不能静默改变额度账号。

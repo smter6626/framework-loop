@@ -104,11 +104,16 @@ effort should normally be at least as strong as the Executor's, especially for c
 high-risk work. This is operational guidance, not a replacement for evidence and mechanical
 validation.
 
-The `~/.codex` symlink, the foreground Codex GUI account, and open GUI windows do not select role
-identity. Every invocation binds the intended `CODEX_HOME` explicitly. Account labels A-D are
+The `~/.codex` symlink, foreground Codex GUI account, and open GUI windows do not select the role
+runtime. Every invocation binds the intended `CODEX_HOME` explicitly. Account labels A-D are
 credential identities, not Reviewer/Executor roles. Historical `~/.codex-A` and `~/.codex-B`
-homes are rejected as live role runtimes. See the
-[Codex Mix runtime-home migration guide](docs/codex-runtime-homes/README.md).
+homes are rejected as live role runtimes.
+
+Tracked workloads use `account_source=codex_mix_active`: a new run pins the current Codex Mix
+active account, and both roles consume that account's quota while retaining separate runtime
+state. An account change during a run, insufficient token lifetime, A/B baseline drift, or a role
+auth-cache write fails closed. See the
+[Codex Mix runtime-home and active-account guide](docs/codex-runtime-homes/README.md).
 
 ## Installation
 
@@ -740,6 +745,7 @@ tests/test_verdict_correction.py     verdict correction and public result
 tests/test_progress_status.py        structured progress, timing, status, and recovery
 tests/test_operator_cli.py           workload config and operator commands
 tests/test_mutation_contracts.py     pure contracts and runner compatibility
+tests/test_codex_mix_account.py      active-account, token, and A/B baseline binding
 tests/test_human_gate.py             Human Gate projection and read-only CLI
 tests/test_local_tui.py              read-only TUI presenter and disposable integration
 ```
@@ -749,6 +755,7 @@ tests/test_local_tui.py              read-only TUI presenter and disposable inte
 ```text
 scripts/run_mutation_loop.py      current mutation orchestrator
 scripts/mutation_contracts.py     side-effect-free control/message contracts
+scripts/codex_mix_account.py      fail-closed Codex Mix active-account binding
 scripts/human_gate.py             pure Human Gate status projection
 scripts/local_tui.py              read-only terminal presenter and operator data source
 scripts/run_text_loop.py          read-only text-routing/context diagnostic runner

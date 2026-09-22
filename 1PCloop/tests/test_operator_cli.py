@@ -78,6 +78,7 @@ class OperatorCliTests(unittest.TestCase):
                 "framework_runtime": relative(args.framework_runtime),
             },
             "profiles": {
+                "account_source": "runtime_home",
                 "reviewer_home": relative(args.reviewer_home),
                 "executor_home": relative(args.executor_home),
             },
@@ -163,6 +164,7 @@ class OperatorCliTests(unittest.TestCase):
             missing = json.loads(json.dumps(original)); del missing["target"]; invalid_values.append(missing)
             version = json.loads(json.dumps(original)); version["schema_version"] = 2; invalid_values.append(version)
             wrong = json.loads(json.dumps(original)); wrong["execution"]["max_cycles"] = True; invalid_values.append(wrong)
+            account_source = json.loads(json.dumps(original)); account_source["profiles"]["account_source"] = "unknown"; invalid_values.append(account_source)
             home = json.loads(json.dumps(original)); home["profiles"]["executor_home"] = home["profiles"]["reviewer_home"]; invalid_values.append(home)
             nested = json.loads(json.dumps(original)); nested["profiles"]["executor_home"] = nested["profiles"]["reviewer_home"] + "/nested"; invalid_values.append(nested)
             outside = json.loads(json.dumps(original)); outside["profiles"]["executor_home"] = "/tmp/outside-role-runtime"; invalid_values.append(outside)

@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import hashlib
 import importlib.util
 import io
@@ -256,6 +257,65 @@ class MutationLoopTests(unittest.TestCase):
             session_mode=MODULE.FRESH_EPHEMERAL,
             resume_target_thread_id=None,
         ))
+        bound = MODULE.build_codex_command(
+            codex_bin="codex",
+            workspace=Path("/tmp/target"),
+            final_path=Path("/tmp/final.txt"),
+            session_mode=MODULE.NEW_PERSISTENT,
+            resume_target_thread_id=None,
+            ephemeral_access_token=True,
+        )
+        self.assertIn("--config", bound)
+        self.assertIn(
+            MODULE.MIX_ACCOUNT.EPHEMERAL_CREDENTIAL_OVERRIDE,
+            bound,
+        )
+        self.assertIn(
+            MODULE.MIX_ACCOUNT.AUTH_ENVIRONMENT_EXCLUDE_OVERRIDE,
+            bound,
+        )
+        self.assertIn(
+            MODULE.MIX_ACCOUNT.NOTIFY_DISABLED_OVERRIDE,
+            bound,
+        )
+
+    def test_account_binding_failure_is_persisted_without_starting_codex(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run_root = root / "run"
+            run_root.mkdir()
+
+            @contextlib.contextmanager
+            def refuse(*_args, **_kwargs):
+                raise MODULE.MIX_ACCOUNT.AccountBindingError(
+                    "active account changed"
+                )
+                yield
+
+            with patch.object(
+                MODULE.MIX_ACCOUNT,
+                "active_account_environment",
+                refuse,
+            ):
+                result = MODULE.run_codex_turn(
+                    run_root=run_root,
+                    turn_dir=run_root / "reviewer-instruction",
+                    codex_bin="codex",
+                    codex_home=root,
+                    workspace=root,
+                    timeout_seconds=10,
+                    role="reviewer",
+                    message_type=MODULE.REVIEWER_INSTRUCTION,
+                    prompt=b"fixture",
+                    session_mode=MODULE.NEW_PERSISTENT,
+                    account_binding=object(),
+                )
+            self.assertFalse(result.success)
+            self.assertIn("account binding failed", result.process["failure"])
+            self.assertIsNone(result.process["exit_code"])
+            self.assertTrue((result.turn_dir / "events.jsonl").is_file())
+            self.assertTrue((result.turn_dir / "stderr.txt").is_file())
+            self.assertIn("--config", result.process["command"])
 
     def test_prompts_define_role_boundaries_without_a_filesystem_sandbox(self):
         target = Path("/tmp/target")

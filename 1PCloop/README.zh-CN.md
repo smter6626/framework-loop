@@ -95,10 +95,14 @@ Executor = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor
 不同模型。实际使用中建议 Reviewer 的模型能力和 reasoning effort 不低于 Executor，复杂或高风险
 任务可以给 Reviewer 更强配置；这只是运行建议，不能替代 evidence 和机械校验。
 
-`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不参与 role identity 判定。每次 CLI
-invocation 都显式设置目标 `CODEX_HOME`。A-D 是 account identity，不是 Reviewer/Executor role；历史
-`~/.codex-A` 和 `~/.codex-B` 不再允许作为 live runtime。完整边界和未执行的迁移流程见
-[Codex Mix runtime-home 迁移说明](docs/codex-runtime-homes/README.md)。
+`~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不选择 role runtime。每次 CLI invocation
+都显式设置目标 `CODEX_HOME`。A-D 是 account identity，不是 Reviewer/Executor role；历史
+`~/.codex-A` 和 `~/.codex-B` 不再允许作为 live runtime。
+
+tracked workload 使用 `account_source=codex_mix_active`：新 run 会固定 Codex Mix 当前 active account，
+Reviewer/Executor 都以该账号消耗额度，但继续使用各自独立的 runtime state。账号在 run 中变化、token
+寿命不足、A/B baseline 变化或 role auth cache 被改写时都会 fail closed。完整边界见
+[Codex Mix runtime-home 与 active-account 说明](docs/codex-runtime-homes/README.md)。
 
 ## 安装
 
@@ -631,6 +635,7 @@ tests/test_verdict_correction.py     verdict correction/public result
 tests/test_progress_status.py        structured progress/timing/status/recovery
 tests/test_operator_cli.py           workload config/operator commands
 tests/test_mutation_contracts.py     纯 contract 与 runner 兼容性
+tests/test_codex_mix_account.py      active account 绑定、token 和 A/B baseline
 tests/test_human_gate.py             Human Gate projection 与只读 CLI
 tests/test_local_tui.py              只读 TUI 呈现层与 disposable integration
 ```
@@ -640,6 +645,7 @@ tests/test_local_tui.py              只读 TUI 呈现层与 disposable integrat
 ```text
 scripts/run_mutation_loop.py      当前 mutation orchestrator
 scripts/mutation_contracts.py     无 side effect 的 control/message contract
+scripts/codex_mix_account.py      Codex Mix active account fail-closed 绑定
 scripts/human_gate.py             纯 Human Gate 状态 projection
 scripts/local_tui.py              只读终端呈现层与 operator 数据源
 scripts/run_text_loop.py          只读 text-routing/context diagnostic runner
