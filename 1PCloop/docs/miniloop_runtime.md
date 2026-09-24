@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/foundation_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_window_layout_v1 / L1 ACTIVE
+= whisper_window_layout_v1 / L1 AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Overall 1PCloop completion
@@ -111,6 +111,14 @@ starts exactly at target-side documentation commit
 limited to screen-aware window geometry, deliberate scroll/focus accessibility,
 regression coverage, and target-side documentation. Real macOS visual and trackpad
 acceptance remains a Human Owner gate after automatic review.
+
+Retry run `20260924T225838Z-88499` completed the full Reviewer -> Executor -> same Reviewer path
+after the auth transaction repair. Reviewer accepted target commit
+`569e5c551c101811ed80fca23bd5708d6ac880cf`; focused and full deterministic tests passed, the
+target feature branch was ordinary-pushed, and framework evidence commit
+`bd3c088840342d59e79d224f6fd0ab8a49fe11a8` reached `origin/main`. L1 has no remaining automatic
+step. Real macOS window placement, trackpad feel, bilingual rendering, and retained S2 controls
+remain the only current Human Gate; merge/release remains separate.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

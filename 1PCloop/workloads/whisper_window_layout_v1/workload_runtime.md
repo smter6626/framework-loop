@@ -3,13 +3,13 @@
 ## 1. Current Status
 
 - Task ID: `whisper_window_layout_v1`
-- 状态: `ACTIVE`
-- 当前 verdict: `NOT EVALUATED`
-- 唯一 Active Step: `L1 -- 限定主窗口高度并建立明确滚动边界`
+- 状态: `AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE`
+- 当前 verdict: `ACCEPT -- deterministic code/offscreen scope only`
+- 唯一 Active Step: 无；L1 machine state 已 `COMPLETED`
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_window_layout_v1/workload_static.md`; SHA-256 `916a44790e67af5f3023d5b36e52fd14097b45348d50e857c9fa56abd753521b`
 - Target identity: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`; branch `codex/bounded-scrollable-main-window-v1`; baseline `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34`
-- 当前 evidence snapshot: 前序 `whisper_session_ui_v1` 已关闭并有人类功能黑盒 PASS；Human Owner 同次测试确认主窗口过高；target branch 仍精确位于 `fb7e38e...` 且 clean；首次 L1 run 在 Reviewer 启动认证阶段 fail closed，尚无 layout 实现 commit
+- 当前 evidence snapshot: retry run `20260924T225838Z-88499` 完成 Reviewer -> Executor -> 原 Reviewer review；target commit `569e5c551c101811ed80fca23bd5708d6ac880cf` 已自动 ACCEPT 并普通 push 到 feature branch；framework evidence commit `bd3c088840342d59e79d224f6fd0ab8a49fe11a8` 已 push；只剩真实 macOS视觉/trackpad Human Gate
 - 最后更新: 2026-09-24
 
 ## 2. Completed
@@ -23,10 +23,13 @@
 - Human-authorized repair: 允许在 switch lock + role lock + 持久事务内临时投影完整 active `auth.json`，并在 turn 后恢复 role 原 bytes/mode。账号 identity 必须固定，A/B 快照必须不变，credential scan 必须为零。修复通过专项、完整回归和双 role real smoke 后，使用新的 retry config/run ID 明确记录 `retry_of=20260924T220337Z-47406` 与 `retry_reason=codex_mix_file_credential_projection_fix`。
 - Auth repair validation: framework commit `8a055a38282e17e678324400ca01721568c43f30` 已普通 push。认证事务专项 14/14、完整 ResourceWarning-strict 回归 222/222 PASS；Reviewer fresh、同线程 resume、Executor ephemeral 三次真实 service smoke 均返回 `auth-ok`，无 401，role auth bytes/mode 已恢复，actual credential hit 为 0，A/B snapshot 和 active identity 不变。compact evidence: `1PCloop/evidence-summaries/codex-mix-auth-projection-repair-20260924.md`。
 - Retry readiness: `window_layout_retry_01.json` raw SHA-256 `88506a4f6f5b8208cede4c7785cab856e1488a27f5fc4211206f41bfd14f3dfe`，canonical resolved SHA-256 `66162d42571ecf8085dc2385944ac4d665a2d80766d7abfcdaeae11edcfe1283`。post-push doctor 9/9、preflight PASS；target 仍 clean 且位于 `fb7e38e...`。retry 使用独立 state root，不改写旧失败 checkpoint。
+- L1 automated implementation: retry run `20260924T225838Z-88499` 绑定旧失败 run，三次 Codex turn 全部 process success。Executor commit `569e5c551c101811ed80fca23bd5708d6ac880cf` 是 baseline 的唯一直接后继，只改 7 个允许文件；新增 screen-aware height bound、左侧 controls scroll area、geometry/screen rebind 和 focused tests，未改 backend/controller/store/settings/session/clipboard 语义。
+- L1 independent automated review: 原 Reviewer thread 对 exact target HEAD 返回 schema-valid `ACCEPT`。Focused layout 4/4、S2 session 9/9、language 6/6、output 5/5、model UI 10/10、full discovery 121/121、UI support 22/22 均 PASS；独立复跑 layout + S2 为 13/13 PASS。commit/file hashes 与实际 bytes 一致。Target feature branch 已普通 push，local/origin/GitHub ref 均为 `569e5c...`，worktree clean。
+- Codex Mix run stability: Reviewer fresh、Executor ephemeral、Reviewer same-thread resume 均使用同一 run-bound active identity；三份 receipt 均记录 file projection、role auth restored、active identity unchanged、actual credential hits 0。turn 后无 transaction 残留，A/B retirement snapshot unchanged。
 
 ## 3. Active Step
 
-### L1 -- 限定主窗口高度并建立明确滚动边界
+### L1 -- 限定主窗口高度并建立明确滚动边界 (`COMPLETED`)
 
 - Objective: 让主窗口在多个可注入 macOS available geometry 下首次显示和 resize 后不超出可用高度，并让所有 controls 可经清晰的滚动/键盘路径访问，同时保持 transcript tabs 自身滚动和已验收功能。
 - Inputs 及固定 identity: 本 Static 和 Runtime；target `fb7e38e...`；`ui_app.py` 当前 root/status/body/controls/tabs layout；`docs/change_records/session_clipboard_ui_v1.md`；现有 `testCodes/test_session_clipboard_ui.py`、`testCodes/test_ui_language.py`、UI/output/model tests。
@@ -43,25 +46,25 @@
 
 | Acceptance criterion | Direct evidence | Evidence sufficiency judgment | Result |
 | --- | --- | --- | --- |
-| AC-01 至 AC-08 | 尚无 layout 实现 commit | 尚不可判断 | INSUFFICIENT |
+| AC-01 至 AC-08 | target `569e5c...`; `ui_app.py`; `testCodes/test_window_layout.py`; `/tmp/whisper_window_layout_v1.hIbddn`; run `20260924T225838Z-88499` | code、offscreen geometry、scroll ownership、focus、retranslation、回归和 exact hashes 足以覆盖自动范围；真实 macOS视觉/trackpad 明确保留给 Human | PASS |
 
-- 独立 evidence access: `NOT APPLICABLE -- 尚未执行 L1`
-- 独立 verdict formation: `NOT APPLICABLE`
-- 独立 evidence-sufficiency judgment: `NOT APPLICABLE`
-- Review verdict: `NOT EVALUATED`
+- 独立 evidence access: Reviewer 读取 exact commit/diff、测试 logs/matrix、target/worktree 和治理 identity。
+- 独立 verdict formation: 原 Reviewer persistent thread 显式 resume，未由 Executor 自验替代。
+- 独立 evidence-sufficiency judgment: 自动范围充分；真实 macOS title bar、多显示器、scrollbar 外观和 trackpad 手感不能由 offscreen Qt 证明。
+- Review verdict: `ACCEPT -- AUTOMATED SCOPE`
 - Review limitations: 自动 Reviewer 可以验收代码、模拟 geometry、event routing 和回归；真实 macOS视觉边界和 trackpad 手感仍由 Human Owner最终确认。
 
 ## 5. State Transition
 
 - Previous state: 前序 external workload `whisper_session_ui_v1` `ACCEPTED / TASK CLOSED WITH FOLLOW-UP UI DEFECT`。
 - Triggering evidence 或 Human decision: 2026-09-18 Human Owner 确认功能实现无问题，但 UI 太长并直接超出窗口限制，明确指定下一项 1PCloop 任务为限定窗口高度并增加适当滚动。
-- Current state: `ACTIVE / L1`。
-- Meaning: 只授权实现和验证窗口 geometry/scroll accessibility；不重开 S2，不授权目标集成或发布。
+- Current state: `L1 COMPLETED / AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE`。
+- Meaning: 代码和 deterministic/offscreen gate 已关闭；不重开 S2，不宣称真实 macOS视觉/trackpad已通过，不授权 merge/release。
 - Transition authorized by: Human Owner。
 
 ## 6. Blockers and Human Decision Gates
 
-- 当前 blocker: 无。认证事务修复和 retry doctor/preflight 已验证；下一动作是启动新的 L1 retry run。
+- 当前 blocker: 无代码 blocker。任务 closure 只等待 Human Owner 的真实 macOS视觉/trackpad结论。
 - Human Gate: Static 变化、隐藏/删除 controls、范围扩大到功能语义、主观视觉重设计、target merge/release/tag/force 或无法通过 deterministic UI evidence 判定时暂停。
 
 ## 7. Residual Validation Items
@@ -71,9 +74,9 @@
 
 ## 8. Pending Tasks -- Non-blocking Blocks
 
-- 当前顶层 Step: `1`，映射为 `L1`。
-- 当前没有需要倒计时管理的 non-blocking block。
-- Pending Gate Check: `CLEAR`。
+- 当前顶层 Active Step: 无；L1 machine state 为 `COMPLETED`。
+- Pending Human Gate: 真实 macOS窗口边界、controls 滚动、右侧独立滚动、中英文与 S2 按钮回归。
+- Pending Gate Check: `HUMAN ACTION REQUIRED`。
 
 ## 9. Superseded Decisions
 
@@ -81,17 +84,16 @@
 
 ## 10. Next Direction
 
-- 完成认证事务修复、双 role real smoke 和新 retry config 的 doctor/preflight 后，启动新的 config-bound retry run；不得 resume 失败 run。
-- 若自动 Reviewer ACCEPT，仅关闭代码/模拟 UI gate并由 Human-facing reviewer普通 push target branch；随后提供真实 macOS人工 checklist。若 REJECT，沿同一 L1 repair cycle处理，不扩大合同。
+- Human Owner 从 source 启动 App，执行真实 macOS视觉/trackpad checklist并报告 PASS 或具体 defect。
+- Human PASS 后只做 task closure 文档更新；merge/release 仍是独立决定。Human 发现 defect 时创建新的 bounded repair step，不改写本次 ACCEPT evidence。
 
-## 11. Current Executor Handoff
+## 11. Current Human Validation Handoff
 
-- 本轮唯一任务: 实现并测试 Static 定义的主窗口高度约束和滚动可达性。
-- 必须读取: 本 Static/Runtime；`ui_app.py` root/controls/tabs/retranslate/resize 相关代码；S2 change record；现有 session clipboard、UI language、output/model tests；双语 README 和 repo map。
-- 可以修改: L1 permitted changes 内的 target UI、tests 和必要文档。
-- 不得修改: 本 Static/Runtime、framework、backend/model/ASR、controller/store/settings/session/clipboard 语义、历史 evidence 或 closed workload。
-- 必须返回的 evidence locator: target commit/parent/diff；geometry/scroll/focus artifacts；targeted/related/full test logs及 SHA；changed-path/protected-path；branch/clean status和limitations。
-- 完成后停止于: `AWAITING_REVIEW`。
+- 启动：`cd /Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui && .venv/bin/python ui_app.py`。
+- 检查初始窗口未超出当前屏幕可用高度；缩短窗口后左侧 controls 可用滚动条、鼠标滚轮、触控板和 Tab/Shift-Tab 到达首尾。
+- 检查 Clean/Raw/Logs 只滚动自己的内容，不带动左侧 controls；状态栏保持在左侧滚动区外。
+- 切换中英文，确认 label 和高度边界仍正常；复查开始新录音清屏、复制 Clean TXT 路径和增量复制文本。
+- 不要求重新 bootstrap whisper runtime；本 gate 不要求播放音频或验证 ASR 质量。
 
 ## Machine-owned State
 
