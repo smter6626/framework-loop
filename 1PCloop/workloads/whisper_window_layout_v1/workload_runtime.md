@@ -21,6 +21,8 @@
 - Operator readiness: framework commit `029f4484cb51cc2afe73f0a6e29a0ee5facc0701` 上运行 `window_layout.json` 的 doctor 8/8 PASS、preflight PASS。Config raw SHA-256 为 `3ff05a6d78d88aafe4516ea69e4bb369a9c2b68c69fd02c122b3bceb5488e745`，resolved SHA-256 为 `95527396a4e4eaa4bd00ee39583c4ff74733daeb7be1072b4d07de6c752c9019`；target clean 且精确位于 `fb7e38e...`，framework local/origin main 同步。该检查没有调用 Agent 或修改 target。
 - Failed auth run: run `20260924T220337Z-47406` 在首次 Reviewer turn 因错误的 OAuth-token-to-`CODEX_ACCESS_TOKEN` transport 返回 401 并 fail closed。三层结果为 `FAILED_CLOSED / NOT_APPLIED / PUSHED`；framework evidence commit 为 `0da9c5fa4e384beda6e908a4028846f3acda7429`。该 run、checkpoint、raw/tracked evidence 永久保留，不能 resume、删除或改写。
 - Human-authorized repair: 允许在 switch lock + role lock + 持久事务内临时投影完整 active `auth.json`，并在 turn 后恢复 role 原 bytes/mode。账号 identity 必须固定，A/B 快照必须不变，credential scan 必须为零。修复通过专项、完整回归和双 role real smoke 后，使用新的 retry config/run ID 明确记录 `retry_of=20260924T220337Z-47406` 与 `retry_reason=codex_mix_file_credential_projection_fix`。
+- Auth repair validation: framework commit `8a055a38282e17e678324400ca01721568c43f30` 已普通 push。认证事务专项 14/14、完整 ResourceWarning-strict 回归 222/222 PASS；Reviewer fresh、同线程 resume、Executor ephemeral 三次真实 service smoke 均返回 `auth-ok`，无 401，role auth bytes/mode 已恢复，actual credential hit 为 0，A/B snapshot 和 active identity 不变。compact evidence: `1PCloop/evidence-summaries/codex-mix-auth-projection-repair-20260924.md`。
+- Retry readiness: `window_layout_retry_01.json` raw SHA-256 `88506a4f6f5b8208cede4c7785cab856e1488a27f5fc4211206f41bfd14f3dfe`，canonical resolved SHA-256 `66162d42571ecf8085dc2385944ac4d665a2d80766d7abfcdaeae11edcfe1283`。post-push doctor 9/9、preflight PASS；target 仍 clean 且位于 `fb7e38e...`。retry 使用独立 state root，不改写旧失败 checkpoint。
 
 ## 3. Active Step
 
@@ -59,7 +61,7 @@
 
 ## 6. Blockers and Human Decision Gates
 
-- 当前 blocker: `L1` 的产品实现不受设计阻塞，但必须先完成并验证 Codex Mix 文件凭据事务修复，再启动明确 retry run。
+- 当前 blocker: 无。认证事务修复和 retry doctor/preflight 已验证；下一动作是启动新的 L1 retry run。
 - Human Gate: Static 变化、隐藏/删除 controls、范围扩大到功能语义、主观视觉重设计、target merge/release/tag/force 或无法通过 deterministic UI evidence 判定时暂停。
 
 ## 7. Residual Validation Items

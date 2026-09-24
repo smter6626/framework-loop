@@ -71,6 +71,22 @@ ae003a1eef8cbac7fe028be419e49106deca29ddce68688a1c5953f1c2750556
 This tracked summary intentionally omits account labels, raw account IDs, token values, token
 hashes, auth JSON, child environments, prompts, stderr bodies, and session content.
 
+## Publication and operator readiness
+
+- Framework implementation commit: `8a055a38282e17e678324400ca01721568c43f30`.
+- Ordinary non-force push advanced `origin/main` to the same commit.
+- Retry config raw SHA-256: `88506a4f6f5b8208cede4c7785cab856e1488a27f5fc4211206f41bfd14f3dfe`.
+- Retry config canonical resolved SHA-256: `66162d42571ecf8085dc2385944ac4d665a2d80766d7abfcdaeae11edcfe1283`.
+- Post-push retry doctor: 9/9 PASS; local artifact SHA-256
+  `4c2c182cdc5a9be56f17e983609f5b0bb3498080d597231891348b7e41493d19`.
+- Post-push retry preflight: PASS; local artifact SHA-256
+  `801d4469ba3e4169cde81b280c8c59aaa137de2a12741ea43bb8f9d388be304f`.
+- Live Codex Mix switcher SHA-256: `6dba7e435877379c1e13e14df897fec65588623cc6134fadccff0d62035cb6cc`.
+- Local Codex Mix README SHA-256: `7f300b0861477eadb9e1c5e775811c651e1384f54670314c5a5a4b5ff0fd2627`.
+
+The switcher and its local README are machine-local Codex Mix assets, not files in the framework
+Git repository. Their hashes bind the exact live versions validated for this repair.
+
 ## Retry boundary
 
 The next layout run must use `window_layout_retry_01.json`, a new run ID, and a distinct state root.

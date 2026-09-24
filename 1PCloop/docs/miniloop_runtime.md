@@ -128,6 +128,14 @@ and the 21,091-entry A/B retirement snapshot must remain unchanged; credentials 
 from prompt/evidence/Git/log/notification surfaces. The retry must use a new run ID and explicitly
 reference the failed run rather than resume or overwrite it.
 
+Implementation commit `8a055a38282e17e678324400ca01721568c43f30` was non-force pushed to
+`origin/main`. Focused auth transaction tests passed 14/14; the full
+ResourceWarning-strict suite passed 222/222 in 238.635 seconds. A three-turn real service smoke
+completed Reviewer fresh, same-thread Reviewer resume, and Executor ephemeral turns without 401;
+all role credentials were restored and actual credential scan hits were zero. The explicit retry
+config then passed doctor 9/9 and preflight. Compact evidence is tracked at
+`1PCloop/evidence-summaries/codex-mix-auth-projection-repair-20260924.md`.
+
 ### 2026-09-18 -- foundation_v1 phase closure
 
 Status: `ACCEPTED / PHASE CLOSED -- AWAITING OVERALL HUMAN OWNER DECISION`
