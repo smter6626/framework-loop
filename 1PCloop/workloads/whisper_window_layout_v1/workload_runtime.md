@@ -99,13 +99,69 @@
 {
   "active_step": {
     "id": "L1",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "e273ff320e67a1875dc2c5e2157db497411d315a04ee7e299df5924564e71c18",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_window_layout_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
 该机器块只授权 L1 的一次 schema-valid Reviewer `ACCEPT -> COMPLETED` transition。它不授权自动关闭 Human 真实 macOS视觉 gate，也不授权 target push、merge、tag 或 release。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "4cd9ef55c5b03ce0bad158de109a36f885824e0c4c76383777106ac19c68fb86",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "569e5c551c101811ed80fca23bd5708d6ac880cf",
+      "sha256": "1a052b74aef9786569885121dfd68012d35e41a23aad12065c9ce64e2e5695c7"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/ui_app.py",
+      "sha256": "c80cfca171d547e25bd312e22177de95996cba4d8da83c00505b3c148cc680a3"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/testCodes/test_window_layout.py",
+      "sha256": "ee15a137d2fb2af77aa895246876c176c963562afa872c7029beddb41656a9c2"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/docs/change_records/window_layout_v1.md",
+      "sha256": "655ae0397ecf9cb899305554b0ac0e0f9d8ea8d73ef3f09463e001e11fdfded6"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "L1",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "e273ff320e67a1875dc2c5e2157db497411d315a04ee7e299df5924564e71c18",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_window_layout_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "L1",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_window_layout_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260924T225838Z-88499/cycle-01/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "824dbb6faf42d00d7f7ea73939d9c0c11e887db9ab6a33e23544c24392310602",
+  "schema_version": 1,
+  "target_head": "569e5c551c101811ed80fca23bd5708d6ac880cf",
+  "timestamp": "2026-09-24T23:15:31.401+00:00",
+  "transition_id": "e273ff320e67a1875dc2c5e2157db497411d315a04ee7e299df5924564e71c18"
+}
+```
