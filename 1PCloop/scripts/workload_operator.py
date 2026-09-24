@@ -182,14 +182,20 @@ def load_config(path: Path) -> WorkloadConfig:
         raise OperatorError("workload config is missing or aliased")
     raw = source.read_bytes()
     value = strict_json_bytes(raw)
-    top = _require_object(
-        value,
-        (
-            "schema_version", "workload_id", "target", "governance",
-            "profiles", "execution", "evidence", "framework_git",
-        ),
-        "config",
-    )
+    required_top = {
+        "schema_version", "workload_id", "target", "governance",
+        "profiles", "execution", "evidence", "framework_git",
+    }
+    if not isinstance(value, dict):
+        raise OperatorError("config must be an object")
+    for key in value:
+        if not isinstance(key, str) or PROHIBITED_KEY.search(key):
+            raise OperatorError("config contains a prohibited field")
+    if not required_top.issubset(value) or not set(value).issubset(
+        required_top | {"retry"}
+    ):
+        raise OperatorError("config field set is invalid")
+    top = value
     if top["schema_version"] != CONFIG_SCHEMA_VERSION:
         raise OperatorError("workload config schema version is unsupported")
     workload_id = RUNNER.P4.validate_run_id(
@@ -223,6 +229,11 @@ def load_config(path: Path) -> WorkloadConfig:
     framework_git = _require_object(
         top["framework_git"], ("branch", "remote", "push_ref"), "framework_git"
     )
+    retry = None
+    if "retry" in top:
+        retry = _require_object(
+            top["retry"], ("retry_of", "retry_reason"), "retry"
+        )
     base = source.parent
     resolved: Dict[str, Any] = {
         "schema_version": CONFIG_SCHEMA_VERSION,
@@ -272,6 +283,15 @@ def load_config(path: Path) -> WorkloadConfig:
             for name in ("branch", "remote", "push_ref")
         },
     }
+    if retry is not None:
+        resolved["retry"] = {
+            "retry_of": RUNNER.P4.validate_run_id(
+                _require_string(retry["retry_of"], "retry.retry_of")
+            ),
+            "retry_reason": _require_string(
+                retry["retry_reason"], "retry.retry_reason"
+            ),
+        }
     if type(resolved["execution"]["enable_runtime_transition"]) is not bool:
         raise OperatorError("execution.enable_runtime_transition must be boolean")
     if (
@@ -319,6 +339,8 @@ def build_runner_args(
         max_cycles=execution["max_cycles"],
         operator_config_identity=config.identity(),
         progress_interval_seconds=execution["progress_interval_seconds"],
+        retry_of=(value.get("retry") or {}).get("retry_of"),
+        retry_reason=(value.get("retry") or {}).get("retry_reason"),
         resume=resume,
         reviewer_home=Path(profiles["reviewer_home"]),
         role_runtime_root=ROLE_RUNTIME_ROOT,

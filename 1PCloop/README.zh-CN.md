@@ -101,7 +101,8 @@ Executor = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor
 
 tracked workload 使用 `account_source=codex_mix_active`：新 run 会固定 Codex Mix 当前 active account，
 Reviewer/Executor 都以该账号消耗额度，但继续使用各自独立的 runtime state。账号在 run 中变化、token
-寿命不足、A/B baseline 变化或 role auth cache 被改写时都会 fail closed。完整边界见
+寿命不足、A/B baseline 变化或认证事务无法安全恢复时都会 fail closed。普通 ChatGPT 登录通过锁保护的
+完整 `auth.json` 临时文件投影使用；turn 后恢复 role 原 bytes/mode，认证环境变量不传给 Agent。完整边界见
 [Codex Mix runtime-home 与 active-account 说明](docs/codex-runtime-homes/README.md)。
 
 ## 安装

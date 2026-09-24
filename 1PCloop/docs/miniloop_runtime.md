@@ -112,6 +112,22 @@ limited to screen-aware window geometry, deliberate scroll/focus accessibility,
 regression coverage, and target-side documentation. Real macOS visual and trackpad
 acceptance remains a Human Owner gate after automatic review.
 
+### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
+
+Run `20260924T220337Z-47406` failed closed in the first Reviewer instruction turn with HTTP/WS
+401 `Missing bearer or basic authentication in header`. Target branch and HEAD stayed clean and
+unchanged; Runtime transition was not applied. The immutable failure evidence was published by
+framework commit `0da9c5fa4e384beda6e908a4028846f3acda7429` and must not be deleted or rewritten.
+
+Diagnosis proved that the implementation incorrectly extracted an ordinary ChatGPT OAuth access
+token from `auth.json` and passed it through the programmatic `CODEX_ACCESS_TOKEN` entry. Human
+Owner authorized a replacement security boundary: complete canonical `auth.json` bytes may be
+temporarily projected into the dedicated role runtime under switch/role locks and a 0700/0600
+persistent recovery transaction. The original role bytes/mode must be restored; active identity
+and the 21,091-entry A/B retirement snapshot must remain unchanged; credentials remain forbidden
+from prompt/evidence/Git/log/notification surfaces. The retry must use a new run ID and explicitly
+reference the failed run rather than resume or overwrite it.
+
 ### 2026-09-18 -- foundation_v1 phase closure
 
 Status: `ACCEPTED / PHASE CLOSED -- AWAITING OVERALL HUMAN OWNER DECISION`

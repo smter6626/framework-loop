@@ -15,6 +15,7 @@ import importlib.util
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -1033,7 +1034,7 @@ def build_codex_command(
     session_mode: str,
     resume_target_thread_id: Optional[str],
     output_schema: Path = SCHEMAS_ROOT / "reviewer_instruction.schema.json",
-    ephemeral_access_token: bool = False,
+    file_credential_projection: bool = False,
 ) -> List[str]:
     if session_mode not in (FRESH_EPHEMERAL, NEW_PERSISTENT, RESUME):
         raise ValueError(f"unknown session mode: {session_mode}")
@@ -1042,9 +1043,9 @@ def build_codex_command(
     if session_mode != RESUME and resume_target_thread_id is not None:
         raise ValueError("resume target is only valid for resume mode")
     command = [codex_bin, "exec"]
-    if ephemeral_access_token:
+    if file_credential_projection:
         for override in (
-            MIX_ACCOUNT.EPHEMERAL_CREDENTIAL_OVERRIDE,
+            MIX_ACCOUNT.FILE_CREDENTIAL_OVERRIDE,
             MIX_ACCOUNT.AUTH_ENVIRONMENT_EXCLUDE_OVERRIDE,
             MIX_ACCOUNT.NOTIFY_DISABLED_OVERRIDE,
         ):
@@ -1116,6 +1117,8 @@ def stream_subprocess(
     timeout_seconds: int,
     progress_interval_seconds: float,
     progress_label: str,
+    process_started: Optional[Callable[[subprocess.Popen, Sequence[str]], None]] = None,
+    process_stopped: Optional[Callable[[subprocess.Popen], None]] = None,
 ) -> Tuple[Optional[int], bytes, bytes, Optional[str]]:
     """Run Codex while teeing raw output and emitting bounded live progress."""
     process: Optional[subprocess.Popen[bytes]] = None
@@ -1165,11 +1168,33 @@ def stream_subprocess(
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
     except OSError as exc:
         events_path.write_bytes(b"")
         stderr_path.write_bytes(b"")
         return None, b"", b"", f"unable to launch Codex: {exc}"
+
+    try:
+        if process_started is not None:
+            process_started(process, command)
+    except BaseException:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+        if process.stdin is not None:
+            process.stdin.close()
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+        raise
 
     emit_progress(f"{progress_label} process_started pid={process.pid}")
 
@@ -1224,11 +1249,11 @@ def stream_subprocess(
             now = time.monotonic()
             if now - started >= timeout_seconds:
                 timed_out = True
-                process.terminate()
+                os.killpg(process.pid, signal.SIGTERM)
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    os.killpg(process.pid, signal.SIGKILL)
                 break
             if now >= next_heartbeat:
                 record_active_progress("heartbeat")
@@ -1239,11 +1264,11 @@ def stream_subprocess(
             time.sleep(min(0.1, heartbeat_interval))
     except BaseException:
         if process.poll() is None:
-            process.terminate()
+            os.killpg(process.pid, signal.SIGTERM)
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                process.kill()
+                os.killpg(process.pid, signal.SIGKILL)
                 process.wait()
         stdout_thread.join(timeout=5)
         stderr_thread.join(timeout=5)
@@ -1255,6 +1280,8 @@ def stream_subprocess(
         raise
 
     exit_code = process.wait()
+    if process_stopped is not None:
+        process_stopped(process)
     stdout_thread.join(timeout=5)
     stderr_thread.join(timeout=5)
     if process.stdout is not None:
@@ -1376,7 +1403,7 @@ def run_codex_turn(
         session_mode=session_mode,
         resume_target_thread_id=resume_target_thread_id,
         output_schema=output_schema,
-        ephemeral_access_token=account_binding is not None,
+        file_credential_projection=account_binding is not None,
     )
     environment = os.environ.copy()
     environment["CODEX_HOME"] = str(codex_home)
@@ -1420,7 +1447,16 @@ def run_codex_turn(
                     binding=account_binding,
                     role_home=codex_home,
                     timeout_seconds=timeout_seconds,
-                ) as (bound_environment, account_binding_evidence):
+                    run_id=run_root.name,
+                    turn=relative_evidence_path(turn_dir, run_root),
+                    role=role,
+                    scan_roots=(run_root,),
+                    git_repositories=(workspace, FRAMEWORK_ROOT),
+                ) as (
+                    bound_environment,
+                    account_binding_evidence,
+                    auth_transaction,
+                ):
                     exit_code, stdout, stderr, process_failure = stream_subprocess(
                         command=command,
                         workspace=workspace,
@@ -1433,6 +1469,8 @@ def run_codex_turn(
                         progress_label=(
                             progress_label or f"role={role} turn={turn_dir.name}"
                         ),
+                        process_started=auth_transaction.child_started,
+                        process_stopped=auth_transaction.child_stopped,
                     )
             if process_failure is not None:
                 failure = process_failure
@@ -1866,6 +1904,12 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
         configuration["codex_mix_account_binding"] = (
             binding.identity_metadata()
         )
+    retry_of = getattr(args, "retry_of", None)
+    if retry_of is not None:
+        configuration["retry"] = {
+            "retry_of": retry_of,
+            "retry_reason": getattr(args, "retry_reason", None),
+        }
     if p63_enabled(args):
         settings = framework_settings(args)
         configuration.update({
@@ -2234,6 +2278,52 @@ def validate_framework_preflight(args: argparse.Namespace) -> Dict[str, Any]:
     return state
 
 
+def validate_retry_preflight(args: argparse.Namespace, target: TargetState) -> None:
+    """Bind an explicit retry to one immutable terminal failure checkpoint."""
+    retry_of = getattr(args, "retry_of", None)
+    retry_reason = getattr(args, "retry_reason", None)
+    if retry_of is None and retry_reason is None:
+        return
+    if not isinstance(retry_of, str) or P4.validate_run_id(retry_of) != retry_of:
+        raise InvariantViolation("retry run identity is invalid")
+    if not isinstance(retry_reason, str) or not retry_reason.strip():
+        raise InvariantViolation("retry reason is invalid")
+    if getattr(args, "resume", False):
+        raise InvariantViolation("an explicit retry cannot use resume semantics")
+    run_root = args.runs_root.resolve() / retry_of
+    summary_path = summary_path_for_args(args, retry_of)
+    if not (run_root / "manifest.json").is_file() or not summary_path.is_file():
+        raise InvariantViolation("retry source evidence is unavailable")
+    search_root = args.state_root.resolve().parent
+    matches = []
+    if search_root.is_dir():
+        for candidate in search_root.rglob("checkpoint.json"):
+            try:
+                value = strict_json(candidate.read_bytes())
+            except (OSError, RuntimeError, ValueError):
+                continue
+            if isinstance(value, dict) and value.get("run_id") == retry_of:
+                matches.append((candidate, value))
+    if len(matches) != 1:
+        raise InvariantViolation("retry source checkpoint is not uniquely available")
+    _path, checkpoint = matches[0]
+    logical = checkpoint.get("logical_outcome")
+    initial = checkpoint.get("target_initial")
+    if (
+        checkpoint.get("state") != FRAMEWORK_EVIDENCE_PUSHED
+        or not isinstance(logical, dict)
+        or logical.get("state") != FAILED_CLOSED
+        or not isinstance(initial, dict)
+        or initial.get("repo") != str(target.repo)
+        or initial.get("branch") != target.branch
+        or initial.get("head") != target.head
+        or initial.get("clean") is not True
+    ):
+        raise InvariantViolation(
+            "retry source is not the same terminal failed target state"
+        )
+
+
 def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, GovernanceSnapshot]:
     target_repo = args.target_repo.resolve()
     runs_root = args.runs_root.resolve()
@@ -2257,6 +2347,7 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
     target = capture_target_state(
         target_repo, args.target_branch, require_clean=True
     )
+    validate_retry_preflight(args, target)
 
     governance_paths = {
         FRAMEWORK_STATIC: args.framework_static,
@@ -3249,6 +3340,12 @@ def orchestrate(
             run_configuration["codex_mix_account_binding"] = (
                 binding.identity_metadata()
             )
+        retry_of = getattr(args, "retry_of", None)
+        if retry_of is not None:
+            run_configuration["retry"] = {
+                "retry_of": retry_of,
+                "retry_reason": getattr(args, "retry_reason", None),
+            }
         if evidence_finalization_enabled:
             run_configuration["evidence_finalization"] = {
                 **framework_settings(args),

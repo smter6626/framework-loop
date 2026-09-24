@@ -111,8 +111,10 @@ homes are rejected as live role runtimes.
 
 Tracked workloads use `account_source=codex_mix_active`: a new run pins the current Codex Mix
 active account, and both roles consume that account's quota while retaining separate runtime
-state. An account change during a run, insufficient token lifetime, A/B baseline drift, or a role
-auth-cache write fails closed. See the
+state. Ordinary ChatGPT login uses a lock-protected, full `auth.json` file projection for one turn;
+the original role bytes/mode are restored afterward and auth environment variables are not passed
+to the Agent. Account drift, insufficient lifetime, A/B drift, or an unrecoverable credential
+transaction fails closed. See the
 [Codex Mix runtime-home and active-account guide](docs/codex-runtime-homes/README.md).
 
 ## Installation

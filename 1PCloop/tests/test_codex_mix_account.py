@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -190,6 +191,7 @@ class CodexMixAccountTests(unittest.TestCase):
                 "CODEX_API_KEY": "wrong-source",
                 "OPENAI_API_KEY": "wrong-source",
             }
+            original_mode = (reviewer / "auth.json").stat().st_mode & 0o777
             with ACCOUNT.active_account_environment(
                 environment,
                 binding=binding,
@@ -197,14 +199,25 @@ class CodexMixAccountTests(unittest.TestCase):
                 timeout_seconds=1200,
                 paths=paths,
                 now=self.NOW,
-            ) as (selected, evidence):
-                self.assertIn("CODEX_ACCESS_TOKEN", selected)
+            ) as (selected, evidence, transaction):
+                self.assertNotIn("CODEX_ACCESS_TOKEN", selected)
                 self.assertNotIn("CODEX_API_KEY", selected)
                 self.assertNotIn("OPENAI_API_KEY", selected)
                 self.assertEqual(evidence["account_alias"], "C")
-                self.assertNotIn(selected["CODEX_ACCESS_TOKEN"], json.dumps(evidence))
+                self.assertEqual(
+                    json.loads((reviewer / "auth.json").read_text())["tokens"]["account_id"],
+                    "account-C",
+                )
+                self.assertEqual(transaction.record["state"], "PROJECTED")
             self.assertEqual((reviewer / "auth.json").read_bytes(), before)
-            self.assertTrue(evidence["role_auth_unchanged"])
+            self.assertEqual((reviewer / "auth.json").stat().st_mode & 0o777, original_mode)
+            self.assertTrue(evidence["role_auth_restored"])
+            self.assertTrue(evidence["active_identity_unchanged"])
+            self.assertEqual(evidence["credential_scan"]["actual_credential_hits"], 0)
+            self.assertFalse(any(
+                item.is_dir() for item in paths.transactions_root.iterdir()
+                if item.name != ".locks"
+            ))
 
     def test_turn_environment_restores_unexpected_role_auth_mutation(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -212,7 +225,7 @@ class CodexMixAccountTests(unittest.TestCase):
             binding = ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
             before = (reviewer / "auth.json").read_bytes()
             with self.assertRaisesRegex(
-                ACCOUNT.AccountBindingError, "modified the role auth cache"
+                ACCOUNT.AccountBindingError, "credential transaction recovery failed"
             ):
                 with ACCOUNT.active_account_environment(
                     {},
@@ -226,6 +239,232 @@ class CodexMixAccountTests(unittest.TestCase):
                         "unexpected mutation\n", encoding="utf-8"
                     )
             self.assertEqual((reviewer / "auth.json").read_bytes(), before)
+
+    def test_secret_scan_fails_without_printing_secret_and_restores(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            binding = ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
+            before = (reviewer / "auth.json").read_bytes()
+            leak_root = root / "outputs"
+            leak_root.mkdir()
+            secret = json.loads(paths.active_auth.read_text())["tokens"]["refresh_token"]
+            with self.assertRaisesRegex(
+                ACCOUNT.AccountBindingError, "credential exposure detected"
+            ) as raised:
+                with ACCOUNT.active_account_environment(
+                    {}, binding=binding, role_home=reviewer,
+                    timeout_seconds=1200, paths=paths, now=self.NOW,
+                    scan_roots=(leak_root,),
+                ):
+                    (leak_root / "stderr.txt").write_text(secret, encoding="utf-8")
+            self.assertNotIn(secret, str(raised.exception))
+            self.assertIn("stderr.txt", str(raised.exception))
+            self.assertEqual((reviewer / "auth.json").read_bytes(), before)
+
+    def test_stale_projected_transaction_recovers_when_child_is_gone(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            original = (reviewer / "auth.json").read_bytes()
+            mode = (reviewer / "auth.json").stat().st_mode & 0o777
+            mtime = (reviewer / "auth.json").stat().st_mtime_ns
+            paths.transactions_root.mkdir(parents=True)
+            transaction = paths.transactions_root / "fixture-reviewer"
+            transaction.mkdir(mode=0o700)
+            backup = transaction / "original-role-auth.json"
+            backup.write_bytes(original)
+            os.chmod(backup, 0o600)
+            (reviewer / "auth.json").write_bytes(paths.active_auth.read_bytes())
+            record = {
+                "schema_version": 1,
+                "transaction_id": "fixture-reviewer",
+                "run_id": "fixture-run",
+                "turn": "reviewer-instruction",
+                "role": "reviewer",
+                "account_alias": "C",
+                "account_id_sha256": hashlib.sha256(b"account-C").hexdigest(),
+                "role_auth_original_sha256": hashlib.sha256(original).hexdigest(),
+                "role_auth_original_mode": mode,
+                "role_auth_original_mtime_ns": mtime,
+                "state": "PROJECTED",
+                "started_at_ns": 1,
+            }
+            (transaction / "transaction.json").write_text(
+                json.dumps(record), encoding="utf-8"
+            )
+            recovered = ACCOUNT.recover_incomplete_transactions(paths=paths)
+            self.assertEqual(recovered, 1)
+            self.assertEqual((reviewer / "auth.json").read_bytes(), original)
+            self.assertFalse(transaction.exists())
+
+    def test_stale_transaction_with_matching_live_child_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            original = (reviewer / "auth.json").read_bytes()
+            paths.transactions_root.mkdir(parents=True)
+            transaction = paths.transactions_root / "fixture-live"
+            transaction.mkdir(mode=0o700)
+            (transaction / "original-role-auth.json").write_bytes(original)
+            record = {
+                "schema_version": 1,
+                "transaction_id": "fixture-live",
+                "run_id": "fixture-run",
+                "turn": "reviewer-instruction",
+                "role": "reviewer",
+                "account_alias": "C",
+                "account_id_sha256": hashlib.sha256(b"account-C").hexdigest(),
+                "role_auth_original_sha256": hashlib.sha256(original).hexdigest(),
+                "role_auth_original_mode": 0o644,
+                "role_auth_original_mtime_ns": (reviewer / "auth.json").stat().st_mtime_ns,
+                "state": "CHILD_RUNNING",
+                "started_at_ns": 1,
+                "child_pid": 123,
+                "child_pgid": 123,
+                "child_started_at": "fixture",
+                "child_executable": "codex",
+                "command_fingerprint": "a" * 64,
+            }
+            (transaction / "transaction.json").write_text(
+                json.dumps(record), encoding="utf-8"
+            )
+            with patch.object(ACCOUNT, "_recorded_child_is_running", return_value=True):
+                with self.assertRaisesRegex(
+                    ACCOUNT.AccountBindingError, "still running"
+                ):
+                    ACCOUNT.recover_incomplete_transactions(paths=paths)
+            self.assertTrue(transaction.exists())
+
+    def test_crash_state_matrix_recovers_or_fails_closed(self):
+        restorable = (
+            "INITIALIZED", "PREPARED", "PROJECTED", "CHILD_EXITED",
+            "RESTORING", "RESTORED",
+        )
+        for state in restorable:
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                paths, reviewer, _executor = self.fixture(root)
+                original = (reviewer / "auth.json").read_bytes()
+                original_stat = (reviewer / "auth.json").stat()
+                paths.transactions_root.mkdir(parents=True)
+                transaction = paths.transactions_root / f"fixture-{state.lower()}"
+                transaction.mkdir(mode=0o700)
+                backup = transaction / "original-role-auth.json"
+                backup.write_bytes(original)
+                os.chmod(backup, 0o600)
+                if state not in {"INITIALIZED", "PREPARED", "RESTORED"}:
+                    (reviewer / "auth.json").write_bytes(paths.active_auth.read_bytes())
+                record = {
+                    "schema_version": 1,
+                    "transaction_id": transaction.name,
+                    "run_id": "fixture-run",
+                    "turn": "reviewer-instruction",
+                    "role": "reviewer",
+                    "account_alias": "C",
+                    "account_id_sha256": hashlib.sha256(b"account-C").hexdigest(),
+                    "role_auth_original_sha256": hashlib.sha256(original).hexdigest(),
+                    "role_auth_original_mode": original_stat.st_mode & 0o777,
+                    "role_auth_original_mtime_ns": original_stat.st_mtime_ns,
+                    "state": state,
+                    "started_at_ns": 1,
+                }
+                (transaction / "transaction.json").write_text(
+                    json.dumps(record), encoding="utf-8"
+                )
+                self.assertEqual(
+                    ACCOUNT.recover_incomplete_transactions(paths=paths), 1
+                )
+                self.assertEqual((reviewer / "auth.json").read_bytes(), original)
+                self.assertFalse(transaction.exists())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            paths.transactions_root.mkdir(parents=True)
+            transaction = paths.transactions_root / "missing-backup"
+            transaction.mkdir(mode=0o700)
+            record = {
+                "schema_version": 1, "transaction_id": "missing-backup",
+                "run_id": "fixture-run", "turn": "reviewer", "role": "reviewer",
+                "account_alias": "C", "account_id_sha256": "a" * 64,
+                "role_auth_original_sha256": "b" * 64,
+                "role_auth_original_mode": 0o600,
+                "role_auth_original_mtime_ns": 1,
+                "state": "PROJECTED", "started_at_ns": 1,
+            }
+            (transaction / "transaction.json").write_text(json.dumps(record))
+            with self.assertRaisesRegex(
+                ACCOUNT.AccountBindingError, "recovery copy is missing"
+            ):
+                ACCOUNT.recover_incomplete_transactions(paths=paths)
+            self.assertTrue((reviewer / "auth.json").is_file())
+
+    def test_python_body_exception_restores_before_reraising(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            binding = ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
+            before = (reviewer / "auth.json").read_bytes()
+            with self.assertRaisesRegex(RuntimeError, "body failed"):
+                with ACCOUNT.active_account_environment(
+                    {}, binding=binding, role_home=reviewer,
+                    timeout_seconds=1200, paths=paths, now=self.NOW,
+                ):
+                    raise RuntimeError("body failed")
+            self.assertEqual((reviewer / "auth.json").read_bytes(), before)
+
+    def test_projection_setup_failure_restores_immediately(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            binding = ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
+            before = (reviewer / "auth.json").read_bytes()
+            original = ACCOUNT._auth_record
+
+            def reject_projected(path, label):
+                if label == "projected role credential":
+                    raise ACCOUNT.AccountBindingError("injected setup failure")
+                return original(path, label)
+
+            with patch.object(ACCOUNT, "_auth_record", side_effect=reject_projected):
+                with self.assertRaisesRegex(
+                    ACCOUNT.AccountBindingError, "injected setup failure"
+                ):
+                    with ACCOUNT.active_account_environment(
+                        {}, binding=binding, role_home=reviewer,
+                        timeout_seconds=1200, paths=paths, now=self.NOW,
+                    ):
+                        self.fail("body must not start")
+            self.assertEqual((reviewer / "auth.json").read_bytes(), before)
+            self.assertFalse(any(
+                path.is_dir() for path in paths.transactions_root.iterdir()
+                if path.name != ".locks"
+            ))
+
+    def test_transaction_metadata_permissions_and_no_secret_values(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths, reviewer, _executor = self.fixture(root)
+            binding = ACCOUNT.inspect_active_account(paths=paths, now=self.NOW)
+            secrets = tuple(
+                json.loads(paths.active_auth.read_text())["tokens"][name]
+                for name in ("access_token", "refresh_token", "id_token")
+            )
+            with ACCOUNT.active_account_environment(
+                {}, binding=binding, role_home=reviewer,
+                timeout_seconds=1200, paths=paths, now=self.NOW,
+                run_id="safe-run", turn="cycle-01/reviewer", role="reviewer",
+            ) as (_environment, _evidence, transaction):
+                rendered = transaction.record_path.read_text()
+                self.assertEqual(transaction.transaction_dir.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(
+                    (transaction.transaction_dir / "original-role-auth.json").stat().st_mode & 0o777,
+                    0o600,
+                )
+                for secret in secrets:
+                    self.assertNotIn(secret, rendered)
+                self.assertNotIn("account-C", rendered)
 
     def test_role_config_rejects_retired_paths_and_escaped_sqlite_home(self):
         with tempfile.TemporaryDirectory() as temporary:

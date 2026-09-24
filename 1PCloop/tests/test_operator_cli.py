@@ -284,6 +284,56 @@ class OperatorCliTests(unittest.TestCase):
             ):
                 self.assertEqual(getattr(args, name).resolve(), getattr(legacy, name).resolve())
 
+    def test_explicit_retry_config_binds_terminal_failure_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path, value, *_ = self.fixture(root)
+            retry_id = "failed-run-001"
+            value["retry"] = {
+                "retry_of": retry_id,
+                "retry_reason": "codex_mix_file_credential_projection_fix",
+            }
+            value["evidence"]["state_root"] = "../state/retry-01"
+            self.write_config(config_path, value)
+            config = OP.load_config(config_path)
+            args = OP.build_runner_args(config, run_id="retry-run-002")
+            self.assertEqual(args.retry_of, retry_id)
+            self.assertEqual(
+                args.retry_reason, "codex_mix_file_credential_projection_fix"
+            )
+
+            target = OP.RUNNER.capture_target_state(
+                args.target_repo, args.target_branch, require_clean=True
+            )
+            prior_run = args.runs_root / retry_id
+            prior_run.mkdir(parents=True)
+            self.write_json(prior_run / "manifest.json", {"run_id": retry_id})
+            args.summary_root.mkdir(parents=True, exist_ok=True)
+            (args.summary_root / f"{retry_id}.md").write_text("immutable failure\n")
+            prior_checkpoint = args.state_root.parent / "original" / "checkpoint.json"
+            prior_checkpoint.parent.mkdir(parents=True)
+            self.write_json(prior_checkpoint, {
+                "run_id": retry_id,
+                "state": OP.RUNNER.FRAMEWORK_EVIDENCE_PUSHED,
+                "logical_outcome": {"state": OP.RUNNER.FAILED_CLOSED},
+                "target_initial": target.metadata(),
+            })
+            OP.RUNNER.validate_retry_preflight(args, target)
+            self.assertEqual((prior_run / "manifest.json").read_text(), '{\n  "run_id": "failed-run-001"\n}\n')
+
+            changed = target.metadata()
+            changed["head"] = "0" * 40
+            self.write_json(prior_checkpoint, {
+                "run_id": retry_id,
+                "state": OP.RUNNER.FRAMEWORK_EVIDENCE_PUSHED,
+                "logical_outcome": {"state": OP.RUNNER.FAILED_CLOSED},
+                "target_initial": changed,
+            })
+            with self.assertRaisesRegex(
+                OP.RUNNER.InvariantViolation, "same terminal failed target state"
+            ):
+                OP.RUNNER.validate_retry_preflight(args, target)
+
     def test_run_binds_config_identity_to_checkpoint_and_manifest(self):
         with tempfile.TemporaryDirectory() as temporary:
             config_path, *_ = self.fixture(Path(temporary))

@@ -263,11 +263,11 @@ class MutationLoopTests(unittest.TestCase):
             final_path=Path("/tmp/final.txt"),
             session_mode=MODULE.NEW_PERSISTENT,
             resume_target_thread_id=None,
-            ephemeral_access_token=True,
+            file_credential_projection=True,
         )
         self.assertIn("--config", bound)
         self.assertIn(
-            MODULE.MIX_ACCOUNT.EPHEMERAL_CREDENTIAL_OVERRIDE,
+            MODULE.MIX_ACCOUNT.FILE_CREDENTIAL_OVERRIDE,
             bound,
         )
         self.assertIn(

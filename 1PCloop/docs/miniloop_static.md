@@ -385,21 +385,16 @@ Static
 
 因此 conversation continuity 不是本项目当前需要重新证明的核心理论问题。自动 prototype 可以优先使用 fresh `codex exec` session，而不是先实现 session-resume machinery。
 
-### Current verified profile behavior
+### Current role runtime and account behavior
 
-当前已经验证：
+Reviewer 和 Executor 使用 `~/.codex-mix/.mix/runtimes/` 下彼此独立的 `CODEX_HOME`，隔离 config、
+session、SQLite 和 thread history。新 run 固定 Codex Mix 当前 active account 的 alias 和 account ID
+SHA-256，两个 role 在该 run 内使用同一账号额度。退休的 `.codex-A`、`.codex-B` 永远只读。
 
-```text
-.codex-A / cheng
-  -> independent account/profile
-  -> codex exec works
-
-.codex-B / dym
-  -> independent account/profile
-  -> codex exec works
-```
-
-串行及并发调用均已成功。
+普通 ChatGPT 登录必须通过受 switch lock、role lock 和持久恢复记录保护的完整 `auth.json` 临时投影。
+原 role auth 在 turn 后恢复 bytes/mode；父进程崩溃后的恢复不能猜测账号。认证材料不得进入 prompt、
+evidence、Git、日志、通知或 Agent shell environment。任何无法证明 identity 固定、child 已停止、恢复
+完整或 credential 未暴露的状态都 fail closed。
 
 当前观察到的具体模型、reasoning effort、sandbox mode 或 Codex version 只能作为 Runtime/evidence 记录，不能上升为永久 Static contract，除非 Human Owner 明确改变要求。
 

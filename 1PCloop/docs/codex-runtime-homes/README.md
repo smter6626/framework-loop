@@ -60,26 +60,33 @@ role runtime 与额度账号是两个独立维度：
 - 每个新 run 在 preflight 时读取 `~/.codex-mix/.mix/active.json`，并验证 marker、
   `~/.codex-mix/auth.json` 和对应 A-D vault 的 `account_id` 一致；
 - run 只记录账号别名和 `account_id` 的 SHA-256，不保存原始 account ID 或 token；
-- 每个 `codex exec` 通过 `CODEX_ACCESS_TOKEN` 接收当前 projected credential，并强制
-  `cli_auth_credentials_store="ephemeral"`；
+- 普通 ChatGPT 登录不再把 OAuth cache 中的 `tokens.access_token` 误用为
+  `CODEX_ACCESS_TOKEN`。每个 turn 在锁内把完整 canonical `auth.json` 临时投影到对应 role runtime，
+  并强制 `cli_auth_credentials_store="file"`；
 - 子进程环境会移除 `CODEX_API_KEY`、`OPENAI_API_KEY` 和 workload identity 覆盖，避免额度来源被
   其他环境变量替换；
-- CLI override 将所有认证环境变量从 Agent shell environment 中排除，并为该 turn 设置
-  `notify=[]`，避免 access token 传给 shell tool、项目脚本或通知进程；
+- CLI override 将全部认证环境变量从 Agent shell environment 中排除，并为该 turn 设置
+  `notify=[]`。Codex child 只通过 role runtime 的文件 credential 登录；
 - run 启动后账号 identity 被固定。若 Codex Mix 在两个 turn 之间或 turn 期间切换账号，当前 run
   必须 fail closed，不能让同一 run 混用多个额度账号；
 - access token 的剩余寿命必须至少覆盖 turn timeout 加 300 秒；
 - preflight 和每个 turn 前后都会把 A/B 当前全树与保存的 21,091-entry retirement snapshot 精确比较；
   任意文件新增、删除、内容、类型、路径、mode、size 或 mtime 变化都会 fail closed；
-- role runtime 原有 `auth.json` 只作为迁移历史缓存，不再决定 1PCloop 的额度来源。每个 turn 前后
-  校验该文件 SHA-256 不变；若 Codex 在 ephemeral 模式下仍改写它，则恢复原字节并 fail closed。
+- role runtime 原有 `auth.json` 只作为迁移历史缓存，不决定 1PCloop 的额度来源。turn 前先将其原始
+  bytes、mode、mtime 和 SHA-256 保存到 `~/.codex-mix/.mix/transactions/1pcloop-auth/` 的 0600
+  短期恢复文件；turn 后原子恢复并验证。允许 inode/ctime 改变，不允许内容或 mode 漂移；
+- 每个 turn 同时持有 `switch.lock` 和 role lock。未完成事务会阻止新 turn 和 Codex Mix
+  switch/rollback/arm。若 1PCloop 父进程崩溃，preflight 只在已验证 child 不存在时自动恢复；匹配的
+  child 仍运行、备份缺失、hash 冲突或 PID identity 模糊时必须 fail closed；
+- process receipt 只保存 alias、account ID SHA-256、恢复结果和零泄露扫描计数。完整 auth、原始
+  account ID、邮箱、token 和子进程完整环境不得进入 prompt、evidence、Git、日志或通知程序。
 
 [OpenAI 官方认证文档](https://learn.chatgpt.com/docs/auth?translationFallback=zh-Hans)说明基于文件的
 登录缓存通常位于 `CODEX_HOME/auth.json`，并应像密码一样保护。
-[OpenAI 官方环境变量文档](https://learn.chatgpt.com/docs/config-file/environment-variables)
-明确把 `CODEX_ACCESS_TOKEN` 定义为可信自动化可使用的 ChatGPT/Codex access token。这里使用环境
-注入而不是在两个 runtime 之间复制 refresh token，避免 Reviewer/Executor 分别轮换同一 refresh
-token 后产生 credential lineage 分叉。
+[OpenAI 官方 access-token 文档](https://learn.chatgpt.com/docs/enterprise/access-tokens)
+明确把 `CODEX_ACCESS_TOKEN` 定义为单独创建的 Codex programmatic access token。普通 ChatGPT
+OAuth cache 不是这种 token，所以 1PCloop 使用受事务保护的完整文件投影，不把 OAuth access token
+塞进程序化 token 入口，也不把 role 中可能刷新的 credential 回写 canonical/vault。
 
 每个 Codex child process 会同时将 `CODEX_HOME` 和 `CODEX_SQLITE_HOME` 设置为同一个 role runtime，
 避免父 shell 中残留的 SQLite override 把 state DB/WAL 写到 canonical 或退休 home。process receipt 同时
@@ -211,7 +218,10 @@ find "$RUN" -name process.json -exec jq -e '
   ((.codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer" or
     .codex_home == "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor") and
    .account_source == "codex_mix_active" and
-   .account_binding.role_auth_unchanged == true)
+   .account_binding.credential_mode == "temporary-file-projection" and
+   .account_binding.role_auth_restored == true and
+   .account_binding.active_identity_unchanged == true and
+   .account_binding.credential_scan.actual_credential_hits == 0)
 ' {} +
 ```
 

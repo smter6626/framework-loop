@@ -9,8 +9,8 @@
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_window_layout_v1/workload_static.md`; SHA-256 `916a44790e67af5f3023d5b36e52fd14097b45348d50e857c9fa56abd753521b`
 - Target identity: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`; branch `codex/bounded-scrollable-main-window-v1`; baseline `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34`
-- 当前 evidence snapshot: 前序 `whisper_session_ui_v1` 已关闭并有人类功能黑盒 PASS；Human Owner 同次测试确认主窗口过高；新 branch 已从 target-side change record commit 精确创建；新 config 的 doctor 8/8 和 preflight 均 PASS；尚无 layout 实现 commit
-- 最后更新: 2026-09-18
+- 当前 evidence snapshot: 前序 `whisper_session_ui_v1` 已关闭并有人类功能黑盒 PASS；Human Owner 同次测试确认主窗口过高；target branch 仍精确位于 `fb7e38e...` 且 clean；首次 L1 run 在 Reviewer 启动认证阶段 fail closed，尚无 layout 实现 commit
+- 最后更新: 2026-09-24
 
 ## 2. Completed
 
@@ -19,6 +19,8 @@
 - Branch preparation: `codex/bounded-scrollable-main-window-v1` 已从 `fb7e38e...` 创建。为避免重复安装约 3 GB 本地依赖，现有 `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui` worktree 已切换到该 branch，并复用 Git-ignored `.venv`、`.tools` 和 `external/whisper.cpp`；tracked worktree 保持 clean。
 - Governance initialization: Human Owner 明确授权准备下一轮窗口高度修复及中文 Static/Runtime。本 task 与旧 S2 分离，只有 L1 一个顶层 Step。
 - Operator readiness: framework commit `029f4484cb51cc2afe73f0a6e29a0ee5facc0701` 上运行 `window_layout.json` 的 doctor 8/8 PASS、preflight PASS。Config raw SHA-256 为 `3ff05a6d78d88aafe4516ea69e4bb369a9c2b68c69fd02c122b3bceb5488e745`，resolved SHA-256 为 `95527396a4e4eaa4bd00ee39583c4ff74733daeb7be1072b4d07de6c752c9019`；target clean 且精确位于 `fb7e38e...`，framework local/origin main 同步。该检查没有调用 Agent 或修改 target。
+- Failed auth run: run `20260924T220337Z-47406` 在首次 Reviewer turn 因错误的 OAuth-token-to-`CODEX_ACCESS_TOKEN` transport 返回 401 并 fail closed。三层结果为 `FAILED_CLOSED / NOT_APPLIED / PUSHED`；framework evidence commit 为 `0da9c5fa4e384beda6e908a4028846f3acda7429`。该 run、checkpoint、raw/tracked evidence 永久保留，不能 resume、删除或改写。
+- Human-authorized repair: 允许在 switch lock + role lock + 持久事务内临时投影完整 active `auth.json`，并在 turn 后恢复 role 原 bytes/mode。账号 identity 必须固定，A/B 快照必须不变，credential scan 必须为零。修复通过专项、完整回归和双 role real smoke 后，使用新的 retry config/run ID 明确记录 `retry_of=20260924T220337Z-47406` 与 `retry_reason=codex_mix_file_credential_projection_fix`。
 
 ## 3. Active Step
 
@@ -57,7 +59,7 @@
 
 ## 6. Blockers and Human Decision Gates
 
-- 当前 blocker: 无。
+- 当前 blocker: `L1` 的产品实现不受设计阻塞，但必须先完成并验证 Codex Mix 文件凭据事务修复，再启动明确 retry run。
 - Human Gate: Static 变化、隐藏/删除 controls、范围扩大到功能语义、主观视觉重设计、target merge/release/tag/force 或无法通过 deterministic UI evidence 判定时暂停。
 
 ## 7. Residual Validation Items
@@ -77,7 +79,7 @@
 
 ## 10. Next Direction
 
-- 使用已通过 doctor/preflight 的 `window_layout.json` 启动一次 config-bound 1PCloop run。
+- 完成认证事务修复、双 role real smoke 和新 retry config 的 doctor/preflight 后，启动新的 config-bound retry run；不得 resume 失败 run。
 - 若自动 Reviewer ACCEPT，仅关闭代码/模拟 UI gate并由 Human-facing reviewer普通 push target branch；随后提供真实 macOS人工 checklist。若 REJECT，沿同一 L1 repair cycle处理，不扩大合同。
 
 ## 11. Current Executor Handoff
