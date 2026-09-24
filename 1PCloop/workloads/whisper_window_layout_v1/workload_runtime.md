@@ -26,6 +26,7 @@
 - L1 automated implementation: retry run `20260924T225838Z-88499` 绑定旧失败 run，三次 Codex turn 全部 process success。Executor commit `569e5c551c101811ed80fca23bd5708d6ac880cf` 是 baseline 的唯一直接后继，只改 7 个允许文件；新增 screen-aware height bound、左侧 controls scroll area、geometry/screen rebind 和 focused tests，未改 backend/controller/store/settings/session/clipboard 语义。
 - L1 independent automated review: 原 Reviewer thread 对 exact target HEAD 返回 schema-valid `ACCEPT`。Focused layout 4/4、S2 session 9/9、language 6/6、output 5/5、model UI 10/10、full discovery 121/121、UI support 22/22 均 PASS；独立复跑 layout + S2 为 13/13 PASS。commit/file hashes 与实际 bytes 一致。Target feature branch 已普通 push，local/origin/GitHub ref 均为 `569e5c...`，worktree clean。
 - Codex Mix run stability: Reviewer fresh、Executor ephemeral、Reviewer same-thread resume 均使用同一 run-bound active identity；三份 receipt 均记录 file projection、role auth restored、active identity unchanged、actual credential hits 0。turn 后无 transaction 残留，A/B retirement snapshot unchanged。
+- Post-run inspect repair: 正常 governance closure commit 暴露 F3 `inspect` 将 framework current HEAD/remote 错误要求为 evidence commit 本身，导致旧 run 被误报 identity conflict。Commit `dd52a84b15c155f9445ae8f6581ab1be1753050e` 改为逐字节验证 exact evidence commit，并要求它是当前 local/remote branch 的祖先；历史改写或不可达仍 fail closed。新增 descendant-history 回归后完整 strict suite 223/223 PASS；当前 `status` 和 `inspect` 均 PASS，target evidence `VALID`。
 
 ## 3. Active Step
 

@@ -120,6 +120,14 @@ target feature branch was ordinary-pushed, and framework evidence commit
 step. Real macOS window placement, trackpad feel, bilingual rendering, and retained S2 controls
 remain the only current Human Gate; merge/release remains separate.
 
+Post-run governance closure exposed one F3 integrity-projection bug: `inspect` required current
+framework HEAD/remote to equal the run's evidence commit, so any legitimate later governance
+commit invalidated old evidence. Commit `dd52a84b15c155f9445ae8f6581ab1be1753050e` keeps exact
+evidence-commit byte/plan validation but accepts it when it remains an ancestor of current
+local/remote history. Rewritten or unreachable evidence still fails closed. Full strict regression
+passed 223/223, and the layout run now reports `status PASS`, `inspect PASS`, and target evidence
+`VALID` after later governance commits.
+
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
 Run `20260924T220337Z-47406` failed closed in the first Reviewer instruction turn with HTTP/WS
