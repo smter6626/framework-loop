@@ -1075,9 +1075,11 @@ def _authoritative_integrity_checks(
             remote=plan["remote"], push_ref=plan["push_ref"],
             require_clean=True,
         )
-        if current["head"] != commit or current["remote_url"] != plan["expected_remote_url"]:
-            raise OperatorError("framework commit differs from current repository identity")
-        return "framework evidence commit matches its checkpointed plan"
+        if current["remote_url"] != plan["expected_remote_url"]:
+            raise OperatorError("framework remote URL differs from the evidence plan")
+        if not RUNNER.is_ancestor(Path(plan["repo"]), commit, current["head"]):
+            raise OperatorError("framework evidence commit is not in current branch history")
+        return "framework evidence commit is intact in current branch history"
 
     def framework_push_check() -> str:
         commit = checkpoint.get("framework_commit_id")
@@ -1087,9 +1089,9 @@ def _authoritative_integrity_checks(
         observed = RUNNER.P63.remote_head(
             Path(plan["repo"]), plan["remote"], plan["push_ref"]
         )
-        if observed != commit:
+        if not RUNNER.is_ancestor(Path(plan["repo"]), commit, observed):
             raise OperatorError("framework remote does not contain the evidence commit")
-        return "framework remote ref matches the evidence commit"
+        return "framework remote history contains the evidence commit"
 
     def target_check() -> str:
         current = RUNNER.capture_target_state(

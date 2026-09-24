@@ -241,3 +241,7 @@ find ~/.codex-mix/.mix/runtimes/1pcloop-reviewer \
 第一条 `find` 必须无输出；第二条应只在两个 dedicated runtime 下显示新 activity。Codex Mix interactive
 account 决定本次 run 的额度来源，runtime home 决定 role state。运行期间如果尝试切换账号，switch lock
 或下一 turn 的 identity check 必须使操作 fail closed，不能静默改变额度账号。
+
+终态 `inspect` 会逐字节重验 run 自己的 framework evidence commit，并要求该 commit 仍可从当前
+framework local/remote branch 到达。后续普通治理 commit 不会使旧 run 失效；force-push、历史改写、
+evidence commit 损坏或不可达仍会 fail closed。

@@ -764,6 +764,29 @@ class OperatorCliTests(unittest.TestCase):
                 "FAIL",
             )
 
+    def test_inspect_keeps_evidence_valid_after_framework_descendant_commits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config_path, _, _, framework, remote, *_ = self.fixture(root)
+            config = OP.load_config(config_path)
+            self.run_config(config)
+            note = framework / "post-run-governance.md"
+            note.write_text("later governance commit\n", encoding="utf-8")
+            subprocess.run(["git", "add", note.name], cwd=framework, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "Record later governance"],
+                cwd=framework, check=True, stdout=subprocess.PIPE,
+            )
+            subprocess.run(
+                ["git", "push", "origin", "main"], cwd=framework,
+                check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            result = OP.inspect_run(config)
+            checks = {item["name"]: item for item in result["checks"]}
+            self.assertEqual(checks["framework_commit"]["status"], "PASS")
+            self.assertEqual(checks["framework_push"]["status"], "PASS")
+            self.assertEqual(result["overall_status"], "PASS")
+
     def test_machine_commands_emit_one_parseable_json_object(self):
         with tempfile.TemporaryDirectory() as temporary:
             config_path, *_ = self.fixture(Path(temporary))
