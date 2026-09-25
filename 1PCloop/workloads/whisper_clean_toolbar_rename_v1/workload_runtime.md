@@ -3,14 +3,16 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_toolbar_rename_v1`
-- 状态: `ACTIVE / W1 AWAITING MANUAL RETRY RUN`
-- 当前 verdict: `NOT EVALUATED`
-- 唯一 Active Step: `W1 -- Clean 工具栏与实时文件重命名`
+- 状态: `MACHINE W1 COMPLETED / INDEPENDENT AC-07 REJECT / REPAIR REQUIRED`
+- 当前 verdict: `REJECT -- independent post-run evidence-sufficiency review`; 原机器 Reviewer `ACCEPT` 保留为历史 verdict
+- 唯一 Active Step: 无；W1 机器块已 `COMPLETED/disabled`，新的有界修复由 `whisper_clean_rename_integrity_repair_v1` 管理
 - Static identity: `1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_static.md`; SHA-256 `eae16fa52bf532bc26accf7afecf78d0c4494128e57091ad613c621ace48948c`
 - 固定 target baseline: `569e5c551c101811ed80fca23bd5708d6ac880cf`；target worktree 已在从该 commit 直接创建的 `codex/clean-toolbar-rename-v1` 分支，创建时无文件变化。
 - 任务入口: Human Owner 2026-09-24 提出三项要求，并明确补充录音/转录进行中可重命名、Stop 后未开始新 Session 时可重命名、新 Session 建立后对象切换为新 Clean 文件。
 - 最近 Pending 截止: 无。真实 macOS/音频功能检查是自动验收后的 Human gate，不是当前代码 blocker。
-- 运行授权: Human Owner 于 2026-09-24 明确选择本人手动启动，并要求提供启动指令。本轮准备者只可完成治理、分支、config、doctor/preflight；不能替 Owner 执行 `run`。
+- 运行授权: Human Owner 曾手动启动本任务的初始/重试 run；两者均为不可重放的终态。新的修复 run 需要另一个 task-local Runtime/config 和新的明确启动授权。
+
+本 Runtime 第 2-6 节中任何仍使用“待运行”“尚无 W1 verdict”表述的文本都是 run 前历史计划，已由下方“独立审核后的当前裁定”取代。机器块和 transition record 原样保留，不用文本修订伪造机器状态回退。
 
 ## 2. Completed -- 只读准备
 
@@ -25,7 +27,7 @@
 - 失败后 role 原 `auth.json` 已恢复，process receipt 显示实际凭据泄露命中 0、active identity 未变；事后 doctor 9/9 PASS。Human Owner 将 Codex CLI 升级到 `0.157.0`，在当前激活账号的交互式 CLI 中选择 `gpt-6-sol high` 并实际收到 `auth-ok`。本地 `codex --version` 已独立核对为 `0.157.0`。这支持启动新 retry，但不把交互式 smoke 冒充 dedicated Reviewer/Executor 的完整 turn 验收。
 - 新 retry 配置 `workload_retry_01.json` 显式绑定 `retry_of=20260925T055829Z-25962`，使用独立 state root `1PCloop/.local/state/whisper_clean_toolbar_rename_v1-retry-01`，不得 resume 或覆盖旧终态 checkpoint。Target 仍是 clean 的 `569e5c...`。
 
-## 3. Active Step -- W1
+## 3. Historical Active Step -- W1 (machine completed; not current)
 
 - Objective: 将复制新增 Clean 文本移至 Clean 工具栏右上、将定位/复制路径按钮缩为左侧同一行，并实现当前 Session Clean 文件在录音中及 Stop 后安全重命名为固定 `.txt` 后缀的用户指定名称。
 - Inputs: 本 Static；固定 target baseline；`ui_app.py::TranscriptTable`/`MainWindow`；`TranscriptStore` 写入句柄；Controller Session owner/event；相关 tests；已通过 Human 布局 gate 的旧任务结果。
@@ -37,7 +39,7 @@
 - Stop conditions: 无法证明转录期间持续追加到改名后的同一文件；只能用会覆盖现有目标的机制；Session/路径竞争无法 fail closed；需要改变 Static、ASR、真实用户文件、旧任务或 Git 基线时立即停下。
 - Report: 给出路径 ownership 与并发控制设计、每个文件的改动、逐项直接 evidence、失败矩阵、完整 commit/parent/branch、未测真实黑盒和已知限制。Executor 不形成最终 ACCEPT。
 
-## 4. Activation and Manual-Run Gate
+## 4. Historical Activation and Manual-Run Gate
 
 1. Human PASS 治理收尾: 旧 task-local Runtime 与 global Runtime 只更新高层状态；旧 machine block、transition record、run evidence 和 target 代码保持不变。
 2. Git 基线: framework `main` 与 target 原 feature branch local/remote/clean 一致；新 target branch 从固定 `569e5c...` 创建，不 merge/rebase 或切换到 `main` 基线。
@@ -45,18 +47,26 @@
 4. 原 `workload.json` 与首次失败 checkpoint 保持原样；只使用 `workload_retry_01.json` 的新 state root、新 run ID 和显式 retry 关系。Reviewer/Executor 继续使用 Codex Mix dedicated homes 和 run-bound active account。
 5. 手动 `run` 前必须确认当前 framework/target clean、`doctor` 和 `preflight` 均 PASS，role config 为 Reviewer `gpt-6-sol/xhigh`、Executor `gpt-6-sol/high`，且认证事务、active identity 与 A/B retirement snapshot 检查通过。任一检查失败，停止并报告，不运行 Agent。
 
-## 5. Independent Review
+## 5. Historical pre-run Independent Review plan
 
 - 尚无 W1 Executor diff、测试 artifact 或 Reviewer verdict。
 - Reviewer 必须特别独立检查两个潜在 blind spot：一是“改名后原有打开句柄仍可写”不足以证明 UI/store/Controller 全部路径同步；二是单纯 `exists()` 后执行可能覆盖目标的 rename 不足以证明 no-clobber。
 - 自动 ACCEPT 不能关闭 Human 的真实录音中改名和实际 Finder/clipboard gate。
 
-## 6. Blockers, Pending and Next Action
+## 6. Historical pre-run Blockers, Pending and Next Action
 
 - 代码可行性 blocker: 未发现。
 - 当前执行 blocker: 无；新 retry config 的 `doctor`/`preflight` 是手动运行前的强制 gate，未通过即停止。升级后的 dedicated role 调用仍须由新 run 实证，不能仅凭交互式 smoke 宣告通过。
 - Pending Tasks: 无。
 - 下一步: Human Owner 仅使用 `workload_retry_01.json` 手动执行全新 `run`；不得对首次失败 run 执行 `resume` 或用原 `workload.json` 启动新 run。结束时通知本对话进行独立验收；真实音频/macOS黑盒由 Human Owner 在自动审核之后另行核验。
+
+## 独立审核后的当前裁定 -- 2026-09-25
+
+- 成功 run `20260925T061052Z-27529` 的三轮路径是 Reviewer `REJECT -> REJECT -> ACCEPT`，机器完成 W1 transition，framework evidence commit `5e544b3ac6700a14fde5177020ef6d6613f0d0f4` 已发布。`status/inspect` PASS 只证明控制面及已提交证据包自洽。
+- 本对话随后直接检查 target commit `352e62b2bf3cd3690e8eee57cb2e933f1405c6af`，独立复跑 focused 34/34 与完整严格 136/136 PASS，但在隔离临时 Session 注入原子改名后目标目录项被移动并由同名 `decoy` 替换的情形，得到 `store_path_points_to_writer=False`、`store_path_content=decoy`、`writer_content=before|after|`。
+- 当前独立 verdict 为 `REJECT`：上游 Static AC-07 的异常竞态/有效路径条件没有充分满足。旧机器 Reviewer ACCEPT 对 AC-07 充分性的 claim 标记为 `INVALIDATED BY LATER DIRECT EVIDENCE`；旧 Reviewer verdict、机器 transition 和原 run evidence 作为历史事实不删除、不改写。正常路径及旧回归 PASS 不被追溯篡改。
+- Target `codex/clean-toolbar-rename-v1` 暂停普通 push 和 Human 实机验收。目标实现必须经新的有界修复 task `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/`，或先由 Human Owner 明确授权改变外部并发修改支持边界。
+- 必读本地交接索引: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-clean-rename-review-pause-20260925.md`，SHA-256 `1e6dc511b4f340351a68a86d8bbca24b1c1a96cbdf15fe3c1ed199d87ccc5f48`。它不代替本 Runtime、Static 或直接 artifact evidence。
 
 ## 7. Machine-owned State
 

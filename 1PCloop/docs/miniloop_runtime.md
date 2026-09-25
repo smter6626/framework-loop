@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_TOOLBAR_RENAME_V1 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 PREPARED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,11 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_toolbar_rename_v1 / W1 ACTIVE / AWAITING MANUAL RUN
+= whisper_clean_rename_integrity_repair_v1 / PREPARED / NOT ACTIVE
+= 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
+
+Prior external workload disposition
+= whisper_clean_toolbar_rename_v1 / MACHINE W1 COMPLETED / INDEPENDENT AC-07 REJECT
 = 1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_runtime.md
 
 Overall 1PCloop completion
@@ -158,6 +162,28 @@ acceptance. The task-local Runtime and `workload_retry_01.json` bind a new run
 explicitly to the failed run using an independent checkpoint root. W1 remains the
 only active external step; Human Owner will manually start the retry after
 doctor/preflight. The original terminal checkpoint must not be resumed or overwritten.
+
+### 2026-09-25 -- Clean rename independent REJECT and bounded repair preparation
+
+Retry run `20260925T061052Z-27529` finished three Reviewer/Executor cycles and
+mechanically completed W1 at target commit `352e62b2bf3cd3690e8eee57cb2e933f1405c6af`.
+The first two Reviewer verdicts were REJECT and the third was ACCEPT; framework
+evidence commit `5e544b3ac6700a14fde5177020ef6d6613f0d0f4` was pushed.
+Subsequent independent review reproduced an AC-07 counterexample: after atomic
+rename, an external same-directory move and replacement made the Store/UI path
+refer to a decoy inode while the open Clean writer appended to the moved file.
+Focused 34/34 and full strict 136/136 tests passed but did not cover that case.
+This later direct evidence invalidates the sufficiency of the machine ACCEPT for
+AC-07, not the historical fact of its transition or evidence publication.
+Target branch push and real macOS/audio Human gate remain on hold.
+
+Human Owner completed a Codex Mix account switch and requested a handoff plus
+repair Static/Runtime, not a repair run. The new task-local documents at
+`1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/` define a bounded
+R1 candidate. It is PREPARED with no active machine block, config or run. Its
+Runtime requires reading the local Git-ignored handoff, then directly checking
+the original Static/Runtime, target commit and run evidence. Activation awaits
+separate Human authorization and a fresh current-account preflight.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
