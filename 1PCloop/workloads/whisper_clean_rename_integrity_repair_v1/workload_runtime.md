@@ -1,14 +1,14 @@
-# Whisper Clean 重命名路径身份修复 v1 -- Runtime 准备状态
+# Whisper Clean 重命名路径身份修复 v1 -- Runtime 当前状态
 
 ## 1. Current Status
 
 - Task ID: `whisper_clean_rename_integrity_repair_v1`
-- 状态: `PREPARED / NOT ACTIVE / AWAITING HUMAN RUN AUTHORIZATION`
+- 状态: `ACTIVE / R1 AUTHORIZED FOR CONTROLLED RUN`
 - 当前 verdict: `NOT EVALUATED`，修复任务没有 Executor commit 或 Reviewer verdict
-- 唯一 Active Step: 无；下方 R1 仅为待激活的有界修复 step
+- 唯一 Active Step: `R1 -- 修复候选路径身份错误`
 - Static identity: `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_static.md`，SHA-256 `bc70ba55127ea3e5becfc33c9924948409d1247306610ee2948cbd7fee861bc4`
 - Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`；当前拟使用 `codex/clean-toolbar-rename-v1`，固定修复基线 `352e62b2bf3cd3690e8eee57cb2e933f1405c6af`
-- Blocker: 无代码可行性结论；Human 尚未授权启动新 1PCloop run，且新 config/机器块均未创建。若第 4 节 Human Decision Gate 触发，则暂停修复
+- Blocker: 无已知启动 blocker；doctor/preflight 必须在运行前通过。若第 4 节 Human Decision Gate 触发，则暂停修复
 - Pending Tasks: 无；原任务真实音频/macOS gate 仍未通过，不得在本修复中代替 Human 关闭
 
 ## 2. 必读交接与证据顺序
@@ -36,7 +36,7 @@
 - 独立 verdict: `REJECT / REPAIR REQUIRED`，目标分支暂不推送，Human 实机验收暂不开始。它显式 invalidates 原 run 对 AC-07 充分性的接受主张，不撤销机器已发生的 transition，也不删除旧 Reviewer verdict、test PASS 或 framework evidence。
 - Human Owner 已完成 Codex Mix 切号。旧 PID 26957/26968 经精确 TERM 退出；当时的桌面 app-server PID 30383 只作为历史记录。未来 run 要重新绑定当前激活账号，不能继承旧 run 的账号身份。
 
-## 4. Proposed R1 -- 修复候选路径身份错误
+## 4. Active R1 -- 修复候选路径身份错误
 
 - Objective: 在改名提交后、目标身份验证前发生外部目录项替换时，应用不得将 decoy 路径作为当前 Clean 路径暴露，同时保持原文件写入连续和原任务 AC-05/06/07 的其它承诺。
 - Inputs: 本 Static、上游 Static/Runtime、handoff 与直接 target/run evidence。Reviewer 需先验证固定基线、目标分支和原反例仍存在。
@@ -49,9 +49,9 @@
 
 ## 5. 激活前治理与运行 gate
 
-1. 先取得 Human Owner 对启动 R1 的明确授权；本轮仅写准备文档，不运行 Agent。
+1. Human Owner 已在当前对话明确授权由本助手启动并监控 R1；原准备阶段只写文档的边界由本次授权取代。
 2. 重新核对 framework `main` 本地/远端 clean、target branch/HEAD/clean、handoff hash、上游原合同及已完成机器块。不得删除或修改旧 run，也不得以原 `workload_retry_01.json` 执行新 run。
-3. 用本 Runtime 的唯一新 machine block 激活 R1，设置独立 `workload_id=whisper_clean_rename_integrity_repair_v1`、`transition_mode=reviewer_accept_once`、`active_step={id:R1,status:ACTIVE}`、`last_transition_id=null`；建立独立 config、state root、新 run ID。该激活由治理准备者在授权后完成，不由 Executor 静默修改。
+3. 本 Runtime 的唯一 machine block 激活 R1，使用独立 `workload_id=whisper_clean_rename_integrity_repair_v1`、`transition_mode=reviewer_accept_once`、`active_step={id:R1,status:ACTIVE}`、`last_transition_id=null`；专用 config 为同目录 `workload.json`，state root 为 `1PCloop/.local/state/whisper_clean_rename_integrity_repair_v1`。新 run ID 由 runner 创建，不复用旧终态。
 4. 使用 Codex Mix dedicated Reviewer/Executor homes；新 run 的额度账号取**启动时**的当前激活账号，不继承旧身份。doctor/preflight 必须验证认证事务、A/B retirement snapshot、role 配置和目标/framework Git 状态。
 5. 新任务独立 ACCEPT 后，仍需本对话或 Human 指定的独立审核直接检查反例和充分性，再根据既有普通 push 授权决定目标分支 push。之后才交 Human 做真实音频/macOS验证。
 
@@ -61,4 +61,17 @@
 
 ## 7. Machine state
 
-本准备 Runtime **没有** `1PCLOOP_RUNTIME_STATE_BEGIN/END` machine block，因此不能被 mutation runner 当作可执行任务。只有第 5 节 gate 满足后才能添加新 R1 block。旧 W1 的 completed/disabled block 及历史 transition record 保持原状。
+本 Runtime 只有一个 R1 ACTIVE machine block。旧 W1 的 completed/disabled block 及历史 transition record 保持原状。
+
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "active_step": {
+    "id": "R1",
+    "status": "ACTIVE"
+  },
+  "last_transition_id": null,
+  "schema_version": 1,
+  "transition_mode": "reviewer_accept_once",
+  "workload_id": "whisper_clean_rename_integrity_repair_v1"
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->

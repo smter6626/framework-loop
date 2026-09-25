@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 PREPARED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 R1 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_rename_integrity_repair_v1 / PREPARED / NOT ACTIVE
+= whisper_clean_rename_integrity_repair_v1 / R1 ACTIVE / RUN AUTHORIZED
 = 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
 
 Prior external workload disposition
@@ -180,10 +180,15 @@ Target branch push and real macOS/audio Human gate remain on hold.
 Human Owner completed a Codex Mix account switch and requested a handoff plus
 repair Static/Runtime, not a repair run. The new task-local documents at
 `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/` define a bounded
-R1 candidate. It is PREPARED with no active machine block, config or run. Its
+R1 candidate. At preparation time it had no active machine block, config or run. Its
 Runtime requires reading the local Git-ignored handoff, then directly checking
-the original Static/Runtime, target commit and run evidence. Activation awaits
+the original Static/Runtime, target commit and run evidence. Activation required
 separate Human authorization and a fresh current-account preflight.
+
+Human Owner subsequently authorized this assistant to activate and monitor R1.
+The repair task now has a distinct ACTIVE machine block, config and state root.
+The old W1 terminal state and evidence remain unchanged. Doctor/preflight and
+current-account auth checks are mandatory before starting the new run.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
