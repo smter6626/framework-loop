@@ -47,11 +47,11 @@
 {
   "active_step": {
     "id": "R2",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "2a59a9c1a90be25cd3d66abc9dd1f6db6c326c0d0f93df1d0f56f72cfc7d2efc",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_clean_fulltext_recovery_r2"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
@@ -63,3 +63,79 @@
 - Framework evidence commit `6ee2ac5b7ddf6cefc2dafb3da1e21fb7548ea082` 已普通 push。Tracked summary 为 `1PCloop/evidence-summaries/20260925T085542Z-34665.md`，raw evidence 位于 Git-ignored `1PCloop/.local/runs/20260925T085542Z-34665/`；旧失败不得删除或覆盖。
 - 认证事务正常收尾：role auth 已恢复且前后 SHA-256 相同，active identity 未变化，实际凭据扫描命中 0。失败不是 target 实现、R2 Static、认证投影或凭据泄漏问题。
 - 当前 machine block 保持 `R2/ACTIVE`。Human Owner 已授权使用 `gpt-5.6-sol`、原推理强度和独立 `workload_retry_01.json` 新建 retry run；不得 resume 这个 terminal failure，也不得切换账号、改用 API Key 或改变推理强度。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "95b39fd05a05edbea17ba0f6968dc56a291cecc811ae2540742f0e656416fa08",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "fb317ea4a2b1db557133e91590e852c0241a3cd8",
+      "sha256": "ed32f22ba2d6025e120bb88d6f3fc62e40f5e6ba528adfe8c1a5eb11db54546a"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/transcript_store.py",
+      "sha256": "131a41bc861ac05e46624a9d83396e669bcad65228465e7500fa72c732f1e660"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/transcription_controller.py",
+      "sha256": "29b97c75c9d90369289ecb7c07142e9e65648fb7816e4f4b56865fccaf2b6a48"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/ui_app.py",
+      "sha256": "537867b5bb91ba7c499d7de6db761d337f84ba9caa746a53818a2534b8e9f38c"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/testCodes/test_clean_rename.py",
+      "sha256": "69c3f03df532814114b139e18c4f1032389991c322bfad9e3d2952c41da7ec28"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/docs/change_records/clean_fulltext_recovery_r2.md",
+      "sha256": "d9a71ec543845fab63271fe18eddc4378627119e40ab4893db531e475d87bd58"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260925T085909Z-35123/cycle-02/executor/events.jsonl",
+      "sha256": "a9bfdec7cd8fba01941f5f5e3d69d5e7b99d979c7c302c2e443c586e624ef980"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260925T085909Z-35123/cycle-02/executor/process.json",
+      "sha256": "ca9b0445c17740daed281aee991cded61c02333f3e7160d9d955c1077c1c76ed"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "R2",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "2a59a9c1a90be25cd3d66abc9dd1f6db6c326c0d0f93df1d0f56f72cfc7d2efc",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_clean_fulltext_recovery_r2"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "R2",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_clean_fulltext_recovery_r2"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260925T085909Z-35123/cycle-02/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "e76d1264427f5f743a61a8d6f1759c3550aa6c94a43e7b237b8b99be4b350400",
+  "schema_version": 1,
+  "target_head": "fb317ea4a2b1db557133e91590e852c0241a3cd8",
+  "timestamp": "2026-09-25T09:21:48.881+00:00",
+  "transition_id": "2a59a9c1a90be25cd3d66abc9dd1f6db6c326c0d0f93df1d0f56f72cfc7d2efc"
+}
+```
