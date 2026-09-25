@@ -3,11 +3,11 @@
 ## 1. 合同身份
 
 - Task ID: `whisper_clean_toolbar_rename_v1`
-- 合同状态: `AUTHORIZED FOR PREPARATION`; 运行 1PCloop 仍等待 Human Owner 下一次明确授权
+- 合同状态: `AUTHORIZED`; Human Owner 已授权准备并手动启动本任务的 1PCloop run
 - Human Owner: 当前项目 Owner
 - 固定目标基线: `569e5c551c101811ed80fca23bd5708d6ac880cf`
 - 目标仓库: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`
-- 目标分支: 下一次启动前，从固定基线创建新的 `codex/clean-toolbar-rename-v1`; 本次不创建或切换分支
+- 目标分支: `codex/clean-toolbar-rename-v1`，从固定基线直接创建
 - 模板参考: `1PCloop/templates/static_prompt_zh.md` 与 `runtime_prompt_zh.md`
 
 本合同只定义稳定目标和验收边界。当前进度、唯一 Active Step 与运行证据见同目录 `workload_runtime.md`。
@@ -46,7 +46,7 @@
 5. 不改变原有 Copy New Clean Text 的行断点规则，不因调整按钮位置而让 Raw/Logs 取得 Clean clipboard action。
 6. 不因按钮移动破坏已验收的屏幕高度上限、左侧 controls 滚动、Clean/Raw/Logs 独立滚动、键盘 focus 与双语动态布局。
 7. Executor 不得修改 Static/Runtime、framework 代码、历史 evidence、旧 workload、模型/凭据或真实用户输出；不得自行宣告最终 ACCEPT。
-8. 1PCloop 执行前必须由 Human 明确授权，并先关闭旧布局任务的 Human PASS 治理状态、创建并检查新分支、建立可运行 Runtime machine block 和独立 config。不得复用已完成 L1 checkpoint。
+8. 1PCloop 执行前必须确认 Human 启动授权、旧布局任务的 Human PASS 治理收尾、新分支身份、可运行 Runtime machine block 和独立 config。不得复用已完成 L1 checkpoint。
 9. 不 force push、merge、tag、release 或从 target `main` 偷换基线。普通 target branch push 只能在独立 Reviewer ACCEPT 后依 Human 已有授权进行。
 
 ## 5. Stable Background and Dependency Map
@@ -89,5 +89,5 @@
 ## 9. Change Control and Open Decisions
 
 - 本 Static 实质修改需要 Human Owner 明确授权；已完成的 `whisper_window_layout_v1` 不因本任务重新打开。
-- Human 授权启动前不得把本 task 设为唯一 Active Step，也不得创建新 run。若发现实时安全重命名在现有边界无法实现，先停下给出具体原因和选项，不静默改为“只允许 Stop 后”。
-- 当前无阻塞性未授权功能边界。目标分支名称和具体安全重命名机制可在启动前机械核对；若 Owner 要求改变“录音中可用”或无覆盖要求，必须先修订本合同。
+- Human 已授权手动启动；若发现实时安全重命名在现有边界无法实现，先停下给出具体原因和选项，不静默改为“只允许 Stop 后”。
+- 当前无阻塞性未授权功能边界。目标分支和具体安全重命名机制须在运行前机械核对；若 Owner 要求改变“录音中可用”或无覆盖要求，必须先修订本合同。

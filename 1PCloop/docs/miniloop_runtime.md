@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_WINDOW_LAYOUT_V1 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_TOOLBAR_RENAME_V1 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -39,12 +39,12 @@ P7 controlled REJECT -> REPAIR fault injection
 = MAY RESUME ONLY AFTER EXPLICIT HUMAN REACTIVATION
 
 Most recently closed engineering task
-= foundation_v1 / ACCEPTED / PHASE CLOSED
-= 1PCloop/workloads/foundation_v1/workload_runtime.md
+= whisper_window_layout_v1 / HUMAN ACCEPTED / TASK CLOSED
+= 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_window_layout_v1 / L1 AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE
-= 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
+= whisper_clean_toolbar_rename_v1 / W1 ACTIVE / AWAITING MANUAL RUN
+= 1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_runtime.md
 
 Overall 1PCloop completion
 = AWAITING EXPLICIT HUMAN OWNER DECISION
@@ -118,7 +118,7 @@ after the auth transaction repair. Reviewer accepted target commit
 target feature branch was ordinary-pushed, and framework evidence commit
 `bd3c088840342d59e79d224f6fd0ab8a49fe11a8` reached `origin/main`. L1 has no remaining automatic
 step. Real macOS window placement, trackpad feel, bilingual rendering, and retained S2 controls
-remain the only current Human Gate; merge/release remains separate.
+were retained for the Human Owner's real macOS gate; merge/release remains separate.
 
 Post-run governance closure exposed one F3 integrity-projection bug: `inspect` required current
 framework HEAD/remote to equal the run's evidence commit, so any legitimate later governance
@@ -127,6 +127,24 @@ evidence-commit byte/plan validation but accepts it when it remains an ancestor 
 local/remote history. Rewritten or unreachable evidence still fails closed. Full strict regression
 passed 223/223, and the layout run now reports `status PASS`, `inspect PASS`, and target evidence
 `VALID` after later governance commits.
+
+### 2026-09-24 -- layout Human PASS and Clean toolbar workload activated
+
+Human Owner explicitly reported that the window-layout change passed real macOS acceptance.
+The task-local `whisper_window_layout_v1` Runtime records that Human decision and closes
+the task without changing its completed L1 machine block, transition record, target commit
+or run evidence. This does not authorize target merge, tag or release.
+
+Human Owner next authorized manual execution of `whisper_clean_toolbar_rename_v1`.
+Its target branch `codex/clean-toolbar-rename-v1` starts at the exact accepted layout
+commit `569e5c551c101811ed80fca23bd5708d6ac880cf`. W1 is the only active external
+step. It covers Clean toolbar placement, same-row locate/copy-path controls and
+no-clobber renaming of the current Session Clean file even while transcription is
+appending. The task-local Static/Runtime and independent operator config own the
+details; this global Runtime only tracks the phase pointer. Reviewer and Executor
+dedicated homes now select `gpt-6-sol` with `xhigh` and `high` effort respectively.
+The Human Owner, not this preparation turn, will execute `run`. Automatic ACCEPT
+will still leave a real audio/macOS Human validation gate.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

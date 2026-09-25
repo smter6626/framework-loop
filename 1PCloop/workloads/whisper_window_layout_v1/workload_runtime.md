@@ -3,13 +3,13 @@
 ## 1. Current Status
 
 - Task ID: `whisper_window_layout_v1`
-- 状态: `AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE`
-- 当前 verdict: `ACCEPT -- deterministic code/offscreen scope only`
+- 状态: `HUMAN ACCEPTED / TASK CLOSED`
+- 当前 verdict: `ACCEPT -- automated scope and Human macOS gate`
 - 唯一 Active Step: 无；L1 machine state 已 `COMPLETED`
 - 最近 Pending 截止: 无
 - Static identity: `1PCloop/workloads/whisper_window_layout_v1/workload_static.md`; SHA-256 `916a44790e67af5f3023d5b36e52fd14097b45348d50e857c9fa56abd753521b`
 - Target identity: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`; branch `codex/bounded-scrollable-main-window-v1`; baseline `fb7e38e4248b1b6fcf58a14193dbfe9315f90f34`
-- 当前 evidence snapshot: retry run `20260924T225838Z-88499` 完成 Reviewer -> Executor -> 原 Reviewer review；target commit `569e5c551c101811ed80fca23bd5708d6ac880cf` 已自动 ACCEPT 并普通 push 到 feature branch；framework evidence commit `bd3c088840342d59e79d224f6fd0ab8a49fe11a8` 已 push；只剩真实 macOS视觉/trackpad Human Gate
+- 当前 evidence snapshot: retry run `20260924T225838Z-88499` 完成 Reviewer -> Executor -> 原 Reviewer review；target commit `569e5c551c101811ed80fca23bd5708d6ac880cf` 已自动 ACCEPT 并普通 push 到 feature branch；framework evidence commit `bd3c088840342d59e79d224f6fd0ab8a49fe11a8` 已 push。Human Owner 于 2026-09-24 在本对话明确报告本次真实 macOS改动人工验收通过；该 Human decision 补足自动检查保留的 UI gate。
 - 最后更新: 2026-09-24
 
 ## 2. Completed
@@ -27,6 +27,7 @@
 - L1 independent automated review: 原 Reviewer thread 对 exact target HEAD 返回 schema-valid `ACCEPT`。Focused layout 4/4、S2 session 9/9、language 6/6、output 5/5、model UI 10/10、full discovery 121/121、UI support 22/22 均 PASS；独立复跑 layout + S2 为 13/13 PASS。commit/file hashes 与实际 bytes 一致。Target feature branch 已普通 push，local/origin/GitHub ref 均为 `569e5c...`，worktree clean。
 - Codex Mix run stability: Reviewer fresh、Executor ephemeral、Reviewer same-thread resume 均使用同一 run-bound active identity；三份 receipt 均记录 file projection、role auth restored、active identity unchanged、actual credential hits 0。turn 后无 transaction 残留，A/B retirement snapshot unchanged。
 - Post-run inspect repair: 正常 governance closure commit 暴露 F3 `inspect` 将 framework current HEAD/remote 错误要求为 evidence commit 本身，导致旧 run 被误报 identity conflict。Commit `dd52a84b15c155f9445ae8f6581ab1be1753050e` 改为逐字节验证 exact evidence commit，并要求它是当前 local/remote branch 的祖先；历史改写或不可达仍 fail closed。新增 descendant-history 回归后完整 strict suite 223/223 PASS；当前 `status` 和 `inspect` 均 PASS，target evidence `VALID`。
+- Human macOS gate: Human Owner 于 2026-09-24 在本对话明确报告“本次改动人工验收通过”。此为真实 UI/trackpad residual gate 的 Human verdict，不是 1PCloop 机器 `HUMAN_GATE` logical outcome，也不改写自动 Reviewer verdict 或旧 run evidence。任务关闭；新 Clean 工具栏/重命名目标由独立 `whisper_clean_toolbar_rename_v1` 管理。
 
 ## 3. Active Step
 
@@ -53,31 +54,31 @@
 - 独立 verdict formation: 原 Reviewer persistent thread 显式 resume，未由 Executor 自验替代。
 - 独立 evidence-sufficiency judgment: 自动范围充分；真实 macOS title bar、多显示器、scrollbar 外观和 trackpad 手感不能由 offscreen Qt 证明。
 - Review verdict: `ACCEPT -- AUTOMATED SCOPE`
-- Review limitations: 自动 Reviewer 可以验收代码、模拟 geometry、event routing 和回归；真实 macOS视觉边界和 trackpad 手感仍由 Human Owner最终确认。
+- Review limitations: 自动 Reviewer 只能验收代码、模拟 geometry、event routing 和回归；真实 macOS视觉边界和 trackpad 手感随后由 Human Owner 以 2026-09-24 的明确 PASS 补足。
 
 ## 5. State Transition
 
 - Previous state: 前序 external workload `whisper_session_ui_v1` `ACCEPTED / TASK CLOSED WITH FOLLOW-UP UI DEFECT`。
 - Triggering evidence 或 Human decision: 2026-09-18 Human Owner 确认功能实现无问题，但 UI 太长并直接超出窗口限制，明确指定下一项 1PCloop 任务为限定窗口高度并增加适当滚动。
-- Current state: `L1 COMPLETED / AUTOMATED ACCEPT / AWAITING HUMAN MACOS GATE`。
-- Meaning: 代码和 deterministic/offscreen gate 已关闭；不重开 S2，不宣称真实 macOS视觉/trackpad已通过，不授权 merge/release。
+- Current state: `L1 COMPLETED / HUMAN ACCEPTED / TASK CLOSED`。
+- Meaning: 代码和 deterministic/offscreen gate 已关闭，Human 真实 macOS gate 已通过；不重开 S2，不授权 merge/release。
 - Transition authorized by: Human Owner。
 
 ## 6. Blockers and Human Decision Gates
 
-- 当前 blocker: 无代码 blocker。任务 closure 只等待 Human Owner 的真实 macOS视觉/trackpad结论。
+- 当前 blocker: 无。Human Owner 已给出真实 macOS gate PASS，任务关闭。
 - Human Gate: Static 变化、隐藏/删除 controls、范围扩大到功能语义、主观视觉重设计、target merge/release/tag/force 或无法通过 deterministic UI evidence 判定时暂停。
 
 ## 7. Residual Validation Items
 
-- 自动 L1 ACCEPT 后仍需 Human Owner 在真实 macOS App 上确认：初始窗口完全处于可用屏幕内；较小高度下可以用鼠标/触控板访问底部 controls；Clean/Raw/Logs 滚动自然；中英文切换和 S2 功能无视觉回归。
+- 原 residual gate 已由 Human Owner 2026-09-24 的本次改动人工验收 PASS 关闭。自动测试仍不被追溯表述为真实 macOS测试。
 - 本地 bootstrap 依赖约 3 GB，当前为下一轮实现和人工测试保留；任务最终关闭后再单独决定清理，不属于 L1 acceptance。
 
 ## 8. Pending Tasks -- Non-blocking Blocks
 
 - 当前顶层 Active Step: 无；L1 machine state 为 `COMPLETED`。
-- Pending Human Gate: 真实 macOS窗口边界、controls 滚动、右侧独立滚动、中英文与 S2 按钮回归。
-- Pending Gate Check: `HUMAN ACTION REQUIRED`。
+- Pending Human Gate: 无；Human Owner 已报告 PASS。
+- Pending Gate Check: `RESOLVED / TASK CLOSED`。
 
 ## 9. Superseded Decisions
 
@@ -85,16 +86,16 @@
 
 ## 10. Next Direction
 
-- Human Owner 从 source 启动 App，执行真实 macOS视觉/trackpad checklist并报告 PASS 或具体 defect。
-- Human PASS 后只做 task closure 文档更新；merge/release 仍是独立决定。Human 发现 defect 时创建新的 bounded repair step，不改写本次 ACCEPT evidence。
+- 本任务已关闭并冻结。下一项 Clean 工具栏/重命名目标使用独立 Static/Runtime 和新的 target 分支；merge/release 仍是独立 Human 决定。
 
-## 11. Current Human Validation Handoff
+## 11. Human Validation Checklist -- historical
 
 - 启动：`cd /Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui && .venv/bin/python ui_app.py`。
 - 检查初始窗口未超出当前屏幕可用高度；缩短窗口后左侧 controls 可用滚动条、鼠标滚轮、触控板和 Tab/Shift-Tab 到达首尾。
 - 检查 Clean/Raw/Logs 只滚动自己的内容，不带动左侧 controls；状态栏保持在左侧滚动区外。
 - 切换中英文，确认 label 和高度边界仍正常；复查开始新录音清屏、复制 Clean TXT 路径和增量复制文本。
 - 不要求重新 bootstrap whisper runtime；本 gate 不要求播放音频或验证 ASR 质量。
+- 结果: Human Owner 已在 2026-09-24 报告本次改动人工验收通过；以上清单保留为验收范围，不再是待执行指令。
 
 ## Machine-owned State
 
@@ -111,7 +112,7 @@
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
-该机器块只授权 L1 的一次 schema-valid Reviewer `ACCEPT -> COMPLETED` transition。它不授权自动关闭 Human 真实 macOS视觉 gate，也不授权 target push、merge、tag 或 release。
+该机器块只授权 L1 的一次 schema-valid Reviewer `ACCEPT -> COMPLETED` transition。Human 真实 macOS gate 由上文另行记录的 Owner decision 关闭；机器块未改写，也不授权 target push、merge、tag 或 release。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
