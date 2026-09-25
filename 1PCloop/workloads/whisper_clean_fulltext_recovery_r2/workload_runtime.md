@@ -62,7 +62,7 @@
 - 三层终态为 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit code 1。没有 Reviewer instruction、Executor turn、target commit 或 Runtime transition。Target 保持 branch `codex/clean-toolbar-rename-v1`、HEAD `b62ef6947d6a634c56e695740e4ea446751e6c79`、工作树 clean。
 - Framework evidence commit `6ee2ac5b7ddf6cefc2dafb3da1e21fb7548ea082` 已普通 push。Tracked summary 为 `1PCloop/evidence-summaries/20260925T085542Z-34665.md`，raw evidence 位于 Git-ignored `1PCloop/.local/runs/20260925T085542Z-34665/`；旧失败不得删除或覆盖。
 - 认证事务正常收尾：role auth 已恢复且前后 SHA-256 相同，active identity 未变化，实际凭据扫描命中 0。失败不是 target 实现、R2 Static、认证投影或凭据泄漏问题。
-- 当前 machine block 保持 `R2/ACTIVE`。Human Owner 已授权使用 `gpt-5.6-sol`、原推理强度和独立 `workload_retry_01.json` 新建 retry run；不得 resume 这个 terminal failure，也不得切换账号、改用 API Key 或改变推理强度。
+- 该首次失败结束时 machine block 仍为 `R2/ACTIVE`。Human Owner 随后授权使用 `gpt-5.6-sol`、原推理强度和独立 `workload_retry_01.json` 新建 retry run；不得 resume 这个 terminal failure，也不得切换账号、改用 API Key 或改变推理强度。后续 retry 已按第 7 节完成该 machine block。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
