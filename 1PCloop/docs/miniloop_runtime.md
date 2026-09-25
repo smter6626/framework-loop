@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 RETRY AUTHORIZED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 HUMAN VALIDATION PENDING`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,8 +43,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_fulltext_recovery_r2 / R2 ACTIVE / FIRST RUN FAILED CLOSED
-= retry authorized with `gpt-5.6-sol` and unchanged reasoning efforts
+= whisper_clean_fulltext_recovery_r2 / MACHINE + INDEPENDENT ACCEPTED
+= HUMAN MACOS VALIDATION PENDING
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Prior external workload disposition
@@ -220,6 +220,17 @@ found zero actual credential values. Failure evidence commit `6ee2ac5` is
 pushed. R2 remains ACTIVE. The Human Owner then authorized a new explicit
 retry using `gpt-5.6-sol` while preserving Reviewer `xhigh` and Executor
 `high`; account identity and all other execution boundaries remain fixed.
+
+R2 retry run `20260925T085909Z-35123` completed after a real two-cycle
+`REJECT -> REPAIR -> ACCEPT` path. The first target commit passed its full
+tests but failed a Reviewer-injected Session-path replacement plus decoy
+counterexample. Repair commit `fb317ea4` added final no-follow Session and
+destination inode binding checks; focused 55/55 and full strict 157/157
+passed in both run evidence and this conversation's independent rerun.
+Runtime transition and evidence publication completed, and the target
+feature branch was ordinary-pushed at exact commit `fb317ea4`. Remaining
+work is Human macOS/audio/Finder/clipboard validation; no merge, tag or
+release is authorized.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

@@ -3,14 +3,14 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_fulltext_recovery_r2`
-- 状态: `ACTIVE / FIRST RUN FAILED CLOSED / RETRY AUTHORIZED`
-- Verdict: `NOT EVALUATED`；首次 run 未产生 Reviewer instruction、Executor commit 或 Reviewer verdict
-- 唯一 Active Step: `R2 -- Clean 全文恢复与明确的否语义`
+- 状态: `IMPLEMENTED / MACHINE ACCEPTED / INDEPENDENTLY ACCEPTED / HUMAN MACOS VALIDATION PENDING`
+- Verdict: `ACCEPT`；机器 Reviewer 与本对话独立审核均通过，真实麦克风/Finder/clipboard/macOS 交互仍由 Human Owner 验收
+- 唯一 Active Step: 无；`R2` machine block 已 `COMPLETED`
 - Static: `1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_static.md`
 - Static identity: SHA-256 `1d75a64ba29fd5c36689274ad2b2079ace822f2dfe91c35f7f4b98b251276d4c`
-- Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 基线 `b62ef6947d6a634c56e695740e4ea446751e6c79`
-- Blocker: 无；retry 启动前须以新 config 重新通过 doctor/preflight
-- Pending Tasks: 使用 `workload_retry_01.json` 启动新 run 并监控到明确终态。旧任务真实音频/macOS Human gate 尚未执行，仍是自动验收后的独立 gate
+- Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 baseline `b62ef6947d6a634c56e695740e4ea446751e6c79`，accepted HEAD `fb317ea4a2b1db557133e91590e852c0241a3cd8`
+- Blocker: 无自动工程 blocker
+- Pending Tasks: Human Owner 运行真实录音和 macOS UI/Finder/clipboard 黑盒验收；merge、tag、release 仍未授权
 
 ## 2. Completed -- R2 输入与 Human 决定
 
@@ -35,9 +35,9 @@
 ## 4. 启动前 gate
 
 1. Human Owner 已明确授权启动并监控 R2；本 Runtime 已添加唯一 `R2/ACTIVE`、`reviewer_accept_once` machine block。
-2. 创建新的 state root `1PCloop/.local/state/whisper_clean_fulltext_recovery_r2`，不 `resume` W1/R1 终态，也不使用 runner 的 `retry` 字段：该字段只接受 `FAILED_CLOSED` 且相同初始 target HEAD，R1 是 `HUMAN_GATE` 且 target 已变化。
+2. 首次 run 使用新的 state root `1PCloop/.local/state/whisper_clean_fulltext_recovery_r2`，未 resume W1/R1。首次 run 因模型可用性 `FAILED_CLOSED` 后，显式 `workload_retry_01.json` 绑定该失败和同一 target HEAD，并使用独立 retry state root。
 3. 重新检查 framework 本地/远端 main 和 target branch/HEAD/clean、R1 evidence、Static hash、Codex Mix 当前账号认证事务及 role 配置。新 run 绑定启动时激活账号，不沿用 R1 账号。
-4. 对本目录 `workload.json` 跑 doctor/preflight；全部 PASS 后才可 `run`。旧 R1 config/state/raw 只读保留。真实 target branch 普通 push 只能在自动和本对话独立验收均通过后执行。
+4. 原 config 与 retry config 均在对应 run 前通过 doctor/preflight。旧 R1 config/state/raw 保持只读；target branch 仅在自动 ACCEPT 和本对话独立验收均通过后普通 push。
 
 ## 5. Machine state
 
@@ -139,3 +139,14 @@
   "transition_id": "2a59a9c1a90be25cd3d66abc9dd1f6db6c326c0d0f93df1d0f56f72cfc7d2efc"
 }
 ```
+
+## 7. R2 retry、独立审核与 target push -- 2026-09-25
+
+- Retry run `20260925T085909Z-35123` 使用 `gpt-5.6-sol`，Reviewer `xhigh`、Executor `high`，doctor 9/9 PASS、preflight PASS。它绑定首次 terminal failure `20260925T085542Z-34665`、相同 target baseline 和独立 state root；旧失败 evidence 未覆盖。
+- Cycle 1 Executor commit `b9016520c9d136d0ed861b807f6e9e25d7f39d5d` 实现 Store 精确全文快照、active/Stop 后恢复、无覆盖切换、Controller ownership guard 和中英 Yes/No 风险 UX。机器 Reviewer 用真实临时 Session 复现“发布后 Session 路径被替换并出现同名 decoy”反例，尽管 focused 52/52、full 154/154 全绿，仍对 R2-AC-03/R2-AC-05 给 `REJECT`。
+- Cycle 2 repair commit `fb317ea4a2b1db557133e91590e852c0241a3cd8` 在 Store 状态发布前重新验证 no-follow Session pathname identity 和 destination inode，并仅通过原 verified directory fd 清理自有 recovery inode。新增 active、stopped/snapshot、destination-replacement 三类竞态测试；最终 focused 55/55、ResourceWarning-strict full 157/157 PASS。
+- 同一 Reviewer thread 对 cycle 2 给 schema-valid `ACCEPT`，请求唯一 `R2 -> COMPLETED` transition。三层终态为 `RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED`，exit code 0；transition ID `2a59a9c1a90be25cd3d66abc9dd1f6db6c326c0d0f93df1d0f56f72cfc7d2efc`，framework evidence commit `46357c0c7fed016224e773578e7aae89cdc56c2b` 已普通 push。
+- 本对话直接审核最终 diff、关键 Store/Controller/UI 边界和 evidence，独立复跑 focused 55/55 与 full 157/157，compile/import、`git diff --check`、commit/file hashes 和 clean worktree 全部通过。未发现新的自动工程 blocker。
+- 五个 Agent turn 均 exit 0；role auth 每轮恢复且前后 SHA-256 相同，active identity 未变化，实际凭据扫描命中 0。失败 run 和 retry run 的 raw/tracked evidence 均保留。
+- 按既有授权，target branch `codex/clean-toolbar-rename-v1` 已普通 push；local HEAD、`origin/codex/clean-toolbar-rename-v1` 与 GitHub ref 均为 `fb317ea4a2b1db557133e91590e852c0241a3cd8`。未 merge、tag 或 release。
+- 剩余 gate 仅为 Human Owner 的真实录音、录制中/停止后重命名恢复、Finder/clipboard 与 macOS 对话框黑盒验收。自动 Reviewer ACCEPT 不替代该 gate。
