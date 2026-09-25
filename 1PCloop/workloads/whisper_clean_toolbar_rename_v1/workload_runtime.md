@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_toolbar_rename_v1`
-- 状态: `ACTIVE / W1 AWAITING MANUAL RUN`
+- 状态: `ACTIVE / W1 AWAITING MANUAL RETRY RUN`
 - 当前 verdict: `NOT EVALUATED`
 - 唯一 Active Step: `W1 -- Clean 工具栏与实时文件重命名`
 - Static identity: `1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_static.md`; SHA-256 `eae16fa52bf532bc26accf7afecf78d0c4494128e57091ad613c621ace48948c`
@@ -21,6 +21,9 @@
 - 旧目标 repo 的 LLM 设计资料假设固定 `clean.txt`，但当前生产 Python 路径扫描未发现已实施的其他固定读取方；W1 必须重扫最新代码，并在文档中留下将来读取方需处理重命名路径的限制。
 - 初始化提交 `5c1cd6d3524ab493097df5a42a9b6b0b04126eca` 创建本 task Static/Runtime。两个 dedicated role runtime 的 `config.toml` 已按 Human 指定设为 Reviewer `gpt-6-sol/xhigh`、Executor `gpt-6-sol/high`；context window 512000 与 auto compact 260000 保持不变。本机 Codex Mix README 的 role 表已同步更新。本次激活没有修改 target 代码、framework runner、角色凭据或历史 evidence，也未调用 Codex Agent。
 - Human 启动授权后，target worktree 从精确 `569e5c...` 创建本 task 的 `codex/clean-toolbar-rename-v1` 分支；branch 创建时 HEAD 不变且工作树 clean。
+- 首次 run `20260925T055829Z-25962` 在 Reviewer instruction 的第一个 Codex turn 收到服务端 HTTP 400：`gpt-6-sol` 在当时 CLI `0.153.4` + ChatGPT 登录组合下被拒绝。没有 Executor turn、target mutation 或 Runtime transition；三层终态为 `FAILED_CLOSED / NOT_APPLIED / PUSHED`。原 checkpoint、raw evidence 和 tracked summary `1PCloop/evidence-summaries/20260925T055829Z-25962.md` 均保留，framework evidence commit `339fb3db014ee01722a8de425fd9136c7e990d1d` 已 push。`PUSHED` 只说明失败证据发布，不是 W1 完成。
+- 失败后 role 原 `auth.json` 已恢复，process receipt 显示实际凭据泄露命中 0、active identity 未变；事后 doctor 9/9 PASS。Human Owner 将 Codex CLI 升级到 `0.157.0`，在当前激活账号的交互式 CLI 中选择 `gpt-6-sol high` 并实际收到 `auth-ok`。本地 `codex --version` 已独立核对为 `0.157.0`。这支持启动新 retry，但不把交互式 smoke 冒充 dedicated Reviewer/Executor 的完整 turn 验收。
+- 新 retry 配置 `workload_retry_01.json` 显式绑定 `retry_of=20260925T055829Z-25962`，使用独立 state root `1PCloop/.local/state/whisper_clean_toolbar_rename_v1-retry-01`，不得 resume 或覆盖旧终态 checkpoint。Target 仍是 clean 的 `569e5c...`。
 
 ## 3. Active Step -- W1
 
@@ -39,7 +42,7 @@
 1. Human PASS 治理收尾: 旧 task-local Runtime 与 global Runtime 只更新高层状态；旧 machine block、transition record、run evidence 和 target 代码保持不变。
 2. Git 基线: framework `main` 与 target 原 feature branch local/remote/clean 一致；新 target branch 从固定 `569e5c...` 创建，不 merge/rebase 或切换到 `main` 基线。
 3. 本 Static identity 已按启动授权更新并固定。下面只存在一个 W1 `ACTIVE` machine block；旧布局 L1 checkpoint 不复用。
-4. 独立 `workload.json` 指向新分支和独立 state root，Reviewer/Executor 使用 Codex Mix dedicated homes 和 run-bound active account。
+4. 原 `workload.json` 与首次失败 checkpoint 保持原样；只使用 `workload_retry_01.json` 的新 state root、新 run ID 和显式 retry 关系。Reviewer/Executor 继续使用 Codex Mix dedicated homes 和 run-bound active account。
 5. 手动 `run` 前必须确认当前 framework/target clean、`doctor` 和 `preflight` 均 PASS，role config 为 Reviewer `gpt-6-sol/xhigh`、Executor `gpt-6-sol/high`，且认证事务、active identity 与 A/B retirement snapshot 检查通过。任一检查失败，停止并报告，不运行 Agent。
 
 ## 5. Independent Review
@@ -51,9 +54,9 @@
 ## 6. Blockers, Pending and Next Action
 
 - 代码可行性 blocker: 未发现。
-- 当前执行 blocker: 无；`doctor`/`preflight` 是手动运行前的强制 gate，未通过即停止。
+- 当前执行 blocker: 无；新 retry config 的 `doctor`/`preflight` 是手动运行前的强制 gate，未通过即停止。升级后的 dedicated role 调用仍须由新 run 实证，不能仅凭交互式 smoke 宣告通过。
 - Pending Tasks: 无。
-- 下一步: Human Owner 使用独立 config 手动执行 `run`，结束时通知本对话进行独立验收；真实音频/macOS黑盒由 Human Owner 在自动审核之后另行核验。
+- 下一步: Human Owner 仅使用 `workload_retry_01.json` 手动执行全新 `run`；不得对首次失败 run 执行 `resume` 或用原 `workload.json` 启动新 run。结束时通知本对话进行独立验收；真实音频/macOS黑盒由 Human Owner 在自动审核之后另行核验。
 
 ## 7. Machine-owned State
 

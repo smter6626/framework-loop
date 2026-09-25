@@ -146,6 +146,19 @@ dedicated homes now select `gpt-6-sol` with `xhigh` and `high` effort respective
 The Human Owner, not this preparation turn, will execute `run`. Automatic ACCEPT
 will still leave a real audio/macOS Human validation gate.
 
+### 2026-09-25 -- first Clean toolbar run failed closed; retry prepared
+
+Run `20260925T055829Z-25962` failed in its first Reviewer service turn when
+`gpt-6-sol` was rejected for Codex ChatGPT sign-in under CLI `0.153.4`. No Executor
+turn, target mutation or Runtime transition occurred. Failure evidence was published
+by framework commit `339fb3db014ee01722a8de425fd9136c7e990d1d` and remains
+immutable. Human Owner upgraded the CLI to `0.157.0` and reported a successful
+interactive `gpt-6-sol` response `auth-ok`; this is a service smoke, not W1
+acceptance. The task-local Runtime and `workload_retry_01.json` bind a new run
+explicitly to the failed run using an independent checkpoint root. W1 remains the
+only active external step; Human Owner will manually start the retry after
+doctor/preflight. The original terminal checkpoint must not be resumed or overwritten.
+
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
 Run `20260924T220337Z-47406` failed closed in the first Reviewer instruction turn with HTTP/WS
