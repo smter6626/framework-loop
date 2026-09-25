@@ -3,12 +3,12 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_rename_integrity_repair_v1`
-- 状态: `ACTIVE / R1 AUTHORIZED FOR CONTROLLED RUN`
-- 当前 verdict: `NOT EVALUATED`，修复任务没有 Executor commit 或 Reviewer verdict
+- 状态: `HUMAN DECISION REQUIRED / R1 ACTIVE (NO TRANSITION)`
+- 当前 verdict: `HUMAN_GATE`，首轮 Reviewer 未接受 R1，也未推进 Runtime
 - 唯一 Active Step: `R1 -- 修复候选路径身份错误`
 - Static identity: `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_static.md`，SHA-256 `bc70ba55127ea3e5becfc33c9924948409d1247306610ee2948cbd7fee861bc4`
 - Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`；当前拟使用 `codex/clean-toolbar-rename-v1`，固定修复基线 `352e62b2bf3cd3690e8eee57cb2e933f1405c6af`
-- Blocker: 无已知启动 blocker；doctor/preflight 必须在运行前通过。若第 4 节 Human Decision Gate 触发，则暂停修复
+- Blocker: Human Owner 必须裁定旧 AC-07 对外部任意移动文件的支持边界；在裁定前不启动新的修复 run、不推送 target 分支
 - Pending Tasks: 无；原任务真实音频/macOS gate 仍未通过，不得在本修复中代替 Human 关闭
 
 ## 2. 必读交接与证据顺序
@@ -61,7 +61,7 @@
 
 ## 7. Machine state
 
-本 Runtime 只有一个 R1 ACTIVE machine block。旧 W1 的 completed/disabled block 及历史 transition record 保持原状。
+本 Runtime 只有一个 R1 ACTIVE machine block。首轮 R1 的 `HUMAN_GATE` 未产生 transition；旧 W1 的 completed/disabled block 及历史 transition record 保持原状。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
@@ -75,3 +75,13 @@
   "workload_id": "whisper_clean_rename_integrity_repair_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
+
+## 8. R1 首轮运行结果 -- 2026-09-25
+
+- 受控 run: `20260925T073217Z-31813`，新 config `workload.json`，新 state root；启动前 doctor 9/9 PASS、preflight PASS。原 W1 终态未 resume 或覆盖。
+- Reviewer instruction 独立复现原同目录移动加 decoy，并要求 Store/Controller/UI 在公开路径前验证写入句柄 inode。Executor 提交目标普通后继 `b62ef6947d6a634c56e695740e4ea446751e6c79`，parent 为固定修复基线 `352e62b2bf3cd3690e8eee57cb2e933f1405c6af`；target 工作树 clean，分支未 push。
+- 同一 Reviewer thread 复审确认：同目录移位加 decoy 的原反例已被阻断，Finder/路径复制改为通过 Store 重新验证；Reviewer 独立完整 ResourceWarning-strict 回归 143/143 PASS，`git diff --check` PASS。
+- Reviewer verdict: `HUMAN_GATE`。当外部进程将原 Clean inode 移出 Session，测试显示 `clean_path=None`，路径操作 fail closed，而打开的写入句柄仍可继续追加。这避免指向 decoy，但不能满足上游 AC-07 对失败后有效当前路径的字面承诺。Human Owner 需选择“应用单 writer + 可检测外部 mutation”边界，或要求更强的协调/监控机制；未经选择不得自行缩小 Static 或宣告 ACCEPT。
+- 三层终态: `HUMAN_GATE / NOT_APPLIED / PUSHED`，exit 0。framework evidence commit `ae15960ad25da06c8cf687f2a46bad917c9d520c` 已普通 push；本 run 的 raw 位于 `1PCloop/.local/runs/20260925T073217Z-31813/`，tracked summary 为 `1PCloop/evidence-summaries/20260925T073217Z-31813.md`。`PUSHED` 仅代表证据发布。
+- 事后只读 `status`、`inspect`、`human-gate` 均 PASS 并指向 `HUMAN_REVIEW_REQUIRED`。三个 Agent turn 的 role auth 均恢复，active identity 未变，实际凭据扫描命中 0。真实音频/macOS Human gate 尚未开始。
+- 下一步只等待 Human 对合同边界做显式决定；之后另行规划修复或验收，不复用本终态 run。

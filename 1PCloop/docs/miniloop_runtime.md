@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 R1 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 HUMAN GATE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_rename_integrity_repair_v1 / R1 ACTIVE / RUN AUTHORIZED
+= whisper_clean_rename_integrity_repair_v1 / R1 ACTIVE / HUMAN DECISION REQUIRED
 = 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
 
 Prior external workload disposition
@@ -189,6 +189,14 @@ Human Owner subsequently authorized this assistant to activate and monitor R1.
 The repair task now has a distinct ACTIVE machine block, config and state root.
 The old W1 terminal state and evidence remain unchanged. Doctor/preflight and
 current-account auth checks are mandatory before starting the new run.
+
+R1 run `20260925T073217Z-31813` ended `HUMAN_GATE / NOT_APPLIED / PUSHED`.
+Target repair commit `b62ef6947d6a634c56e695740e4ea446751e6c79` addresses
+the same-Session move plus decoy, but external movement of the writer inode
+outside the Session leaves no verifiable current Session path. Reviewer did
+not accept the original AC-07 valid-path guarantee under that condition.
+Human Owner must choose the supported external-mutation boundary before a
+new run or target push. Detailed evidence is in the task-local Runtime.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
