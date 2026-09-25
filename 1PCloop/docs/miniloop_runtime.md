@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 RETRY AUTHORIZED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_fulltext_recovery_r2 / R2 ACTIVE / HUMAN RUN AUTHORIZED
+= whisper_clean_fulltext_recovery_r2 / R2 ACTIVE / FIRST RUN FAILED CLOSED
+= retry authorized with `gpt-5.6-sol` and unchanged reasoning efforts
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Prior external workload disposition
@@ -209,6 +210,16 @@ recovery. A separate `whisper_clean_fulltext_recovery_r2` Static, Runtime
 and config were prepared. On 2026-09-25 the Human Owner explicitly
 authorized this assistant to start and monitor R2. R2 is now the sole
 active external step; R1 Human Gate and W1 history remain unchanged.
+
+R2 run `20260925T085542Z-34665` failed closed in the initial Reviewer
+turn before any instruction, Executor mutation or Runtime transition. The
+Codex service rejected explicit `gpt-6-sol` use for the ChatGPT account
+bound at run start. Target branch, HEAD and clean state were unchanged;
+role auth was restored, active identity was unchanged and credential scan
+found zero actual credential values. Failure evidence commit `6ee2ac5` is
+pushed. R2 remains ACTIVE. The Human Owner then authorized a new explicit
+retry using `gpt-5.6-sol` while preserving Reviewer `xhigh` and Executor
+`high`; account identity and all other execution boundaries remain fixed.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

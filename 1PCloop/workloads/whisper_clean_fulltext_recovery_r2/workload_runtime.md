@@ -3,14 +3,14 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_fulltext_recovery_r2`
-- 状态: `ACTIVE / HUMAN RUN AUTHORIZED`
-- Verdict: `NOT EVALUATED`；R2 尚无 Executor commit 或 Reviewer verdict
+- 状态: `ACTIVE / FIRST RUN FAILED CLOSED / RETRY AUTHORIZED`
+- Verdict: `NOT EVALUATED`；首次 run 未产生 Reviewer instruction、Executor commit 或 Reviewer verdict
 - 唯一 Active Step: `R2 -- Clean 全文恢复与明确的否语义`
 - Static: `1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_static.md`
 - Static identity: SHA-256 `1d75a64ba29fd5c36689274ad2b2079ace822f2dfe91c35f7f4b98b251276d4c`
 - Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 基线 `b62ef6947d6a634c56e695740e4ea446751e6c79`
-- Blocker: 无；启动前仍须重新通过实时 Git、认证事务、doctor 和 preflight gate
-- Pending Tasks: 无；旧任务真实音频/macOS Human gate 尚未执行，仍是自动验收后的独立 gate
+- Blocker: 无；retry 启动前须以新 config 重新通过 doctor/preflight
+- Pending Tasks: 使用 `workload_retry_01.json` 启动新 run 并监控到明确终态。旧任务真实音频/macOS Human gate 尚未执行，仍是自动验收后的独立 gate
 
 ## 2. Completed -- R2 输入与 Human 决定
 
@@ -18,6 +18,7 @@
 - R1 run `20260925T073217Z-31813` 的 target commit `b62ef6947d6a634c56e695740e4ea446751e6c79` 阻断同目录 move+decoy；Reviewer 严格回归 143/143 PASS，但因外部把 writer inode 移出 Session 后无可验证路径而给 `HUMAN_GATE / NOT_APPLIED / PUSHED`。证据见 `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md`、`1PCloop/evidence-summaries/20260925T073217Z-31813.md` 和 Git-ignored raw run。R1 的机器块及终态保持原样。
 - Human Owner 于 2026-09-25 在当前对话明确选择新的异常恢复行为：路径不在原 Session 时弹出“是否创建 `<inputString>.txt`”；“是”要包含此前全部转录并承接后续写入，“否”不处理并继续转录，同时明确保存风险。之后 Human 要求先评估全文恢复难度，并认可 Store 层精确复制/Stop 前快照方案，最后授权“准备 R2”。这授权合同与准备文件，不授权本轮启动 Agent。
 - Human Owner 于 2026-09-25 在读取本任务交接后明确要求“启动并监控 R2”。本次授权激活唯一 `R2/ACTIVE` machine block；它不扩大 Static、target push、merge、tag、release 或真实用户 Session 的授权边界。
+- 首次启动因当前账号不支持 `gpt-6-sol` 失败后，Human Owner 明确授权改用 `gpt-5.6-sol` 重新开始，并保持 Reviewer `xhigh`、Executor `high`。本授权不允许改变账号、推理强度或其他边界。
 - 直接代码核查：当前 Clean writer 以只写 `w` 模式打开；Store 的 `append_clean()` 和 `rename_clean()` 已有同一 `_clean_lock`，Stop 会关闭文件；UI 表格只保留解析后的时间/正文且事件可能排队，因此不能作为精确 Clean 字节的权威来源。隔离临时文件实验确认，改为可读写句柄后，在路径被移走、由 decoy 占用或 unlink 时，句柄仍可读取已写完整内容。该实验是可行性证据，不是 R2 实现或验收。
 
 ## 3. Proposed R2 -- 全文恢复与明确的“否”语义
@@ -54,3 +55,11 @@
   "workload_id": "whisper_clean_fulltext_recovery_r2"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
+
+## 6. R2 首次启动结果 -- 2026-09-25
+
+- Run `20260925T085542Z-34665` 在 cycle 1 的初始 Reviewer turn 启动后约 6 秒收到 Codex service `invalid_request_error`: 当前 ChatGPT 账号不支持 `gpt-6-sol`。本机 CLI 为 `0.157.0`；Reviewer role 明确配置 `gpt-6-sol / xhigh`，模型名称和推理强度配置未被自动替换。
+- 三层终态为 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit code 1。没有 Reviewer instruction、Executor turn、target commit 或 Runtime transition。Target 保持 branch `codex/clean-toolbar-rename-v1`、HEAD `b62ef6947d6a634c56e695740e4ea446751e6c79`、工作树 clean。
+- Framework evidence commit `6ee2ac5b7ddf6cefc2dafb3da1e21fb7548ea082` 已普通 push。Tracked summary 为 `1PCloop/evidence-summaries/20260925T085542Z-34665.md`，raw evidence 位于 Git-ignored `1PCloop/.local/runs/20260925T085542Z-34665/`；旧失败不得删除或覆盖。
+- 认证事务正常收尾：role auth 已恢复且前后 SHA-256 相同，active identity 未变化，实际凭据扫描命中 0。失败不是 target 实现、R2 Static、认证投影或凭据泄漏问题。
+- 当前 machine block 保持 `R2/ACTIVE`。Human Owner 已授权使用 `gpt-5.6-sol`、原推理强度和独立 `workload_retry_01.json` 新建 retry run；不得 resume 这个 terminal failure，也不得切换账号、改用 API Key 或改变推理强度。
