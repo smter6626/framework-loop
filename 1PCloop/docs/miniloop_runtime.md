@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 PREPARED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,7 +43,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_fulltext_recovery_r2 / PREPARED / NOT ACTIVE
+= whisper_clean_fulltext_recovery_r2 / R2 ACTIVE / HUMAN RUN AUTHORIZED
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Prior external workload disposition
@@ -206,8 +206,9 @@ path or durable saved output can be promised. A feasibility check showed
 the parsed UI table is not an exact byte source, whereas Store-level
 readable writer access and a pre-close snapshot can support full-content
 recovery. A separate `whisper_clean_fulltext_recovery_r2` Static, Runtime
-and config are prepared. R2 is not active and no Agent run is authorized
-by this preparation; R1 Human Gate and W1 history remain unchanged.
+and config were prepared. On 2026-09-25 the Human Owner explicitly
+authorized this assistant to start and monitor R2. R2 is now the sole
+active external step; R1 Human Gate and W1 history remain unchanged.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

@@ -1,15 +1,15 @@
-# Whisper Clean 全文恢复 R2 -- Runtime 准备状态
+# Whisper Clean 全文恢复 R2 -- Runtime
 
 ## 1. Current Status
 
 - Task ID: `whisper_clean_fulltext_recovery_r2`
-- 状态: `PREPARED / NOT ACTIVE / AWAITING HUMAN RUN AUTHORIZATION`
+- 状态: `ACTIVE / HUMAN RUN AUTHORIZED`
 - Verdict: `NOT EVALUATED`；R2 尚无 Executor commit 或 Reviewer verdict
-- 唯一 Active Step: 无；R2 是待激活候选，不存在可执行 machine block
+- 唯一 Active Step: `R2 -- Clean 全文恢复与明确的否语义`
 - Static: `1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_static.md`
 - Static identity: SHA-256 `1d75a64ba29fd5c36689274ad2b2079ace822f2dfe91c35f7f4b98b251276d4c`
 - Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 基线 `b62ef6947d6a634c56e695740e4ea446751e6c79`
-- Blocker: Human Owner 尚未授权启动 R2；不得用本准备文件直接调用 mutation runner
+- Blocker: 无；启动前仍须重新通过实时 Git、认证事务、doctor 和 preflight gate
 - Pending Tasks: 无；旧任务真实音频/macOS Human gate 尚未执行，仍是自动验收后的独立 gate
 
 ## 2. Completed -- R2 输入与 Human 决定
@@ -17,6 +17,7 @@
 - W1 历史成功 run `20260925T061052Z-27529` 及其后续独立 AC-07 REJECT 均保留于 `1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_runtime.md`。
 - R1 run `20260925T073217Z-31813` 的 target commit `b62ef6947d6a634c56e695740e4ea446751e6c79` 阻断同目录 move+decoy；Reviewer 严格回归 143/143 PASS，但因外部把 writer inode 移出 Session 后无可验证路径而给 `HUMAN_GATE / NOT_APPLIED / PUSHED`。证据见 `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md`、`1PCloop/evidence-summaries/20260925T073217Z-31813.md` 和 Git-ignored raw run。R1 的机器块及终态保持原样。
 - Human Owner 于 2026-09-25 在当前对话明确选择新的异常恢复行为：路径不在原 Session 时弹出“是否创建 `<inputString>.txt`”；“是”要包含此前全部转录并承接后续写入，“否”不处理并继续转录，同时明确保存风险。之后 Human 要求先评估全文恢复难度，并认可 Store 层精确复制/Stop 前快照方案，最后授权“准备 R2”。这授权合同与准备文件，不授权本轮启动 Agent。
+- Human Owner 于 2026-09-25 在读取本任务交接后明确要求“启动并监控 R2”。本次授权激活唯一 `R2/ACTIVE` machine block；它不扩大 Static、target push、merge、tag、release 或真实用户 Session 的授权边界。
 - 直接代码核查：当前 Clean writer 以只写 `w` 模式打开；Store 的 `append_clean()` 和 `rename_clean()` 已有同一 `_clean_lock`，Stop 会关闭文件；UI 表格只保留解析后的时间/正文且事件可能排队，因此不能作为精确 Clean 字节的权威来源。隔离临时文件实验确认，改为可读写句柄后，在路径被移走、由 decoy 占用或 unlink 时，句柄仍可读取已写完整内容。该实验是可行性证据，不是 R2 实现或验收。
 
 ## 3. Proposed R2 -- 全文恢复与明确的“否”语义
@@ -32,11 +33,24 @@
 
 ## 4. 启动前 gate
 
-1. Human Owner 另行授权启动 R2。届时才添加唯一 `R2/ACTIVE`、`reviewer_accept_once` 的 machine block；当前没有该块。
+1. Human Owner 已明确授权启动并监控 R2；本 Runtime 已添加唯一 `R2/ACTIVE`、`reviewer_accept_once` machine block。
 2. 创建新的 state root `1PCloop/.local/state/whisper_clean_fulltext_recovery_r2`，不 `resume` W1/R1 终态，也不使用 runner 的 `retry` 字段：该字段只接受 `FAILED_CLOSED` 且相同初始 target HEAD，R1 是 `HUMAN_GATE` 且 target 已变化。
 3. 重新检查 framework 本地/远端 main 和 target branch/HEAD/clean、R1 evidence、Static hash、Codex Mix 当前账号认证事务及 role 配置。新 run 绑定启动时激活账号，不沿用 R1 账号。
 4. 对本目录 `workload.json` 跑 doctor/preflight；全部 PASS 后才可 `run`。旧 R1 config/state/raw 只读保留。真实 target branch 普通 push 只能在自动和本对话独立验收均通过后执行。
 
 ## 5. Machine state
 
-本准备 Runtime 不包含 `1PCLOOP_RUNTIME_STATE_BEGIN/END` machine block；不能作为可执行 R2 任务。R1 的 Human Gate 及历史机器块不在这里迁移或改写。
+本 Runtime 只有一个 `R2/ACTIVE` machine block，仅授权一次 schema-valid Reviewer `ACCEPT -> COMPLETED` transition。R1 的 Human Gate 及历史机器块不在这里迁移或改写。
+
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "active_step": {
+    "id": "R2",
+    "status": "ACTIVE"
+  },
+  "last_transition_id": null,
+  "schema_version": 1,
+  "transition_mode": "reviewer_accept_once",
+  "workload_id": "whisper_clean_fulltext_recovery_r2"
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->
