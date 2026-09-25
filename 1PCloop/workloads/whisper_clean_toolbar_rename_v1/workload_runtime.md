@@ -64,13 +64,84 @@
 {
   "active_step": {
     "id": "W1",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "b9b811c9306443203ea4705989182cbaeebcdac87b46c245513c54b8f37c6b9c",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_clean_toolbar_rename_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
 该机器块只授权 W1 的一次 schema-valid Reviewer `ACCEPT -> COMPLETED` transition。它不授权自动关闭 Human 真实录音 gate，也不授权 target merge、tag 或 release。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "cea2b3f97657247cba5c5094e4bfa17c130c67018c72503dd05c4b443d692897",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "352e62b2bf3cd3690e8eee57cb2e933f1405c6af",
+      "sha256": "6a048cb682f4d323c06ae287be40d9cf27639b076fb85dc79cfc2c7506b24da3"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/transcript_store.py",
+      "sha256": "8abc07a3925e28efc2f6e1d48d69a094a035f84e2a2c812c62f4cee5d22d4030"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/ui_app.py",
+      "sha256": "ee4fe7f865481d8877a07478683544f2d6b08e6d16f7694f0805dccb086b9abc"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/testCodes/test_clean_rename.py",
+      "sha256": "dce37870e7bc6dd06db0bab43237b4bc0aead41c4954ea773ae835347f03422c"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/testCodes/test_window_layout.py",
+      "sha256": "83a83ed0920329bdf0d1a901a9e73653185d3a5bea7e8545cf0661c48f76248d"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui/docs/change_records/clean_toolbar_rename_v1.md",
+      "sha256": "ef461a14c0829b639c4ba8d4c5600307d2df968d6a56ddb1e5874ab4c34a398f"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260925T061052Z-27529/cycle-03/executor/events.jsonl",
+      "sha256": "81ed35ab912f88da9449d778bd8e6a5259a5e76ea7bd70419aeb702cf300f768"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "W1",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "b9b811c9306443203ea4705989182cbaeebcdac87b46c245513c54b8f37c6b9c",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_clean_toolbar_rename_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "W1",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_clean_toolbar_rename_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260925T061052Z-27529/cycle-03/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "b2886d07569f68e5d1bcc53f89a71fb7a2035ddcd6951cd7610585277624be28",
+  "schema_version": 1,
+  "target_head": "352e62b2bf3cd3690e8eee57cb2e933f1405c6af",
+  "timestamp": "2026-09-25T06:38:30.221+00:00",
+  "transition_id": "b9b811c9306443203ea4705989182cbaeebcdac87b46c245513c54b8f37c6b9c"
+}
+```
