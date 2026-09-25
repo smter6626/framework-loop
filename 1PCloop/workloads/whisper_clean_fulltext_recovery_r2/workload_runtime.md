@@ -1,0 +1,42 @@
+# Whisper Clean 全文恢复 R2 -- Runtime 准备状态
+
+## 1. Current Status
+
+- Task ID: `whisper_clean_fulltext_recovery_r2`
+- 状态: `PREPARED / NOT ACTIVE / AWAITING HUMAN RUN AUTHORIZATION`
+- Verdict: `NOT EVALUATED`；R2 尚无 Executor commit 或 Reviewer verdict
+- 唯一 Active Step: 无；R2 是待激活候选，不存在可执行 machine block
+- Static: `1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_static.md`
+- Static identity: SHA-256 `1d75a64ba29fd5c36689274ad2b2079ace822f2dfe91c35f7f4b98b251276d4c`
+- Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 基线 `b62ef6947d6a634c56e695740e4ea446751e6c79`
+- Blocker: Human Owner 尚未授权启动 R2；不得用本准备文件直接调用 mutation runner
+- Pending Tasks: 无；旧任务真实音频/macOS Human gate 尚未执行，仍是自动验收后的独立 gate
+
+## 2. Completed -- R2 输入与 Human 决定
+
+- W1 历史成功 run `20260925T061052Z-27529` 及其后续独立 AC-07 REJECT 均保留于 `1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_runtime.md`。
+- R1 run `20260925T073217Z-31813` 的 target commit `b62ef6947d6a634c56e695740e4ea446751e6c79` 阻断同目录 move+decoy；Reviewer 严格回归 143/143 PASS，但因外部把 writer inode 移出 Session 后无可验证路径而给 `HUMAN_GATE / NOT_APPLIED / PUSHED`。证据见 `1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md`、`1PCloop/evidence-summaries/20260925T073217Z-31813.md` 和 Git-ignored raw run。R1 的机器块及终态保持原样。
+- Human Owner 于 2026-09-25 在当前对话明确选择新的异常恢复行为：路径不在原 Session 时弹出“是否创建 `<inputString>.txt`”；“是”要包含此前全部转录并承接后续写入，“否”不处理并继续转录，同时明确保存风险。之后 Human 要求先评估全文恢复难度，并认可 Store 层精确复制/Stop 前快照方案，最后授权“准备 R2”。这授权合同与准备文件，不授权本轮启动 Agent。
+- 直接代码核查：当前 Clean writer 以只写 `w` 模式打开；Store 的 `append_clean()` 和 `rename_clean()` 已有同一 `_clean_lock`，Stop 会关闭文件；UI 表格只保留解析后的时间/正文且事件可能排队，因此不能作为精确 Clean 字节的权威来源。隔离临时文件实验确认，改为可读写句柄后，在路径被移走、由 decoy 占用或 unlink 时，句柄仍可读取已写完整内容。该实验是可行性证据，不是 R2 实现或验收。
+
+## 3. Proposed R2 -- 全文恢复与明确的“否”语义
+
+- Objective: 当当前 Session Clean 路径经验证缺失时，给 Human 一次明确选择；“是”安全生成完整 `<stem>.txt` 并切换后续写入，“否”保持原句柄和当前转录但清楚显示路径/持久性风险。
+- Inputs: R2 Static、W1/R1 Static/Runtime、R1 target commit/diff 与 run evidence、Store/Controller/UI/engine 直接代码；不能仅凭交接文档或 UI 表格。
+- Permitted changes: R2 Static 第 4 节限定的 target Store/必要 Controller/UI、相关 tests 和准确的双语文档；普通 target 后继 commit。
+- Prohibited changes: 旧 W1/R1 治理及 evidence、真实 Session、ASR/audio/model、framework runner、认证、未授权 target push/merge/release。
+- Required evidence: 活跃和 Stop 后准确的原始 Clean 字节；外部 move/unlink、decoy/冲突/符号链接、临时复制失败及后续 append 的文件身份与顺序；“否”后不产生新文件且路径动作 fail closed；Qt 中英文本与 Session freshness；完整 tests、commit/diff/hash。
+- Acceptance: R2-AC-01 至 R2-AC-06 由新的 Reviewer 独立判断；机器 ACCEPT 后还需本对话独立复核。真实麦克风/macOS 黑盒留给 Human。
+- Stop conditions: 无法证明精确全文、切换丢行/重复、错误时覆盖或发布部分目标、误把不确定 I/O 当作缺失、须改变 Human 决定或目标分支身份时停止。
+- Executor report: 修改逻辑、精确文件范围、active/Stop/No/失败矩阵、测试结果、完整 commit、未测边界；不得自行宣告最终 ACCEPT。
+
+## 4. 启动前 gate
+
+1. Human Owner 另行授权启动 R2。届时才添加唯一 `R2/ACTIVE`、`reviewer_accept_once` 的 machine block；当前没有该块。
+2. 创建新的 state root `1PCloop/.local/state/whisper_clean_fulltext_recovery_r2`，不 `resume` W1/R1 终态，也不使用 runner 的 `retry` 字段：该字段只接受 `FAILED_CLOSED` 且相同初始 target HEAD，R1 是 `HUMAN_GATE` 且 target 已变化。
+3. 重新检查 framework 本地/远端 main 和 target branch/HEAD/clean、R1 evidence、Static hash、Codex Mix 当前账号认证事务及 role 配置。新 run 绑定启动时激活账号，不沿用 R1 账号。
+4. 对本目录 `workload.json` 跑 doctor/preflight；全部 PASS 后才可 `run`。旧 R1 config/state/raw 只读保留。真实 target branch 普通 push 只能在自动和本对话独立验收均通过后执行。
+
+## 5. Machine state
+
+本准备 Runtime 不包含 `1PCLOOP_RUNTIME_STATE_BEGIN/END` machine block；不能作为可执行 R2 任务。R1 的 Human Gate 及历史机器块不在这里迁移或改写。

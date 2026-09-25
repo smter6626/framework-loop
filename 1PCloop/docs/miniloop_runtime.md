@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_RENAME_INTEGRITY_REPAIR_V1 HUMAN GATE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 PREPARED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -43,12 +43,12 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_rename_integrity_repair_v1 / R1 ACTIVE / HUMAN DECISION REQUIRED
-= 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
+= whisper_clean_fulltext_recovery_r2 / PREPARED / NOT ACTIVE
+= 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Prior external workload disposition
-= whisper_clean_toolbar_rename_v1 / MACHINE W1 COMPLETED / INDEPENDENT AC-07 REJECT
-= 1PCloop/workloads/whisper_clean_toolbar_rename_v1/workload_runtime.md
+= whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
+= 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
 
 Overall 1PCloop completion
 = AWAITING EXPLICIT HUMAN OWNER DECISION
@@ -197,6 +197,17 @@ outside the Session leaves no verifiable current Session path. Reviewer did
 not accept the original AC-07 valid-path guarantee under that condition.
 Human Owner must choose the supported external-mutation boundary before a
 new run or target push. Detailed evidence is in the task-local Runtime.
+
+Human Owner then selected an explicit recovery path: when the original
+Session Clean file has no verifiable path, a Yes choice creates a new
+user-named `.txt` containing the complete Clean history and receives later
+appends; a No choice leaves the open writer running but warns that no safe
+path or durable saved output can be promised. A feasibility check showed
+the parsed UI table is not an exact byte source, whereas Store-level
+readable writer access and a pre-close snapshot can support full-content
+recovery. A separate `whisper_clean_fulltext_recovery_r2` Static, Runtime
+and config are prepared. R2 is not active and no Agent run is authorized
+by this preparation; R1 Human Gate and W1 history remain unchanged.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 
