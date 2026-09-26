@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 HUMAN VALIDATION PENDING`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 HUMAN ACCEPTED / TASK CLOSED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -39,13 +39,12 @@ P7 controlled REJECT -> REPAIR fault injection
 = MAY RESUME ONLY AFTER EXPLICIT HUMAN REACTIVATION
 
 Most recently closed engineering task
-= whisper_window_layout_v1 / HUMAN ACCEPTED / TASK CLOSED
-= 1PCloop/workloads/whisper_window_layout_v1/workload_runtime.md
+= whisper_clean_fulltext_recovery_r2 / MACHINE + INDEPENDENT + HUMAN ACCEPTED
+= TASK CLOSED
+= 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Current external engineering task
-= whisper_clean_fulltext_recovery_r2 / MACHINE + INDEPENDENT ACCEPTED
-= HUMAN MACOS VALIDATION PENDING
-= 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
+= NONE / NO ACTIVE EXTERNAL STEP
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
@@ -228,9 +227,17 @@ counterexample. Repair commit `fb317ea4` added final no-follow Session and
 destination inode binding checks; focused 55/55 and full strict 157/157
 passed in both run evidence and this conversation's independent rerun.
 Runtime transition and evidence publication completed, and the target
-feature branch was ordinary-pushed at exact commit `fb317ea4`. Remaining
-work is Human macOS/audio/Finder/clipboard validation; no merge, tag or
-release is authorized.
+feature branch was ordinary-pushed at exact commit `fb317ea4`. Human Owner
+subsequently completed the real macOS black-box gate and explicitly reported
+PASS. R2 is now Human accepted and task closed; no merge, tag or release is
+authorized.
+
+Target-side stable documentation was then consolidated in documentation-only
+commit `0388fa9daf65d5b5d0efae0e86eec824e33eab15`: current behavior now lives in
+the bilingual README, engineering detail, repo map and future LLM resolver gate,
+while the duplicate `docs/change_records/` directory was removed. Detailed
+Reviewer/Executor history and evidence remain in this framework repository.
+No new external task or Active Step was created by this closure.
 
 ### 2026-09-24 -- Codex Mix auth transport failure and authorized repair
 

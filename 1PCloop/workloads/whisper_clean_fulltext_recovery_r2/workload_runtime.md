@@ -3,14 +3,14 @@
 ## 1. Current Status
 
 - Task ID: `whisper_clean_fulltext_recovery_r2`
-- 状态: `IMPLEMENTED / MACHINE ACCEPTED / INDEPENDENTLY ACCEPTED / HUMAN MACOS VALIDATION PENDING`
-- Verdict: `ACCEPT`；机器 Reviewer 与本对话独立审核均通过，真实麦克风/Finder/clipboard/macOS 交互仍由 Human Owner 验收
+- 状态: `IMPLEMENTED / MACHINE ACCEPTED / INDEPENDENTLY ACCEPTED / HUMAN MACOS ACCEPTED / TASK CLOSED`
+- Verdict: `ACCEPT`；机器 Reviewer、本对话独立审核和 Human Owner 的真实 macOS 黑盒验收均通过
 - 唯一 Active Step: 无；`R2` machine block 已 `COMPLETED`
 - Static: `1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_static.md`
 - Static identity: SHA-256 `1d75a64ba29fd5c36689274ad2b2079ace822f2dfe91c35f7f4b98b251276d4c`
 - Target: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`，branch `codex/clean-toolbar-rename-v1`，R2 baseline `b62ef6947d6a634c56e695740e4ea446751e6c79`，accepted HEAD `fb317ea4a2b1db557133e91590e852c0241a3cd8`
-- Blocker: 无自动工程 blocker
-- Pending Tasks: Human Owner 运行真实录音和 macOS UI/Finder/clipboard 黑盒验收；merge、tag、release 仍未授权
+- Blocker: 无
+- Pending Tasks: 本任务无；merge、tag、release 是独立集成决定，仍未授权
 
 ## 2. Completed -- R2 输入与 Human 决定
 
@@ -149,4 +149,12 @@
 - 本对话直接审核最终 diff、关键 Store/Controller/UI 边界和 evidence，独立复跑 focused 55/55 与 full 157/157，compile/import、`git diff --check`、commit/file hashes 和 clean worktree 全部通过。未发现新的自动工程 blocker。
 - 五个 Agent turn 均 exit 0；role auth 每轮恢复且前后 SHA-256 相同，active identity 未变化，实际凭据扫描命中 0。失败 run 和 retry run 的 raw/tracked evidence 均保留。
 - 按既有授权，target branch `codex/clean-toolbar-rename-v1` 已普通 push；local HEAD、`origin/codex/clean-toolbar-rename-v1` 与 GitHub ref 均为 `fb317ea4a2b1db557133e91590e852c0241a3cd8`。未 merge、tag 或 release。
-- 剩余 gate 仅为 Human Owner 的真实录音、录制中/停止后重命名恢复、Finder/clipboard 与 macOS 对话框黑盒验收。自动 Reviewer ACCEPT 不替代该 gate。
+- 机器与独立审核后的剩余 gate 曾仅为 Human Owner 的真实录音、录制中/停止后重命名恢复、Finder/clipboard 与 macOS 对话框黑盒验收。该 gate 已由第 8 节的 Human disposition 关闭；自动 Reviewer ACCEPT 本身不替代该 Human 决定。
+
+## 8. Human macOS acceptance 与任务关闭 -- 2026-09-25
+
+- Human Owner 在真实 macOS App 路径完成黑盒核验后明确报告“本次人工核验通过”。该明确 disposition 接受 R2 的用户可见行为，并关闭本 Runtime 原先保留的麦克风、录制中/Stop 后、Finder/clipboard 和中英确认交互 Human gate。
+- Human PASS 不改写历史 machine evidence：首次 `gpt-6-sol` 失败 run `20260925T085542Z-34665`、retry run `20260925T085909Z-35123`、cycle 1 `REJECT`、cycle 2 `ACCEPT`、machine transition ID 和 raw/tracked evidence 全部保持原样。
+- Target 实现接受点仍为 `fb317ea4a2b1db557133e91590e852c0241a3cd8`。Human 随后授权把稳定用户行为和当前技术合同整合进双语 README、`docs/工程细节.md`、`docs/repo_map.md` 与未来 LLM 文档，并删除重复的 `docs/change_records/`；文档-only commit `0388fa9daf65d5b5d0efae0e86eec824e33eab15` 已普通 push 到同一 feature branch。
+- 删除 target-side change records 不删除 1PCloop 历史。上方 immutable transition record 中的历史 locator/hash 继续描述当时接受 commit 的字节；对应文件仍可由 Git 历史与 framework evidence 复核。
+- R2 现在 `HUMAN MACOS ACCEPTED / TASK CLOSED`，没有 Active Step 或 task-local pending blocker。Target branch 尚未 merge、tag 或 release；这些动作不属于本任务关闭授权。
