@@ -3,14 +3,14 @@
 ## 1. 合同身份与授权
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 合同状态: `DRAFT / AWAITING HUMAN REVIEW`
+- 合同状态: `AUTHORIZED`
 - Human Owner: 当前项目 Owner。
 - 任务治理目录: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/`
 - 产品仓库: `smter6626/live_subtitle_generator`。
 - 当前功能源码工作区: `/Users/smterpro/Workspace/whisper/live_subtitle_generator-session-ui`。
 - 模板: `/Users/smterpro/Workspace/framework-loop/1PCloop/templates/static_prompt_zh.md` 与 `runtime_prompt_zh.md`。
 
-Human Owner 于 2026-09-29 在本对话确认下列发布方案，并要求先准备 Static/Runtime，审阅批准后才开始任务。该决定确认发布身份和拟执行范围，不是本轮启动、构建、merge、tag 或 Release 发布的授权。本文批准后才作为执行合同；执行准备仍须通过 Runtime 启动 gate。
+Human Owner 于 2026-09-29 在本对话确认下列发布方案，先审阅 Static/Runtime，随后明确授权 "可以，现在开始执行，你来负责启动+监控，完成后你也再做一次验证；然后我来验收"。本文已获批准，授权通过启动 gate 后执行自动化部分并停在最终 ZIP 的 Human 黑盒验收；未取得该 artifact 的 Human PASS 前仍不得创建真实 tag/draft、上传或发布。
 
 ## 2. 用人类语言说明目标
 

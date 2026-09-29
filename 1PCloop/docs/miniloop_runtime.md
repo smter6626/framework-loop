@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_CLEAN_FULLTEXT_RECOVERY_R2 HUMAN ACCEPTED / TASK CLOSED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1 ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -44,7 +44,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Current external engineering task
-= NONE / NO ACTIVE EXTERNAL STEP
+= whisper_release_1_1_0_v1 / REL1 ACTIVE
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
@@ -81,6 +82,18 @@ remains `ACTIVE` only because the Static Completion Definition reserves the fina
 `1PCloop/workloads/foundation_v1/workload_runtime.md` is frozen by default; this
 global Runtime retains the phase pointer and high-level transitions to avoid further
 unbounded growth.
+
+### 2026-09-29 -- Whisper 1.1.0 release automation authorized
+
+Human Owner approved `whisper_release_1_1_0_v1` Static/Runtime and authorized
+assistant startup, monitoring and independent verification before Human artifact
+acceptance. REL1 is the sole active external implementation step, in a new Downloads
+clone on `codex/release-1-1-0-automation`, based on accepted documentation commit
+`0388fa9daf65d5b5d0efae0e86eec824e33eab15`. Ordinary mutation Agents remain
+prohibited from push/merge/tag/Release operations. Reviewed workload-specific
+automation may later integrate/build/verify, but real tag/draft/upload/publication
+requires Human PASS for the exact final ZIP. Closed R2/foundation and paused P7
+remain unchanged. Detailed state/evidence belongs to the task-local Runtime.
 
 ### 2026-09-18 -- external workload `whisper_session_ui_v1` activated
 

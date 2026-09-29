@@ -3,16 +3,17 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `AWAITING_REVIEW / NOT STARTED`
+- 状态: `ACTIVE / STEP 1 PREPARING TO RUN`
 - Verdict: `NOT EVALUATED`
-- 唯一 Active Step: 无；本文是待 Human 审阅的初始计划，Step 1-5 均 `QUEUED`。
+- 唯一 Active Step: `REL1` -- Step 1 发布工具、版本一致性与自动化边界；Step 2-5 均 `QUEUED`。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-09-29，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: 等待 Human 审阅并明确批准开始；本轮没有 Agent、构建、集成、tag、draft、上传或发布。
-- 新 workload config、可执行 machine block、state root、run ID: 均未创建/激活。
-- 全局 Runtime 当前仍 `NONE / NO ACTIVE EXTERNAL STEP`，只在批准并准备启动时受控更新指针，不重开已关闭任务。
+- 执行门禁: Human 已批准并授权启动/监控；准备独立 implementation run，完成机器审核后由本对话独立复核。未执行构建、集成、tag、draft、上传或发布。
+- Config: 同目录 `workload.json`；state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1`。新 run ID 由 runner 创建，不 resume 旧任务。
+- 全局 Runtime 已指向本任务 `REL1`，旧 task 保持关闭/冻结。
+- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；Step 1 target: 其 `implementation/`，新 branch `codex/release-1-1-0-automation`。原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
 
 ## 2. 已完成的准备与直接事实
 
@@ -20,6 +21,7 @@
 
 - Human 先明确下一任务是 "让 1pcloop 完成除了黑盒测试以外的其他发布所需的自动化部分"；本对话于 2026-09-29 提出固定 `1.1.0`、正式版、Apple Silicon ZIP、审核后 main 集成、ad-hoc、中英说明及 same-artifact Human gate。
 - Human 随后确认 "按上述方案，准备好 static 和 runtime 之后我来审阅，批准后就开始任务"。本轮只落实该文档准备权限，未把方向确认当作立即执行授权。
+- 文档准备 commit `93e1ab6205d80a2e75580a6c559a7527f7bae29a` 普通 push 后，Human 于同日在本对话批准并要求助手启动、监控及再验证，最后由 Human 验收。该新决定激活本任务，不取消最终 artifact gate，也不授权提前发布。
 - 已完整读取交接: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-release-automation-preparation-handoff-20260929.md`。它是恢复索引，不代替代码或发布 evidence。
 - 已完整读取 framework 中文 Static/Runtime 模板；重读实际 runner role prompts、target build/ZIP/spec 和相关现行/历史文档。没有仅凭交接记忆冻结实现接口。
 
@@ -49,7 +51,7 @@ Framework 文档准备提交必然使上述 framework HEAD 前进，属于预期
 - R2 accepted code `fb317ea4a2b1db557133e91590e852c0241a3cd8`；focused 55/55、full strict 157/157、独立审核和 Human PASS 已在旧 Runtime 留存。后续文档整合为 `0388fa9...`，已删除 target `docs/change_records/`。这些是范围基线，不是新 1.1.0 ZIP 的 acceptance。
 - Foundation closed、P7 paused、R2 task closed；不 resume 旧 terminal run，也不移动/覆盖旧失败、REJECT、Human gate 或 transition records。
 
-## 3. 执行结构 -- 待批准
+## 3. 执行结构 -- 已批准
 
 ```text
 Step 1: 普通 1PCloop 实现发布工具 -> Reviewer ACCEPT -> 本对话独立复核
@@ -65,10 +67,10 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: `QUEUED`，非 Active。
+状态: `ACTIVE / REL1`。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
-- 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；批准后创建新 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。
+- 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；在 Downloads 隔离 clone 新建 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。原工作区的相对源码路径在本 clone 下均保持一致，实际 target 以 `workload.json` 为准。
 - Permitted changes: target 的版本/lock 本项目元数据、必要 Release/Debug spec 与直接版本来源、`scripts/` 发布工具及直接打包依赖、相关 `testCodes/`、中英 README、PACKAGING、必要 repo map/技术说明、发布说明源文件。普通后继 commit，代码逻辑变化前先读依赖。
 - Prohibited changes: 普通 Agent 的 push/merge/tag/真实 Release API；Static/Runtime；framework runner/schema/roles/认证；ASR/audio/model/Clean 功能；用户数据；第三方依赖升级；历史 tag/assets；未来 GUI/LLM/公证工程。
 - 实现要求: fixed repo/ref/version/asset、阶段 journal/恢复、普通 loop acceptance 绑定、受控 integration/build、独立 artifact identity、可信 Human receipt、draft/asset 对账与 final publication、safe read-only status。公共终端以简明阶段/结论为主，安全 metadata 和详细日志落本地，不 dump 环境或凭据。
@@ -141,8 +143,8 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 无。本任务没有 Active Step 或可运行 config，不给 Agent 一次执行全部五步的无限授权。
-- Next Direction: Human 审阅这两份文档；批准后准备启动 gate 和 Step 1，由 1PCloop 实现并审核发布工作流。
+- Current Executor Handoff: 仅实现 Step 1 的发布工具/版本/测试/文档；按照当前 Reviewer 有界指令执行，不执行真实集成、构建发布或 Step 2-5 的远端 mutation。成功后停止于本步独立审核，不自行宣布整体发布成功。
+- Next Direction: 完成 doctor/preflight 后启动 `REL1`；机器审核结束再独立复核，只有 Step 1 通过才运行受控 Step 2-3，随后停在 Step 4 Human gate。
 
 ## 11. 直接输入导航
 
@@ -156,6 +158,23 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 
 ## 12. 合同固定值
 
-Static SHA-256: `1a87d831cbff94a0d551eadd8a022f9ad2f8b17b34ad5bc5f9f216e8b4853bf4`。
+Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 
-这是本轮文件准备后的草案固定值，不是 Human approval、启动 receipt 或 release acceptance。批准/修订后重新核对并在实际 config/Runtime transition 中使用。
+上述为获授权合同固定值；启动前核对实际文件 hash，不把合同批准当作 artifact acceptance。
+
+## 13. REL1 implementation machine state
+
+本机器块只授权 Step 1 的一次 `ACCEPT -> COMPLETED`。Step 2-5 不由同一 implementation checkpoint 自动激活，也不把一次 machine ACCEPT 当作真实发布。
+
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "schema_version": 1,
+  "workload_id": "whisper_release_1_1_0_v1",
+  "transition_mode": "reviewer_accept_once",
+  "active_step": {
+    "id": "REL1",
+    "status": "ACTIVE"
+  },
+  "last_transition_id": null
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->
