@@ -168,14 +168,14 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
-  "schema_version": 1,
-  "workload_id": "whisper_release_1_1_0_v1",
-  "transition_mode": "reviewer_accept_once",
   "active_step": {
     "id": "REL1A",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null
+  "last_transition_id": "99eabf1cdb7068992806e617bcffeaf7fd1e102cf06a8f03824152dfa7b78719",
+  "schema_version": 1,
+  "transition_mode": "disabled",
+  "workload_id": "whisper_release_1_1_0_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
@@ -221,3 +221,59 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 ### QUEUED REL1C: 构建/Human gate/发布 workflow 完成
 
 在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "52a78d2ca6467154c431f386f027a0bfe60692b5b5594cd071852151d7997822",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "b28027927f23c3a2333b1ae9da0dd6989901e616",
+      "sha256": "a0df1866a1927ceef3be7db72683ed326a03674c2d22f13f5fae2d10c07b1055"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-phased/scripts/build_release_zip.py",
+      "sha256": "8946b7e6ecfea04c7482ee71e2e8e467ac331b7343d7b2426b374a0af9b037e7"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-phased/testCodes/test_release_zip.py",
+      "sha256": "b903d8e305ebff27048e217efcf024bc47d0df524b840c4c38ac0105b7c3022b"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260930T041657Z-42494/cycle-03/executor/events.jsonl",
+      "sha256": "37f6e6fe30e9a10eecab316a7c4dcc684a8f1ee1a984ac8802ef697250505eff"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "REL1A",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "99eabf1cdb7068992806e617bcffeaf7fd1e102cf06a8f03824152dfa7b78719",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "REL1A",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260930T041657Z-42494/cycle-03/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "9766a0395f8d1053e284d4712246547dd4010607dfe5f1281a5ad2588846434d",
+  "schema_version": 1,
+  "target_head": "b28027927f23c3a2333b1ae9da0dd6989901e616",
+  "timestamp": "2026-09-30T04:56:06.121+00:00",
+  "transition_id": "99eabf1cdb7068992806e617bcffeaf7fd1e102cf06a8f03824152dfa7b78719"
+}
+```
