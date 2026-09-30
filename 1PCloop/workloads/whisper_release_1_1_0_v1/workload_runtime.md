@@ -3,7 +3,7 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `ACTIVE / STEP 1 PREPARING TO RUN`
+- 状态: `ACTIVE / STEP 1 CONTINUATION PREPARING TO RUN`
 - Verdict: `NOT EVALUATED`
 - 唯一 Active Step: `REL1` -- Step 1 发布工具、版本一致性与自动化边界；Step 2-5 均 `QUEUED`。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
@@ -11,9 +11,9 @@
 - 更新日期: 2026-09-29，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: Human 已批准并授权启动/监控；准备独立 implementation run，完成机器审核后由本对话独立复核。未执行构建、集成、tag、draft、上传或发布。
-- Config: 同目录 `workload.json`；state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1`。新 run ID 由 runner 创建，不 resume 旧任务。
+- 当前 Config: 同目录 `workload_continuation_01.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1-continuation-01`。原 `workload.json` 和失败 checkpoint 保留，不 resume 终态。
 - 全局 Runtime 已指向本任务 `REL1`，旧 task 保持关闭/冻结。
-- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；Step 1 target: 其 `implementation/`，新 branch `codex/release-1-1-0-automation`。原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
+- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 Step 1 target: 其 `implementation-continuation-01/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
 
 ## 2. 已完成的准备与直接事实
 
@@ -178,3 +178,17 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
   "last_transition_id": null
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
+
+## 14. REL1 首轮失败与安全 continuation -- 2026-09-29 本地日期
+
+- Run `20260929T233941Z-37891`：doctor 9/9、preflight PASS，Reviewer instruction turn 成功；Executor 在 1200 秒上限后失败，没有完整 final receipt、实现 commit 或最终 Reviewer verdict。三层终态 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit code 1；evidence commit `7c33a5478df19e6ed469e5633c3d6fb022a2dea5`，summary `/Users/smterpro/Workspace/framework-loop/1PCloop/evidence-summaries/20260929T233941Z-37891.md`。时间戳为 UTC 次日不改变本地日期；只记录 runner 的 timeout，不把它误标为 Reviewer REJECT。
+- 两角色 process receipt 直接核验：原 auth 恢复成功、前后 hash 相同、active identity 不变、actual credential hits=0；对应拥有的 runner/child PID 已不存在。失败不是认证或目标代码已审核拒绝；未执行 main 集成、正式构建、tag/draft/upload/publication。
+- 原 target HEAD 未变，留下 17 份未提交候选文件。没有 reset、stash、删除或由助手把草稿提交为“实现”。在原目录保留它们，另建干净 clone 继续同一 REL1，避免 dirty preflight 或覆写失败历史。
+- 草稿快照: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/failed-rel1-draft.tgz`，SHA-256 `43f0d0ef6262228c99a04bd9cd3d94aa501cca4c9e80d1ab3dff6ecd9d1d84da`。仅含 17 个产品代码/测试/文档候选，未纳入 credentials、用户 Session、模型或 generated runtime。
+- 草稿只是未接受的参考。新 Reviewer 应读取 archive 和源码、独立评估，再给 Executor 有界重用/修复指令；仅在当前干净 clone 内由 Executor 实现/测试/提交，不能把旧候选直接当作 acceptance。
+- 旧 run 记录包含误用 Python 3.9 的 import failure，之后控制器测试曾由失败修到 15/15 PASS，但 ZIP 测试没有通过。助手使用现有产品环境 Python 3.12.14 对草稿做独立 focused 检查：43 tests，42 PASS/1 ERROR；错误是正式 entry 要求当前 repo 的 `.venv/bin/python`，不能借用另一 worktree 的 interpreter path。日志 `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/verification-focused.txt`，SHA-256 `c8f256a839edc994fc7ad9c891350409db0dd1c4f1da133d852ac61f96ad9fb1`。这不是正式 build 或 task ACCEPT。
+- 新 clone 已运行现有 `scripts/bootstrap_python_env.sh`，固定 uv 0.12.5 / Python 3.12.14 / frozen lock，environment smoke 5/5 PASS；只创建 Git-ignored `.tools`/`.venv`，source HEAD/branch/clean 均未变，未构建 App。后续 Agent 测试必须使用本 clone 的 `.venv/bin/python`，不要降级或放宽 interpreter gate。
+- 直接代码检查还发现需要新 Reviewer 核验的缺口：草稿 `integrate()` 要求 main 已为 feature 祖先，无法处理本任务已知分叉；release contract 指向旧 feature ref 而不是新发布准备分支；merge/push 恢复和集成后测试 gate 不足。GitHub adapter 使用了本机 `gh api` 不支持的 `--repo`、`gh release upload` 不支持的 `--json`/错误 release-ID 参数，且用 text mode 下载 ZIP；这些不能靠 fake Publisher 全绿证明生产可用。本机 `gh api --help` 与 `gh release upload --help` 已只读核对，未调用远端写入。
+- 还必须补查生产路径的实际 trust anchor、重新计算 journal hash 后的 state/identity 篡改、Human receipt 每次恢复重验、实际 extraction bytes/source proof、失败输出隐私，以及上传/公开后真实下载对账。上述是未接受草稿的调查方向，不代替新 Reviewer 的直接 verdict。
+- continuation 使用新的 target path 和 state root，因此是同任务的 fresh implementation continuation，不冒充严格要求同 target identity 的 `retry` API，也不 resume 旧失败。新的 turn timeout 固定为 1800 秒，给剩余实现/测试留有边界；原 run 的 1200 秒历史和 config 不改。scope、模型/推理强度、账号固定机制和 Step 2-5 门禁保持原合同。
+- 必须以正确 target-local Python 完成 focused/full strict 回归和真实 CLI adapter 无网络 fixture 测试；保留 1PCloop `REJECT -> REPAIR -> re-review`。continuation 完成机器审核前，Step 2-5 继续 queued。

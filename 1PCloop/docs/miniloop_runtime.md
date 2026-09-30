@@ -95,6 +95,13 @@ automation may later integrate/build/verify, but real tag/draft/upload/publicati
 requires Human PASS for the exact final ZIP. Closed R2/foundation and paused P7
 remain unchanged. Detailed state/evidence belongs to the task-local Runtime.
 
+Initial REL1 run `20260929T233941Z-37891` ended `FAILED_CLOSED / NOT_APPLIED /
+PUSHED` after Executor timeout, without an implementation commit or final review.
+Authentication restored with zero credential hits; target/main/tag/Release remote
+state is unchanged. The incomplete draft and failed evidence are preserved. A fresh
+clean-clone continuation with isolated state and correct locked Python environment
+remains within REL1; it is not a terminal-run resume or authorization for release.
+
 ### 2026-09-18 -- external workload `whisper_session_ui_v1` activated
 
 Human Owner authorized a new two-step external workload without reopening the
