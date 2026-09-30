@@ -67,7 +67,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: 整体实现目标未完成；按第 16 节拆分为 1a/1b/1c。当前仅 `REL1A` 是权威 Active Step，本节是父级范围，不是一条要求单 turn 完成全部内容的执行指令。
+状态: 整体实现目标未完成；按第 16 节拆分为 1a/1b/1c。`REL1A` 已机器和独立接受，当前无 Active Step；REL1B 文档准备见第 18 节。本节是父级范围，不是一条要求单 turn 完成全部内容的执行指令。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；在 Downloads 隔离 clone 新建 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。原工作区的相对源码路径在本 clone 下均保持一致，实际 target 以 `workload.json` 为准。
@@ -220,6 +220,8 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 
 在 1a 接受后，基于其固定后继源码，选择性修复第二候选的 controller 前半部分及充分的生产 CLI/真实 disposable Git tests；包括可信外部批准、rehashed state 篡改保护、canonical origins/精确 refs、真实分叉、集成 bootstrap/full regression 先于 main push、interrupt/resume 对账与 concise status。未完成 1c 时真实 build/publish入口必须机械禁用，不能默认可用。角色仍不得实际远端 mutation。
 
+子步骤草案: [rel1b_static.md](rel1b_static.md) 和 [rel1b_runtime.md](rel1b_runtime.md)，均 `DRAFT / AWAITING HUMAN APPROVAL`。这是同一任务顶层 Step 1 的细化，不更改父 Static，不启动新 run；批准后以子 Runtime 为唯一当前执行状态入口，父 Runtime 只保留指针及历史。
+
 ### QUEUED REL1C: 构建/Human gate/发布 workflow 完成
 
 在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。
@@ -242,6 +244,10 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 | PT-REL-01 | 候选notes完整性与新增/已有功能区分 | 3，正式build前 | max(3-1-1,0)=1 | OPEN_NON_BLOCKING | REL1C补多语言、移除icon/model-feedback/download-progress为1.1.0新增的错误暗示，补标准GUI打开说明；同步fixed notes hash/tests并独立审核。当前不宣告正式release notes已接受。 |
 
 本轮不激活REL1B。接下来还需完成1b/1c及真实集成build，才有最终ZIP交Human验收；旧源码Human PASS不能代替该artifact gate。
+
+## 18. REL1B 文档准备 -- 2026-09-29
+
+Human 要求 "你来准备REL1B的static和runtime，准备好之后我审核"。已按中文模板建立上面的独立子步骤草案，明确批准/journal/分叉集成/测试 gate/恢复/只读 status 验收；父 Static保持不变，当前仍无 Active Step。生产 trust-anchor/key 部署未获新授权，fixture 可验证协议但不能被生产接受。未创建启动 config/machine block，未调用Agent、merge/build/push target/tag/Release。本次只修正第4节过期 Active表述并增加导航，不改 REL1A machine state或transition record。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->

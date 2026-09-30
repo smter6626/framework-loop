@@ -48,6 +48,12 @@ Current external engineering task
 = NO ACTIVE EXECUTION STEP / REL1B QUEUED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
+Next-step document preparation
+= REL1B STATIC/RUNTIME DRAFT / AWAITING HUMAN APPROVAL
+= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_static.md
+= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_runtime.md
+= NO NEW RUN OR PRODUCTION RELEASE ACTION
+
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
 = 1PCloop/workloads/whisper_clean_rename_integrity_repair_v1/workload_runtime.md
@@ -107,7 +113,7 @@ Continuation `20260930T024227Z-40513` stopped on Codex service usage limit befor
 commit or final review, again with restored auth and zero credential hits. Human
 asked to continue. Step 1 is now split internally into REL1A version/package identity,
 queued REL1B approval/integration controls, and queued REL1C build/Human/publication
-workflow. Only REL1A is active; original Static and all release/Human gates remain
+workflow. At that time only REL1A was active; original Static and all release/Human gates remain
 unchanged. Both failed drafts and immutable evidence are preserved.
 
 REL1A run `20260930T041657Z-42494` completed three cycles, with explicit
