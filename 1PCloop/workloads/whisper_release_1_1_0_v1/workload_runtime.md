@@ -3,17 +3,17 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `ACTIVE / STEP 1 CONTINUATION PREPARING TO RUN`
+- 状态: `ACTIVE / STEP 1a PREPARING TO RUN`
 - Verdict: `NOT EVALUATED`
-- 唯一 Active Step: `REL1` -- Step 1 发布工具、版本一致性与自动化边界；Step 2-5 均 `QUEUED`。
+- 唯一 Active Step: `REL1A` -- Step 1a 产品版本与包身份；Step 1b/1c 及 Step 2-5 均 `QUEUED`。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-09-29，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: Human 已批准并授权启动/监控；准备独立 implementation run，完成机器审核后由本对话独立复核。未执行构建、集成、tag、draft、上传或发布。
-- 当前 Config: 同目录 `workload_continuation_01.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1-continuation-01`。原 `workload.json` 和失败 checkpoint 保留，不 resume 终态。
-- 全局 Runtime 已指向本任务 `REL1`，旧 task 保持关闭/冻结。
-- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 Step 1 target: 其 `implementation-continuation-01/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
+- 当前 Config: 同目录 `workload_rel1a.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1a`。原两个 config 和失败 checkpoint 保留，不 resume 终态。
+- 全局 Runtime 已指向本任务 `REL1A`，旧 task 保持关闭/冻结。
+- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 target: 其 `implementation-phased/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 与 `implementation-continuation-01/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
 
 ## 2. 已完成的准备与直接事实
 
@@ -67,7 +67,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: `ACTIVE / REL1`。
+状态: 整体实现目标未完成；按第 16 节拆分为 1a/1b/1c。当前仅 `REL1A` 是权威 Active Step，本节是父级范围，不是一条要求单 turn 完成全部内容的执行指令。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；在 Downloads 隔离 clone 新建 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。原工作区的相对源码路径在本 clone 下均保持一致，实际 target 以 `workload.json` 为准。
@@ -143,8 +143,8 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 仅实现 Step 1 的发布工具/版本/测试/文档；按照当前 Reviewer 有界指令执行，不执行真实集成、构建发布或 Step 2-5 的远端 mutation。成功后停止于本步独立审核，不自行宣布整体发布成功。
-- Next Direction: 完成 doctor/preflight 后启动 `REL1`；机器审核结束再独立复核，只有 Step 1 通过才运行受控 Step 2-3，随后停在 Step 4 Human gate。
+- Current Executor Handoff: 仅实现第 16 节 `REL1A` 的版本/包身份/测试/必要文档。父级 Step 1 的控制器要求排队给 1b/1c，不在本 turn 编写完整控制器。成功后停止于子步骤独立审核，不自行宣布整体发布成功。
+- Next Direction: 完成 doctor/preflight 后启动 `REL1A`；每个子步骤机器审核结束再独立复核，全部 Step 1 实现通过才运行受控 Step 2-3，随后停在 Step 4 Human gate。
 
 ## 11. 直接输入导航
 
@@ -162,9 +162,9 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 
 上述为获授权合同固定值；启动前核对实际文件 hash，不把合同批准当作 artifact acceptance。
 
-## 13. REL1 implementation machine state
+## 13. 当前 implementation machine state
 
-本机器块只授权 Step 1 的一次 `ACCEPT -> COMPLETED`。Step 2-5 不由同一 implementation checkpoint 自动激活，也不把一次 machine ACCEPT 当作真实发布。
+本机器块只授权 `REL1A` 的一次 `ACCEPT -> COMPLETED`，不是整个 Step 1 或任务完成。旧 `REL1/ACTIVE` 块的固定 preimage 保留在两个失败 run 中；它没有获得 ACCEPT。本 Runtime 的唯一机器块显式细分为当前子步骤，旧 checkpoint、verdict 和历史 hash 不修改。Step 1b/1c、2-5 不由同一 checkpoint 自动激活。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
@@ -172,7 +172,7 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
   "workload_id": "whisper_release_1_1_0_v1",
   "transition_mode": "reviewer_accept_once",
   "active_step": {
-    "id": "REL1",
+    "id": "REL1A",
     "status": "ACTIVE"
   },
   "last_transition_id": null
@@ -192,3 +192,32 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 - 还必须补查生产路径的实际 trust anchor、重新计算 journal hash 后的 state/identity 篡改、Human receipt 每次恢复重验、实际 extraction bytes/source proof、失败输出隐私，以及上传/公开后真实下载对账。上述是未接受草稿的调查方向，不代替新 Reviewer 的直接 verdict。
 - continuation 使用新的 target path 和 state root，因此是同任务的 fresh implementation continuation，不冒充严格要求同 target identity 的 `retry` API，也不 resume 旧失败。新的 turn timeout 固定为 1800 秒，给剩余实现/测试留有边界；原 run 的 1200 秒历史和 config 不改。scope、模型/推理强度、账号固定机制和 Step 2-5 门禁保持原合同。
 - 必须以正确 target-local Python 完成 focused/full strict 回归和真实 CLI adapter 无网络 fixture 测试；保留 1PCloop `REJECT -> REPAIR -> re-review`。continuation 完成机器审核前，Step 2-5 继续 queued。
+
+## 15. continuation 限额失败与恢复条件 -- 2026-09-29 本地日期
+
+- Run `20260930T024227Z-40513`：新 Reviewer 直接读取 archive、target 代码、installed gh help，并在干净基线上跑 packaging/build/runtime focused 31/31 PASS；instruction turn 成功。Executor 写出新的版本/ZIP/provenance 和约 1280 行 controller 草稿，但在约 986 秒出现明确 service `usage limit`，未达到 1800 秒 timeout，也没有 final receipt、提交或最终 Reviewer verdict。
+- 三层终态 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，evidence commit `4cb0fc36fe0f607eb334dd10bb9869cebe98af39`；summary `/Users/smterpro/Workspace/framework-loop/1PCloop/evidence-summaries/20260930T024227Z-40513.md`。没有 machine ACCEPT，不能标记 REJECT 或 ACCEPT；父级实现未完成。
+- 直接核验两个 process receipt：账号 A 固定、active identity 不变、role auth 已恢复、actual credential hits=0；runner/child 已结束，绑定 PID 的临时 caffeinate 也已退出。服务提示 8:56 PM 后重试；之后实际时钟已过提示时间，客户端只读额度查询显示 ordinary usage allowed。未自动切号/换模型、未消费 reset credit 或购买 credits；新 run 仍以实际服务响应为准，不把查询结果当作产品 acceptance。
+- 第二份候选快照 `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/quota-stopped-rel1-draft.tgz`，SHA-256 `b73f5601e692108bf466d692baf05138d30afac77ae6dbd2a3cf5a18f0b69817`，含 12 个候选文件，仅作未接受参考。原目录、失败 raw/summary 和第一次 17 文件快照均保持不变。
+- Human 随后在本对话明确要求 "继续"。在既有 Static 范围内优化 Runtime 编排：把 Step 1 实现拆成下述三个子步骤，各有独立 run/state、提交、机器审核和本对话复核。它们共同满足原 Step 1 acceptance；不减少最终 gate，不变更产品版本/发布权限。子步骤继承顶层编号 1，不新增 Pending 倒计时。
+
+## 16. 当前唯一 Active Step -- REL1A / Step 1a
+
+### REL1A: 产品版本、正式 App/ZIP 身份与构建 provenance
+
+- Objective: 完成可独立验收的版本/包身份基础层，不在本 turn 实现完整 integration/Human/publication controller。
+- Inputs: 当前 Static；干净 `implementation-phased/` target；两份固定 hash 的未接受候选 archive；现有 build/runtime/ZIP/test 合同。允许读取候选再选择性重用到当前 target；不得修改旧候选目录。
+- 允许文件: `pyproject.toml`、`uv.lock` 的本项目版本，Release spec，必要的 `scripts/build_macos.sh`、`build_release_zip.py`、`verify_packaged_runtime.py`、纯 version/provenance helper、产品 release identity contract、中英 release notes，直接相关 tests 及准确的双语 README/PACKAGING/repo map。必要依赖先读，第三方 pins不变。
+- 明确排除: 本步骤不得新增/复制整份 `release_controller.py`，不得实现真实 integration/push/tag/API/upload；控制器及其批准签名协议由 1b/1c 承接。也不正式构建 App，不改 ASR/UI/认证/治理。辅助 provenance 不能引用尚未存在的未来 controller 文件，否则当前正式 build 链会被破坏。
+- Acceptance: 固定 1.1.0 project/lock/App plist/notes/template 身份，manifest schema 不变；正确 target-local Python gate；fresh clean source + build tools + 精确 App tree/hash 的构建绑定；旧/变化/dirty source、错误版本、stale/edited provenance、wrong tools fail closed；ZIP 既有 boundary/CRC/bytes/mode/symlink/extracted verifier 不回归，Human-review extraction locator 真实保留，managed output 无覆盖。以 fixtures验证，真实 build 仍给 Step 3。
+- Evidence: 完整普通后继 commit/parent/diff；focused version/ZIP/runtime/provenance 正反测试、全量 strict testCodes 回归、shell语法、diff check；独立 Reviewer 的 criteria-to-evidence 对照。仅本子步骤可 ACCEPT，整体 controller/任务不能被宣告完成。
+- 执行顺序: 先依赖/影响读取 -> 最小实现 -> focused -> full strict -> 普通 commit/clean -> 同 Reviewer 审核 -> 本对话独立复核。使用当前 clone `.venv/bin/python` 3.12.14 和 pinned uv；不使用系统 Python 3.9 或其它 worktree interpreter。
+- Stop: 需求必须扩大、改变稳定 pins/权限或缺 evidence 时停止；完整实现不足可由 Reviewer 有界 REJECT/REPAIR，不能跳过 tests。
+
+### QUEUED REL1B: 独立批准、journal 与集成控制器
+
+在 1a 接受后，基于其固定后继源码，选择性修复第二候选的 controller 前半部分及充分的生产 CLI/真实 disposable Git tests；包括可信外部批准、rehashed state 篡改保护、canonical origins/精确 refs、真实分叉、集成 bootstrap/full regression 先于 main push、interrupt/resume 对账与 concise status。未完成 1c 时真实 build/publish入口必须机械禁用，不能默认可用。角色仍不得实际远端 mutation。
+
+### QUEUED REL1C: 构建/Human gate/发布 workflow 完成
+
+在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。

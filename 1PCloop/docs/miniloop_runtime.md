@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1 ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1A ACTIVE`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -44,7 +44,7 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Current external engineering task
-= whisper_release_1_1_0_v1 / REL1 ACTIVE
+= whisper_release_1_1_0_v1 / REL1A ACTIVE
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Prior external workload disposition
@@ -101,6 +101,13 @@ Authentication restored with zero credential hits; target/main/tag/Release remot
 state is unchanged. The incomplete draft and failed evidence are preserved. A fresh
 clean-clone continuation with isolated state and correct locked Python environment
 remains within REL1; it is not a terminal-run resume or authorization for release.
+
+Continuation `20260930T024227Z-40513` stopped on Codex service usage limit before
+commit or final review, again with restored auth and zero credential hits. Human
+asked to continue. Step 1 is now split internally into REL1A version/package identity,
+queued REL1B approval/integration controls, and queued REL1C build/Human/publication
+workflow. Only REL1A is active; original Static and all release/Human gates remain
+unchanged. Both failed drafts and immutable evidence are preserved.
 
 ### 2026-09-18 -- external workload `whisper_session_ui_v1` activated
 
