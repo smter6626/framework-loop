@@ -3,11 +3,11 @@
 ## 1. 当前状态
 
 - 父 Task ID: `whisper_release_1_1_0_v1`；子步骤: `REL1B`；顶层编号仍为 `1`。
-- 状态: `ACTIVE / FIRST RUN FAILED CLOSED / RETRY READY FOR MANUAL START`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
-- 唯一 Active Step: REL1B。首轮模型服务拒绝，尚无实施 verdict；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
+- 状态: `ACTIVE / TIMEOUT DRAFT PRESERVED / CONTINUATION READY FOR MANUAL START`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
+- 唯一 Active Step: REL1B。模型拒绝与后续Executor超时均保留，尚无实施 ACCEPT；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
 - 本步 Static: [rel1b_static.md](rel1b_static.md)；其 SHA-256 见第 10 节。
 - 父合同与权威总状态: [workload_static.md](workload_static.md)、[workload_runtime.md](workload_runtime.md)。
-- 最后更新: 2026-09-29，America/Phoenix；UTC 次日 run ID 不改变此本地日期。
+- 最后更新: 2026-09-30，America/Phoenix。历史run timestamp采用UTC；不以当前日期改写旧记录。
 - Human 已指定本轮模型并要求准备手动启动指令；此决定授权 REL1B 实施准备，启动由 Human 执行。本轮建立独立 config/active machine block，但不调用 Agent，不创建生产 key/批准，不 merge/build/push target/tag/API。
 
 ## 2. 已完成与继续基线
@@ -43,7 +43,7 @@ REL1A 已机器和本对话独立接受，不重做:
    - `packaging/release_contract.json`、`runtime_manifest.json`、正式 spec；`pyproject.toml`、`uv.lock`、`.python-version`、`.gitignore`。
    - 双语 README、`PACKAGING.md`、`docs/repo_map.md` 和相关 `testCodes/`。
 4. 必要时读取 framework 现有 runner/operator 以理解只读角色与普通后继 commit 边界，但不得修改它们。
-5. 第二候选 `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/quota-stopped-rel1-draft.tgz`，SHA-256 `b73f5601e692108bf466d692baf05138d30afac77ae6dbd2a3cf5a18f0b69817`，仅未接受参考。原 `implementation-continuation-01/` 不可编辑；不要整份复制其 controller。
+5. 本轮主要候选是第13节七文件固定快照 `rel1b-timeout-draft-source-only-20260930.tgz`，必须核hash并直接评估代码，不从头重写。更早 `quota-stopped-rel1-draft.tgz` 等仅为历史参考；若无特定依赖问题，不重新逐份完整展开旧候选或恢复其authority。原所有dirty目录均不可编辑。
 
 旧候选已知问题: 信任根由 caller 选择，journal self-hash 不证明批准/测试 authority，分叉与恢复 gate 尚未接受，后半段 gh argv/二进制下载曾不正确。不能因草稿或旧测试存在就沿用结论。`release_contract.json` 与 REL1A helper EXPECTED_CONTRACT 精确相等，不可直接添加 controller 字段破坏身份层；本步控制输入应独立建模。
 
@@ -51,7 +51,7 @@ REL1A 已机器和本对话独立接受，不重做:
 
 ### REL1B: 批准、持久 journal、分叉集成控制器
 
-Objective: 实现 Static B-AC-01 至 08，并交付可独立复核的 controller 前半段；生产集成/build/publication 不在本 run 中执行。
+Objective: 接续第13节已有七文件草稿，按第14节完成必要修复、完整回归、四份文档和普通提交，满足Static B-AC-01至08，再做最终Reviewer审核。不从零重建四模块，不重复REL1A，不在本run做生产集成/build/publication。
 
 允许文件:
 
@@ -69,8 +69,8 @@ Objective: 实现 Static B-AC-01 至 08，并交付可独立复核的 controller
 
 执行顺序:
 
-1. 全文读输入，检查 target HEAD/branch/clean 和依赖影响。解释 trust boundary/状态模型，选最小方案；再由 Reviewer 给 Executor 有界指令。
-2. 实现批准/journal/只读 status，再实现隔离 Git 集成与测试 gate。可模块化，不实现 REL1C 后半段。
+1. 全文读当前合同/状态和直接必要依赖，检查新target基线/clean；核第13节archive与晚完成测试，Reviewer直接评估现有草稿后给收尾指令。不能把24/24当最终接受，也不要重复从零设计。
+2. Executor只在新target内按Reviewer指定七文件候选重用/修复，补缺少的验证/操作文档，不实现REL1C。具体步骤见第14节。
 3. 运行 focused 和完整 strict 回归，保存原始测试日志、失败反例、SHA/locator。所有临时 fixtures/logs 在 Downloads 下精确目录，不污染 source。
 4. 普通后继 commit/clean，交回同 Reviewer 审核；REJECT 后仅做有界 repair，再测试/re-review。
 5. Machine ACCEPT 只关闭 REL1B implementation；本对话再独立复核。未接受整个 Step 1 前不运行真正的 controller integration。
@@ -97,9 +97,9 @@ Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CL
 Human 2026-09-29 决定: "1pcloop这次的reviewer和Executer的模型配置分别改成6.1sol xhigh和6.1sol high；完成后给出1pcloop的启动指令我手动启动"。据此完成以下准备，实际 run 由 Human 启动:
 
 1. Static 为 AUTHORIZED，记录上述 Human 决定并重新固定 hash；父 Runtime/global 指向本 Runtime，唯一 Active Step 为 REL1B。
-2. 首轮config `workload_rel1b.json`及其state保留。当前启动用 [workload_rel1b_retry_cli_01.json](workload_rel1b_retry_cli_01.json)，同Static/Runtime/target，独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-retry-cli-01`，显式引用原失败run，不resume或覆盖旧checkpoint；见第12节。
+2. 首轮及CLI retry config/state均保留。当前启动用 [workload_rel1b_continuation_02.json](workload_rel1b_continuation_02.json)，同Static/Runtime，但target为新的干净 `implementation-rel1b-continuation-02`；独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-continuation-02`。这是同任务fresh continuation，不是要求相同target路径的strict retry，也不resume旧终态；见第13-14节。
 3. 本 Runtime 新建唯一 REL1B `ACTIVE / reviewer_accept_once` machine block，只准 `ACCEPT -> COMPLETED`。父 Runtime 原 REL1A COMPLETED machine block/transition record 不改写，旧 run 不 resume。
-4. Max cycles 4、每 turn timeout 1800s、progress interval 15s；Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`。这两个值分别保存于 `/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer/config.toml` 和 `1pcloop-executor/config.toml`；operator config 只选择 runtime homes，模型不写死在 `onepcloop.py`。其余配置不变，不自动换模型。
+4. Max cycles 4、每turn timeout 3600s、progress interval 15s；旧配置1800s不改写。Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`，role配置不变；operator只选择独立runtime homes。Human 2026-09-30采纳保留草稿/收尾/60分钟建议，详见第14节。不自动换模型或账号。
 5. 新 run 固定启动时 Codex Mix active account；用户此前报告 acc3/marker C 只是历史观察，不能据此硬编码。双 role 独立 runtime、temporary auth projection/restoration/scan 与 A/B read-only snapshot沿用既有机制，不打印凭据。
 6. Framework/target/治理 identity重验，doctor/preflight通过；使用临时 `caffeinate -i` 随runner结束释放，不改系统设置。
 
@@ -163,3 +163,39 @@ REL1B Static SHA-256: `2f2503a27e174dbbd3064faa6cc1b22c3a0389a12176f78ae92ecc122
 - Human要求检查最新版并授权升级，随后自行重启。npm当前latest stable为0.159.2，已从0.157.0升级并核验；未安装alpha，不改模型、账号、auth、canonical或退休A/B。
 - 新config固定已升级npm CLI绝对路径，避免其它终端PATH选旧版；`retry_of=20260930T060931Z-48717`，reason `codex_cli_stable_upgrade_0_157_0_to_0_159_2`，新的state/new run ID，target路径/branch/clean HEAD符合原失败初始状态。不是terminal checkpoint resume。
 - 升级不证明模型服务权限已解决。本轮不发起额外service smoke或Agent、不自动fallback；Human重新doctor/preflight通过后run，若仍模型拒绝则保留新失败并停止。实施门禁与真实发布gate不变。
+
+## 13. CLI retry超时与现有草稿 -- 已检查，不是ACCEPT
+
+Run `20260930T062228Z-49634` 使用升级后CLI及6.1-sol，Reviewer instruction成功，778.366s；Executor一直实现/调试，1806.546s时receipt标记 `timeout after 1800 seconds`，未得到final JSON。总run约2591.58s；三层 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit1。不是Reviewer REJECT、模型拒绝、401或usage limit。
+
+- Framework evidence commit: `dd2cb1500b45aa9755700a6bea439ac47734343b`，summary [20260930T062228Z-49634.md](../../evidence-summaries/20260930T062228Z-49634.md)。
+- Raw: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260930T062228Z-49634/`；两turn role auth restored、active unchanged、actual credential hits=0。
+- 旧checkpoint `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-retry-cli-01/whisper_release_1_1_0_v1/checkpoint.json`，SHA-256 `4626c77020746b0edd6276b62b29245207ac77cd9d0699f8f586a8d252ec205b`。原target HEAD仍 `b28027927f23c3a2333b1ae9da0dd6989901e616`，无tracked/staged改动，仅以下七文件untracked草稿，约1591行；未提交，不能作为已接受实现。
+- 四模块: `scripts/release_approval.py`、`release_controller.py`、`release_integration.py`、`release_journal.py`。
+- 三测试: `testCodes/test_release_approval.py`、`test_release_controller.py`、`test_release_journal.py`。
+
+直接诊断发现: 前两次focused因disposable bare/clone默认master与main/指定feature allowlist冲突出现GIT_CONFIG拦截；最后更新fixture后第三次focused有24/24 PASS，413.794s。日志 `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/rel1b-fixtures.e6jkcmk0/third-focused.log`，SHA-256 `a1fc5f64c58bf4b60fa570a26cb834a729aebd9dd363133e7601e9baef9783f6`；mtime `2026-09-30T07:11:28.373738+00:00`，晚于run完成约5分45秒。它是超时后完成的local diagnostic，不是成功turn receipt，也未跑全量回归/文档/提交/最终review。
+
+稳定性观察: 有工具测试在run超时后继续完成的迹象；诊断时未发现相关run/fixture路径匹配的活跃进程。此处不声称整个子进程清理机制已证明可靠，不在产品实施中修改framework runner；测试命令应给明确预算、留出停止/日志收尾时间，不放后台或用超时后输出伪造成功。若恢复发现未结束进程，先停止而不是并发复用。
+
+最新固定草稿快照:
+
+- `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/rel1b-timeout-draft-source-only-20260930.tgz`。
+- SHA-256 `a29e2520ec1028027506826556d652e152276d8d9b532cffd9868799d347cb7d`，仅上述七个普通source/test文件，逐成员bytes核对通过；不含AppleDouble/xattr、`.git`、auth、fixture私钥、环境或用户数据。先生成的带macOS元数据archive保持本地，不作为本轮输入。
+- 原dirty `implementation-phased/`、两种失败state/raw/summary和fixture/logs全部保持不变，没有reset/stash/清理/助手提交草稿。
+
+## 14. 本轮fresh continuation -- 有界收尾，不重新实现
+
+Human于2026-09-30采纳“保留草稿、干净延续、限定修复/测试/文档/提交、单turn60分钟”建议。Static职责与验收条件保持原样；只更新Runtime执行编排/输入/timeout。保持同任务、同唯一REL1B，不将continuation当新产品目标或terminal resume。
+
+当前target `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02`，branch `codex/release-1-1-0-automation`，clean baseline `b28027927f23c3a2333b1ae9da0dd6989901e616`。从旧clone的committed对象作no-local/no-hardlinks独立clone，未复制untracked文件；origin恢复为canonical `git@github.com:smter6626/live_subtitle_generator.git`。已运行现有bootstrap_python_env.sh，clone-local Python3.12.14/uv0.12.5/frozen lock，environment smoke5/5 PASS；只生成ignored环境，没有App build。
+
+给本轮Reviewer/Executor的优先指令:
+
+1. 新Reviewer读本Static/Runtime、父合同/范围和第13节evidence，核archivehash/七成员字节并直接评估候选源码。原controller方案是未接受输入，不继承“PASS”。无需为了恢复状态再逐份完整展开更早失败草稿；相关已接受REL1A机制仍须按实际依赖核对。
+2. 指令要求Executor优先重用经本轮Reviewer判断可用的七文件，复制/应用只发生在新target；不是助手把草稿提前放入target。检查trust模型、生产缺配置、fixture/production隔离、Git gate/recovery/readonly/privacy和准确文档，做必要的窄修复，不盲目重设计所有模块。
+3. 重跑focused与全部testCodes strict，使用当前新clone的`.venv/bin/python`，不借用旧解释器。旧24/24日志和fixture不得冒充本轮test evidence；新fixtures/logs仍在Downloads下独立目录。给约7分钟专项测试预留预算；若安全检查/代码改动使结果过期，再跑相应回归，不能因超时风险跳gate。
+4. 补双语README/PACKAGING/repo_map四文档，准确写REL1B候选、缺生产trust的禁用边界、操作及恢复，不声称Step1/集成/发布已完成。生产trust_root/root权限部署尚未授权，必要敏感变更先呈交Human。
+5. 普通后继commit、diff/clean与测试logs/hash -> 同Reviewer最终审核 -> 本对话独立复核。REJECT保持repair链；ACCEPT只关闭本REL1B，不激活REL1C。
+
+新config `workload_rel1b_continuation_02.json`无`retry`字段，因为target路径改变，不满足既有strict retry API的same-target条件；第13-14节提供显式continuation provenance。新state/run不覆写原checkpoint；原config不改。本轮仅准备并给指令，由Human手动启动。

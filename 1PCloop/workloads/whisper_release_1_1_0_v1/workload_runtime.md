@@ -3,17 +3,17 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1B ACTIVE / MODEL SERVICE FAILED CLOSED / CLI-UPGRADE RETRY READY`。
+- 状态: `REL1B ACTIVE / TIMEOUT DRAFT PRESERVED / CONTINUATION READY FOR MANUAL START`。
 - Verdict: `NOT EVALUATED -- REL1B`；REL1A 保持 `ACCEPTED`，不代表整个 Step 1 或发布完成。
-- 唯一 Active Step: REL1B，权威当前实施状态见 [rel1b_runtime.md](rel1b_runtime.md)；首轮模型启动失败，不是implementation REJECT或ACCEPT。REL1A machine block 已 COMPLETED，REL1C 和 Step 2-5 仍 QUEUED。
+- 唯一 Active Step: REL1B，权威当前实施状态见 [rel1b_runtime.md](rel1b_runtime.md)；模型失败及随后Executor超时保留，无implementation ACCEPT。REL1A machine block 已 COMPLETED，REL1C 和 Step 2-5 仍 QUEUED。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
-- 更新日期: 2026-09-29，America/Phoenix。
+- 更新日期: 2026-09-30，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human 已指定 REL1B 模型并要求准备指令由 Human 手动启动；REL1A机器及独立复核已完成。未执行 REL1B Agent turn、构建、集成、tag、draft、上传或发布。
-- 最近已结束Config: 同目录 `workload_rel1a.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1a`。原两个 config 和失败 checkpoint 保留，不resume终态或重复启动1a。
+- 执行门禁: Human已采纳REL1B草稿接续收尾及单turn60分钟安排；启动由Human手动执行。REL1A已接受，REL1B实施未接受，无真实构建/集成/tag/draft/upload/publication。
+- 最近已结束Config: `workload_rel1b_retry_cli_01.json`，run `20260930T062228Z-49634`。当前启动入口 `workload_rel1b_continuation_02.json`及独立state，未调用新Agent；所有旧config/checkpoint保留，不resume终态。
 - 全局 Runtime 保留本任务阶段指针，当前 Active Step 为 REL1B，详细实施状态由子 Runtime 维护；旧 task 保持关闭/冻结。
-- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 target: 其 `implementation-phased/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 与 `implementation-continuation-01/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
+- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前target为其 `implementation-rel1b-continuation-02/`，branch `codex/release-1-1-0-automation`，clean baseline `b28027927f23c3a2333b1ae9da0dd6989901e616`。原三个implementation目录及用户worktrees保持不变，`implementation-phased/`七文件草稿已固定archive，详见子Runtime第13-14节。
 
 ## 2. 已完成的准备与直接事实
 
@@ -257,6 +257,12 @@ Human 随后指定 Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`，
 ## 20. REL1B 首轮失败与 CLI stable retry准备 -- 2026-09-29
 
 首轮 `20260930T060931Z-48717` 在Reviewer首次服务请求收到模型不支持HTTP 400，Executor未运行，target仍clean `b280279...`；三层FAILED_CLOSED/NOT_APPLIED/PUSHED，auth已恢复、actual credential hits=0。Human授权CLI检查/升级后自行重启；已从0.157.0升级npm stable0.159.2，模型不变。新retry配置、failure evidence和旧checkpoint固定hash见子Runtime第12节；保留旧config/checkpoint/summary，不resume终态，不由助手启动，无真实集成/构建/发布。
+
+## 21. REL1B timeout draft与fresh continuation -- 2026-09-30
+
+CLI retry `20260930T062228Z-49634` 的Reviewer成功，Executor1800s超时，总约43分钟；auth恢复/actual credential hits=0，无实现commit/最终Reviewer verdict。七文件草稿、旧dirty工作区与失败checkpoint/raw/summary全部保留。第三轮专项24/24在超时后完成，不能把它升级为成功turn或整体ACCEPT；测试子任务越过run结束的迹象记录为稳定性观察，非本步framework改动授权。
+
+Human采纳保留草稿、干净延续、限定修复/完整测试/文档/提交、每turn60分钟。两个Static不变；当前config `workload_rel1b_continuation_02.json`、clean target `implementation-rel1b-continuation-02/`、七文件archive固定hash、clone-local环境5/5和精确收尾指令见子Runtime第13-14节。因为target路径不同，新run是同任务fresh continuation，不假装strict retry或旧终态resume。仍只实施REL1B，不激活REL1C或真实集成；启动由Human手动执行。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

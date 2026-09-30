@@ -45,25 +45,34 @@ Most recently closed engineering task
 
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
-= REL1B ACTIVE / MODEL SERVICE FAILED CLOSED / CLI-UPGRADE RETRY READY
+= REL1B ACTIVE / TIMEOUT DRAFT PRESERVED / CLEAN CONTINUATION READY
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
 = REL1B STATIC AUTHORIZED / RUNTIME ACTIVE
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_runtime.md
-= NO NEW RUN OR PRODUCTION RELEASE ACTION
+= NEXT RUN NOT STARTED / NO PRODUCTION RELEASE ACTION
 
 REL1B operator configuration
-= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_retry_cli_01.json
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_continuation_02.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
 = HUMAN MANUAL START / ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
+= TURN TIMEOUT 3600s / EXISTING DRAFT COMPLETION ONLY
 
 REL1B first run `20260930T060931Z-48717` failed on a model-service HTTP 400
 before Executor implementation. Failed evidence and restored authentication are
 retained. Human authorized the CLI stable upgrade from 0.157.0 to 0.159.2;
 explicit retry uses a new state root, not terminal-checkpoint resume.
 No model fallback, account switch, target mutation or assistant-started run occurred.
+
+REL1B upgraded-CLI run `20260930T062228Z-49634` reached implementation, then
+Executor timed out at 1800s with seven uncommitted candidate files. A later local
+focused log has 24/24 PASS, but does not supply a successful turn/full review.
+Human adopted draft-preserving completion with a 3600s turn budget. Both Static
+contracts and acceptance gates are unchanged. A clean same-task continuation clone,
+fixed draft archive and new state/config are prepared; manual start remains pending.
+Detailed timeout/process-lifetime observations and evidence are in the child Runtime.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
