@@ -3,8 +3,8 @@
 ## 1. 当前状态
 
 - 父 Task ID: `whisper_release_1_1_0_v1`；子步骤: `REL1B`；顶层编号仍为 `1`。
-- 状态: `ACTIVE / READY FOR MANUAL START`；Verdict: `NOT EVALUATED`。
-- 唯一 Active Step: REL1B。REL1A 已完成，REL1B 尚无运行结果，REL1C 和真实 Step 2-5 仍 QUEUED。
+- 状态: `ACTIVE / FIRST RUN FAILED CLOSED / RETRY READY FOR MANUAL START`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
+- 唯一 Active Step: REL1B。首轮模型服务拒绝，尚无实施 verdict；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
 - 本步 Static: [rel1b_static.md](rel1b_static.md)；其 SHA-256 见第 10 节。
 - 父合同与权威总状态: [workload_static.md](workload_static.md)、[workload_runtime.md](workload_runtime.md)。
 - 最后更新: 2026-09-29，America/Phoenix；UTC 次日 run ID 不改变此本地日期。
@@ -97,7 +97,7 @@ Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CL
 Human 2026-09-29 决定: "1pcloop这次的reviewer和Executer的模型配置分别改成6.1sol xhigh和6.1sol high；完成后给出1pcloop的启动指令我手动启动"。据此完成以下准备，实际 run 由 Human 启动:
 
 1. Static 为 AUTHORIZED，记录上述 Human 决定并重新固定 hash；父 Runtime/global 指向本 Runtime，唯一 Active Step 为 REL1B。
-2. 独立 config `workload_rel1b.json`，governance 指向本 Static/Runtime，workload ID 仍为父任务；独立 state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b`，不使用 REL1A 或两个失败 run 的 state。
+2. 首轮config `workload_rel1b.json`及其state保留。当前启动用 [workload_rel1b_retry_cli_01.json](workload_rel1b_retry_cli_01.json)，同Static/Runtime/target，独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-retry-cli-01`，显式引用原失败run，不resume或覆盖旧checkpoint；见第12节。
 3. 本 Runtime 新建唯一 REL1B `ACTIVE / reviewer_accept_once` machine block，只准 `ACCEPT -> COMPLETED`。父 Runtime 原 REL1A COMPLETED machine block/transition record 不改写，旧 run 不 resume。
 4. Max cycles 4、每 turn timeout 1800s、progress interval 15s；Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`。这两个值分别保存于 `/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer/config.toml` 和 `1pcloop-executor/config.toml`；operator config 只选择 runtime homes，模型不写死在 `onepcloop.py`。其余配置不变，不自动换模型。
 5. 新 run 固定启动时 Codex Mix active account；用户此前报告 acc3/marker C 只是历史观察，不能据此硬编码。双 role 独立 runtime、temporary auth projection/restoration/scan 与 A/B read-only snapshot沿用既有机制，不打印凭据。
@@ -154,3 +154,12 @@ REL1B Static SHA-256: `2f2503a27e174dbbd3064faa6cc1b22c3a0389a12176f78ae92ecc122
   "workload_id": "whisper_release_1_1_0_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
+
+## 12. 模型拒绝、CLI stable升级和手动retry -- 2026-09-29
+
+- 首轮 `20260930T060931Z-48717`: doctor 9/9与preflight PASS；Reviewer首次服务请求HTTP 400，提示 `The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.`。这是启动失败，不是Reviewer REJECT；Executor未运行，无产品改动或实施commit。
+- 三层 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit1；framework evidence commit `8bd6c871cd115ba4406d85c5abda5dfa18173b74`，summary [20260930T060931Z-48717.md](../../evidence-summaries/20260930T060931Z-48717.md)。Role auth restored、active identity unchanged、actual credential hits=0。
+- 原checkpoint `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b/whisper_release_1_1_0_v1/checkpoint.json`，SHA-256 `52745c6e04da160f49e22885d08addbcc7ad12a5e228f417b0d0c6024034d233`。原config/checkpoint/raw/summary不改写。
+- Human要求检查最新版并授权升级，随后自行重启。npm当前latest stable为0.159.2，已从0.157.0升级并核验；未安装alpha，不改模型、账号、auth、canonical或退休A/B。
+- 新config固定已升级npm CLI绝对路径，避免其它终端PATH选旧版；`retry_of=20260930T060931Z-48717`，reason `codex_cli_stable_upgrade_0_157_0_to_0_159_2`，新的state/new run ID，target路径/branch/clean HEAD符合原失败初始状态。不是terminal checkpoint resume。
+- 升级不证明模型服务权限已解决。本轮不发起额外service smoke或Agent、不自动fallback；Human重新doctor/preflight通过后run，若仍模型拒绝则保留新失败并停止。实施门禁与真实发布gate不变。

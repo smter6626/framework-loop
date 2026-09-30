@@ -3,9 +3,9 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1B ACTIVE / READY FOR MANUAL START`。
+- 状态: `REL1B ACTIVE / MODEL SERVICE FAILED CLOSED / CLI-UPGRADE RETRY READY`。
 - Verdict: `NOT EVALUATED -- REL1B`；REL1A 保持 `ACCEPTED`，不代表整个 Step 1 或发布完成。
-- 唯一 Active Step: REL1B，权威当前实施状态见 [rel1b_runtime.md](rel1b_runtime.md)；REL1A machine block 已 COMPLETED，REL1C 和 Step 2-5 仍 QUEUED。尚无 REL1B run result。
+- 唯一 Active Step: REL1B，权威当前实施状态见 [rel1b_runtime.md](rel1b_runtime.md)；首轮模型启动失败，不是implementation REJECT或ACCEPT。REL1A machine block 已 COMPLETED，REL1C 和 Step 2-5 仍 QUEUED。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-09-29，America/Phoenix。
@@ -253,6 +253,10 @@ Human 要求 "你来准备REL1B的static和runtime，准备好之后我审核"�
 
 Human 随后指定 Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`，要求完成配置并给启动指令，由Human手动启动。据此授权 REL1B 实施准备，子 Static为AUTHORIZED、子 Runtime新增REL1B唯一ACTIVE machine block、独立 `workload_rel1b.json` 和state identity。模型只修改两个专用role runtime的顶层model值，推理强度/认证/额度账号隔离机制不变，不修改canonical配置或退休A/B。父Static、本文REL1A机器块/transition record、旧configs及失败evidence不变；生产trust部署与真实集成/发布仍受原gate限制。模型服务可用性不由doctor/preflight证明，拒绝时fail closed，不自动fallback。助手未调用Agent；以子Runtime为实际启动入口。
 
+
+## 20. REL1B 首轮失败与 CLI stable retry准备 -- 2026-09-29
+
+首轮 `20260930T060931Z-48717` 在Reviewer首次服务请求收到模型不支持HTTP 400，Executor未运行，target仍clean `b280279...`；三层FAILED_CLOSED/NOT_APPLIED/PUSHED，auth已恢复、actual credential hits=0。Human授权CLI检查/升级后自行重启；已从0.157.0升级npm stable0.159.2，模型不变。新retry配置、failure evidence和旧checkpoint固定hash见子Runtime第12节；保留旧config/checkpoint/summary，不resume终态，不由助手启动，无真实集成/构建/发布。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

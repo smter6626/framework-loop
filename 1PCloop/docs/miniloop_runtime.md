@@ -45,7 +45,7 @@ Most recently closed engineering task
 
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
-= REL1B ACTIVE / READY FOR MANUAL START / NO RUN RESULT YET
+= REL1B ACTIVE / MODEL SERVICE FAILED CLOSED / CLI-UPGRADE RETRY READY
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
@@ -55,9 +55,15 @@ Next-step document preparation
 = NO NEW RUN OR PRODUCTION RELEASE ACTION
 
 REL1B operator configuration
-= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b.json
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_retry_cli_01.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
 = HUMAN MANUAL START / ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
+
+REL1B first run `20260930T060931Z-48717` failed on a model-service HTTP 400
+before Executor implementation. Failed evidence and restored authentication are
+retained. Human authorized the CLI stable upgrade from 0.157.0 to 0.159.2;
+explicit retry uses a new state root, not terminal-checkpoint resume.
+No model fallback, account switch, target mutation or assistant-started run occurred.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
