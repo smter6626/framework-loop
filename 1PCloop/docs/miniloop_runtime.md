@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1A ACTIVE`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1A ACCEPTED / NO ACTIVE EXECUTION STEP`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -44,7 +44,8 @@ Most recently closed engineering task
 = 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
 
 Current external engineering task
-= whisper_release_1_1_0_v1 / REL1A ACTIVE
+= whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
+= NO ACTIVE EXECUTION STEP / REL1B QUEUED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Prior external workload disposition
@@ -108,6 +109,17 @@ asked to continue. Step 1 is now split internally into REL1A version/package ide
 queued REL1B approval/integration controls, and queued REL1C build/Human/publication
 workflow. Only REL1A is active; original Static and all release/Human gates remain
 unchanged. Both failed drafts and immutable evidence are preserved.
+
+REL1A run `20260930T041657Z-42494` completed three cycles, with explicit
+REJECT -> REPAIR -> REJECT -> REPAIR -> ACCEPT. Accepted target is
+`b28027927f23c3a2333b1ae9da0dd6989901e616`; machine focused/full tests 78/78 and
+172/172. This conversation independently reviewed code, production boundaries,
+counterexamples and reran focused 73/73 plus full strict 172/172, accepting only
+REL1A. Machine block/evidence remain immutable; no formal build or Release exists.
+REL1B/REL1C and real integration/build remain queued, before the Human ZIP gate.
+Current account marker is C; any future stage needs a new run, not an A-bound
+terminal checkpoint resume. Detailed REJECT metadata, independent evidence and
+release-notes follow-up before build are in task-local Runtime.
 
 ### 2026-09-18 -- external workload `whisper_session_ui_v1` activated
 

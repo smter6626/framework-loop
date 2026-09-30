@@ -3,16 +3,16 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `ACTIVE / STEP 1a PREPARING TO RUN`
-- Verdict: `NOT EVALUATED`
-- 唯一 Active Step: `REL1A` -- Step 1a 产品版本与包身份；Step 1b/1c 及 Step 2-5 均 `QUEUED`。
+- 状态: `REL1A MACHINE + INDEPENDENTLY ACCEPTED / AWAITING NEXT STEP`
+- Verdict: `ACCEPTED -- REL1A ONLY`；不代表整个 Step 1 或发布完成。
+- 唯一 Active Step: 无；`REL1A` machine block 已 COMPLETED，Step 1b/1c 及 Step 2-5 均 `QUEUED`，本轮未启动下一步。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-09-29，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human 已批准并授权启动/监控；准备独立 implementation run，完成机器审核后由本对话独立复核。未执行构建、集成、tag、draft、上传或发布。
-- 当前 Config: 同目录 `workload_rel1a.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1a`。原两个 config 和失败 checkpoint 保留，不 resume 终态。
-- 全局 Runtime 已指向本任务 `REL1A`，旧 task 保持关闭/冻结。
+- 执行门禁: Human 已批准并授权启动/监控；REL1A机器及独立复核已完成，下一阶段本轮未激活。未执行构建、集成、tag、draft、上传或发布。
+- 最近已结束Config: 同目录 `workload_rel1a.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1a`。原两个 config 和失败 checkpoint 保留，不resume终态或重复启动1a。
+- 全局 Runtime 保留本任务阶段指针，但当前无 active execution step，旧 task 保持关闭/冻结。
 - 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 target: 其 `implementation-phased/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 与 `implementation-continuation-01/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
 
 ## 2. 已完成的准备与直接事实
@@ -137,14 +137,14 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 
 ## 10. 审核与状态规则
 
-- 独立审核尚未发生；本轮没有 Executor report，所有 implementation/build/publication claim 均 `NOT EVALUATED`。
+- REL1A机器与本对话独立审核均已完成，见第17节。整体implementation、真实build/publication acceptance仍缺后续evidence，不继承REL1A的局部ACCEPT。
 - Reviewer 必须直接访问源码/commit/实际 artifact/remote evidence，独立形成 verdict 和 evidence sufficiency 判断；Executor 全绿不能替代反例路线验证。
 - 一次只激活一个顶层 Step。repair 子步骤继承父编号；implementation machine ACCEPT 与后续 workflow 状态单独核对。
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 仅实现第 16 节 `REL1A` 的版本/包身份/测试/必要文档。父级 Step 1 的控制器要求排队给 1b/1c，不在本 turn 编写完整控制器。成功后停止于子步骤独立审核，不自行宣布整体发布成功。
-- Next Direction: 完成 doctor/preflight 后启动 `REL1A`；每个子步骤机器审核结束再独立复核，全部 Step 1 实现通过才运行受控 Step 2-3，随后停在 Step 4 Human gate。
+- Current Executor Handoff: 无；REL1A 已机器和独立接受，不再次执行原 1a 指令。下一步需按新阶段准备独立 config/state及当前账号绑定。
+- Next Direction: REL1B -> REL1C -> 集成与构建 -> Human 最终 ZIP 验收。当前尚无可人工验收的新 App/ZIP，本轮只完成独立复核及治理记录，未继续启动。
 
 ## 11. 直接输入导航
 
@@ -201,9 +201,11 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 - 第二份候选快照 `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/quota-stopped-rel1-draft.tgz`，SHA-256 `b73f5601e692108bf466d692baf05138d30afac77ae6dbd2a3cf5a18f0b69817`，含 12 个候选文件，仅作未接受参考。原目录、失败 raw/summary 和第一次 17 文件快照均保持不变。
 - Human 随后在本对话明确要求 "继续"。在既有 Static 范围内优化 Runtime 编排：把 Step 1 实现拆成下述三个子步骤，各有独立 run/state、提交、机器审核和本对话复核。它们共同满足原 Step 1 acceptance；不减少最终 gate，不变更产品版本/发布权限。子步骤继承顶层编号 1，不新增 Pending 倒计时。
 
-## 16. 当前唯一 Active Step -- REL1A / Step 1a
+## 16. Step 1 子步骤编排 -- REL1A 已接受，1b/1c 排队
 
 ### REL1A: 产品版本、正式 App/ZIP 身份与构建 provenance
+
+状态: `MACHINE + INDEPENDENTLY ACCEPTED`，下面保留当时有界验收范围，不是当前执行指令。
 
 - Objective: 完成可独立验收的版本/包身份基础层，不在本 turn 实现完整 integration/Human/publication controller。
 - Inputs: 当前 Static；干净 `implementation-phased/` target；两份固定 hash 的未接受候选 archive；现有 build/runtime/ZIP/test 合同。允许读取候选再选择性重用到当前 target；不得修改旧候选目录。
@@ -221,6 +223,25 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 ### QUEUED REL1C: 构建/Human gate/发布 workflow 完成
 
 在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。
+
+## 17. REL1A machine acceptance 与本对话独立复核
+
+- Run `20260930T041657Z-42494` 自行完成，不是对话中断后停止；三轮 target commits 为 `a6bf16df8c7dfd85d67c5631119bc7ea73d1131a` -> `b51c0eb9c16c598cebddbc9a915b7e4b0b37fe26` -> `b28027927f23c3a2333b1ae9da0dd6989901e616`，均普通后继，clean。
+- Cycle 1 Executor 64/64、166/166 全绿，Reviewer独立复跑仍 REJECT：arbitrary manifest可弱化依赖政策且未绑定provenance，另有文档漂移。Cycle 2 68/68、170/170 全绿，Reviewer仍 REJECT：ignored dist父目录symlink能引入外部 App/provenance。Cycle 3 78/78、172/172 后机器 ACCEPT，Runtime只完成 REL1A；拒绝、repair和原始证据全部保留。
+- 最终 `RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED`，transition `99eabf1cdb7068992806e617bcffeaf7fd1e102cf06a8f03824152dfa7b78719`，evidence commit `d7b3eb768c4b8bd3f56c97ac4ee6bb7ce0b2cc24`。七 turn auth restored、credential hits=0；无运行中Agent。
+- 本对话直接源码/累计diff/production CLI/独立反例及回归检查接受 REL1A：focused 73/73，full strict 172/172；独立 mutant manifest和external dist拒绝，旧CLI override拒绝，锁/脚本/diff/clean通过。未正式build、push target、merge、tag、upload或publish。
+- 独立证据及日志精确hash: `/Users/smterpro/Workspace/framework-loop/1PCloop/evidence-summaries/whisper-release-rel1a-independent-review-20260929.md`。本次接受仅范围内基础层，未来控制器/真实artifact evidence尚缺，不能推进为整体AC全通过或Human gate已准备。
+- Human报告当前账号acc3；只读marker显示 `C`。已结束run绑定A不改写。下一阶段新run通过preflight绑定当时active账号，不能对旧run换账号resume；本轮未调用Codex。
+
+### Pending Tasks
+
+当前顶层里程碑编号仍为1，REL1A/1B/1C均继承父级1；没有正在执行的Active Step。
+
+| ID | 非阻塞性后续事项 | 截止Step | 剩余安全迁移次数 | 状态 | 关闭要求 |
+| --- | --- | --- | --- | --- | --- |
+| PT-REL-01 | 候选notes完整性与新增/已有功能区分 | 3，正式build前 | max(3-1-1,0)=1 | OPEN_NON_BLOCKING | REL1C补多语言、移除icon/model-feedback/download-progress为1.1.0新增的错误暗示，补标准GUI打开说明；同步fixed notes hash/tests并独立审核。当前不宣告正式release notes已接受。 |
+
+本轮不激活REL1B。接下来还需完成1b/1c及真实集成build，才有最终ZIP交Human验收；旧源码Human PASS不能代替该artifact gate。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
