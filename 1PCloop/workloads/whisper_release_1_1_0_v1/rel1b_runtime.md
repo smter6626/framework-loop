@@ -1,14 +1,14 @@
-# Whisper 1.1.0 REL1B -- Runtime 审阅草案
+# Whisper 1.1.0 REL1B -- Runtime
 
 ## 1. 当前状态
 
-- 父 Task ID: `whisper_release_1_1_0_v1`；候选子步骤: `REL1B`；顶层编号仍为 `1`。
-- 状态: `DRAFT / AWAITING HUMAN APPROVAL`；Verdict: `NOT EVALUATED`。
-- 唯一 Active Step: 无。REL1A 已完成，REL1B 尚未启动，REL1C 和真实 Step 2-5 仍 QUEUED。
+- 父 Task ID: `whisper_release_1_1_0_v1`；子步骤: `REL1B`；顶层编号仍为 `1`。
+- 状态: `ACTIVE / READY FOR MANUAL START`；Verdict: `NOT EVALUATED`。
+- 唯一 Active Step: REL1B。REL1A 已完成，REL1B 尚无运行结果，REL1C 和真实 Step 2-5 仍 QUEUED。
 - 本步 Static: [rel1b_static.md](rel1b_static.md)；其 SHA-256 见第 10 节。
 - 父合同与权威总状态: [workload_static.md](workload_static.md)、[workload_runtime.md](workload_runtime.md)。
 - 最后更新: 2026-09-29，America/Phoenix；UTC 次日 run ID 不改变此本地日期。
-- 本次授权仅为准备文档给 Human 审核。不创建启动 config/active machine block，不调用 Agent，不创建生产 key/批准，不 merge/build/push target/tag/API。
+- Human 已指定本轮模型并要求准备手动启动指令；此决定授权 REL1B 实施准备，启动由 Human 执行。本轮建立独立 config/active machine block，但不调用 Agent，不创建生产 key/批准，不 merge/build/push target/tag/API。
 
 ## 2. 已完成与继续基线
 
@@ -47,7 +47,7 @@ REL1A 已机器和本对话独立接受，不重做:
 
 旧候选已知问题: 信任根由 caller 选择，journal self-hash 不证明批准/测试 authority，分叉与恢复 gate 尚未接受，后半段 gh argv/二进制下载曾不正确。不能因草稿或旧测试存在就沿用结论。`release_contract.json` 与 REL1A helper EXPECTED_CONTRACT 精确相等，不可直接添加 controller 字段破坏身份层；本步控制输入应独立建模。
 
-## 4. 待批准的唯一实施步骤 -- 尚未 Active
+## 4. 唯一 Active Step -- 等待 Human 手动启动
 
 ### REL1B: 批准、持久 journal、分叉集成控制器
 
@@ -94,20 +94,20 @@ Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CL
 
 ## 6. 启动准备与机器边界
 
-批准后才做:
+Human 2026-09-29 决定: "1pcloop这次的reviewer和Executer的模型配置分别改成6.1sol xhigh和6.1sol high；完成后给出1pcloop的启动指令我手动启动"。据此完成以下准备，实际 run 由 Human 启动:
 
-1. 将 Static 变为 AUTHORIZED，记录 Human 决定/重新算 hash；父 Runtime/global 指向本 Runtime，唯一 Active Step 为 REL1B。
-2. 单独建立 `workload_rel1b.json`，governance 指向本 Static/Runtime，workload ID 仍为父任务；独立 state root 候选 `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b`。本草案不创建配置。
-3. 在本 Runtime 新建唯一 REL1B `ACTIVE / reviewer_accept_once` machine block，只准 `ACCEPT -> COMPLETED`。父 Runtime 原 REL1A COMPLETED machine block/transition record 不改写，旧 run 不 resume。
-4. Max cycles 候选 4、每 turn timeout 1800s、progress interval 15s；Reviewer `gpt-5.6-sol/xhigh`、Executor `gpt-5.6-sol/high`，保持已用推理强度。启动前核对实际配置/可用性，不自动换模型。
+1. Static 为 AUTHORIZED，记录上述 Human 决定并重新固定 hash；父 Runtime/global 指向本 Runtime，唯一 Active Step 为 REL1B。
+2. 独立 config `workload_rel1b.json`，governance 指向本 Static/Runtime，workload ID 仍为父任务；独立 state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b`，不使用 REL1A 或两个失败 run 的 state。
+3. 本 Runtime 新建唯一 REL1B `ACTIVE / reviewer_accept_once` machine block，只准 `ACCEPT -> COMPLETED`。父 Runtime 原 REL1A COMPLETED machine block/transition record 不改写，旧 run 不 resume。
+4. Max cycles 4、每 turn timeout 1800s、progress interval 15s；Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`。这两个值分别保存于 `/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer/config.toml` 和 `1pcloop-executor/config.toml`；operator config 只选择 runtime homes，模型不写死在 `onepcloop.py`。其余配置不变，不自动换模型。
 5. 新 run 固定启动时 Codex Mix active account；用户此前报告 acc3/marker C 只是历史观察，不能据此硬编码。双 role 独立 runtime、temporary auth projection/restoration/scan 与 A/B read-only snapshot沿用既有机制，不打印凭据。
 6. Framework/target/治理 identity重验，doctor/preflight通过；使用临时 `caffeinate -i` 随runner结束释放，不改系统设置。
 
-当前没有可供执行的 REL1B config 或 active machine block。审核本文不等于已有运行结果。
+Doctor/preflight 只证明本机配置、认证 TTL、路径和治理门禁，不能证明当前账号实际服务支持该模型。若首次 turn 服务拒绝 `gpt-6.1-sol`，fail closed 并保留失败 evidence，不自动回退 5.6 或换账号。未为本轮预检发起额外模型 smoke/Agent 调用。
 
 ## 7. Blockers、决策与 Pending
 
-- 当前等待 Human 审核并明确批准开始；这是启动 gate，不是实施失败或可以忽略的 pending。
+- 当前等待 Human 手动启动；模型变更和 REL1B 实施准备已由上述决定授权，不是 implementation ACCEPT。
 - 生产信任配置尚未存在: 不阻止批准后实现隔离 fixture/缺配置 fail-closed，但阻止真实 integration。执行中如必须部署 key 或新可信入口才能验证当前 criterion，停止给 Human 具体方案，不降级为普通 pending。
 - 自动 merge 若遇内容冲突必须停止，不能悄悄覆盖 main 文档；真实冲突结果尚未知。
 - 新 controller/测试量若仍无法在有界 turn 内完成，呈交更小编排，不牺牲 gate，也不自动把未来步骤算完成。
@@ -122,7 +122,7 @@ REL1B/repair 与 REL1C 都继承父级 1，不消耗顶层迁移次数。真实 
 
 ## 8. 当前状态迁移与历史保留
 
-本次从"REL1B QUEUED"补充为"REL1B 文档 DRAFT，可供 Human 审阅"，没有 implementation activation/acceptance。REL1A 已接受、两个失败 run、两轮 REJECT、原 artifact 和 hash 全部保留。
+先从"REL1B QUEUED"补充为"REL1B 文档 DRAFT，可供 Human 审阅"；Human 随后指定模型并要求手动启动，现为 "REL1B ACTIVE / READY FOR MANUAL START"。仅激活本实施步骤，没有新的 implementation acceptance/run result。REL1A 已接受、两个失败 run、两轮 REJECT、原 artifact 和 hash 全部保留。
 
 原总 Runtime 第 4 节残留"REL1A 是 Active"只做语义修正，不改变完成 machine block 或过去真实执行历史。新文档不恢复未接受旧 controller，也不把 source Human PASS当新 ZIP PASS。
 
@@ -134,6 +134,23 @@ Executor 报告应包含: 逻辑/依赖影响、批准信任模型与未部署�
 
 ## 10. Static 固定值
 
-REL1B Static SHA-256: `07f5e10619fc5a34b2b0cbb03e66a0205a6e0b56bd51411c322b4328aae51c51`。
+REL1B Static SHA-256: `2f2503a27e174dbbd3064faa6cc1b22c3a0389a12176f78ae92ecc12269190b5`。
 
 批准后如改动内容须重新固定 hash；此值只是文档 byte identity，不是批准证明。
+
+## 11. 当前 implementation machine state
+
+只授权 REL1B implementation 的一次 `ACCEPT -> COMPLETED`。Machine ACCEPT 不等于本对话独立复核、生产集成、Human artifact PASS 或发布完成，不自动激活 REL1C。
+
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "active_step": {
+    "id": "REL1B",
+    "status": "ACTIVE"
+  },
+  "last_transition_id": null,
+  "schema_version": 1,
+  "transition_mode": "reviewer_accept_once",
+  "workload_id": "whisper_release_1_1_0_v1"
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->

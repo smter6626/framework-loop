@@ -3,16 +3,16 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A MACHINE + INDEPENDENTLY ACCEPTED / AWAITING NEXT STEP`
-- Verdict: `ACCEPTED -- REL1A ONLY`；不代表整个 Step 1 或发布完成。
-- 唯一 Active Step: 无；`REL1A` machine block 已 COMPLETED，Step 1b/1c 及 Step 2-5 均 `QUEUED`，本轮未启动下一步。
+- 状态: `REL1B ACTIVE / READY FOR MANUAL START`。
+- Verdict: `NOT EVALUATED -- REL1B`；REL1A 保持 `ACCEPTED`，不代表整个 Step 1 或发布完成。
+- 唯一 Active Step: REL1B，权威当前实施状态见 [rel1b_runtime.md](rel1b_runtime.md)；REL1A machine block 已 COMPLETED，REL1C 和 Step 2-5 仍 QUEUED。尚无 REL1B run result。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-09-29，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human 已批准并授权启动/监控；REL1A机器及独立复核已完成，下一阶段本轮未激活。未执行构建、集成、tag、draft、上传或发布。
+- 执行门禁: Human 已指定 REL1B 模型并要求准备指令由 Human 手动启动；REL1A机器及独立复核已完成。未执行 REL1B Agent turn、构建、集成、tag、draft、上传或发布。
 - 最近已结束Config: 同目录 `workload_rel1a.json`；独立 state root: `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1a`。原两个 config 和失败 checkpoint 保留，不resume终态或重复启动1a。
-- 全局 Runtime 保留本任务阶段指针，但当前无 active execution step，旧 task 保持关闭/冻结。
+- 全局 Runtime 保留本任务阶段指针，当前 Active Step 为 REL1B，详细实施状态由子 Runtime 维护；旧 task 保持关闭/冻结。
 - 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；当前 target: 其 `implementation-phased/`，branch `codex/release-1-1-0-automation`，clean baseline `0388fa9daf65d5b5d0efae0e86eec824e33eab15`。原 `implementation/` 与 `implementation-continuation-01/` 保留未验收草稿，原三个用户 worktree 保持不变。后续精确目录及清理提醒在 evidence 中维护。
 
 ## 2. 已完成的准备与直接事实
@@ -67,7 +67,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: 整体实现目标未完成；按第 16 节拆分为 1a/1b/1c。`REL1A` 已机器和独立接受，当前无 Active Step；REL1B 文档准备见第 18 节。本节是父级范围，不是一条要求单 turn 完成全部内容的执行指令。
+状态: 整体实现目标未完成；按第 16 节拆分为 1a/1b/1c。REL1A 已接受，当前唯一实施步骤 REL1B 见子 Runtime及第19节；第18节保留此前草案准备。本文不重复编译子步骤，不要求单 turn 完成父级范围。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；在 Downloads 隔离 clone 新建 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。原工作区的相对源码路径在本 clone 下均保持一致，实际 target 以 `workload.json` 为准。
@@ -143,8 +143,8 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 无；REL1A 已机器和独立接受，不再次执行原 1a 指令。下一步需按新阶段准备独立 config/state及当前账号绑定。
-- Next Direction: REL1B -> REL1C -> 集成与构建 -> Human 最终 ZIP 验收。当前尚无可人工验收的新 App/ZIP，本轮只完成独立复核及治理记录，未继续启动。
+- Current Executor Handoff: [rel1b_runtime.md](rel1b_runtime.md) 第4节为当前唯一实施步骤；governance/config已独立准备，启动由Human手动执行，不 resume REL1A。
+- Next Direction: REL1B -> REL1C -> 集成与构建 -> Human 最终 ZIP 验收。当前尚无可人工验收的新 App/ZIP；本轮只做REL1B配置与治理准备，未调用Agent。
 
 ## 11. 直接输入导航
 
@@ -216,11 +216,11 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 - 执行顺序: 先依赖/影响读取 -> 最小实现 -> focused -> full strict -> 普通 commit/clean -> 同 Reviewer 审核 -> 本对话独立复核。使用当前 clone `.venv/bin/python` 3.12.14 和 pinned uv；不使用系统 Python 3.9 或其它 worktree interpreter。
 - Stop: 需求必须扩大、改变稳定 pins/权限或缺 evidence 时停止；完整实现不足可由 Reviewer 有界 REJECT/REPAIR，不能跳过 tests。
 
-### QUEUED REL1B: 独立批准、journal 与集成控制器
+### ACTIVE REL1B: 独立批准、journal 与集成控制器
 
 在 1a 接受后，基于其固定后继源码，选择性修复第二候选的 controller 前半部分及充分的生产 CLI/真实 disposable Git tests；包括可信外部批准、rehashed state 篡改保护、canonical origins/精确 refs、真实分叉、集成 bootstrap/full regression 先于 main push、interrupt/resume 对账与 concise status。未完成 1c 时真实 build/publish入口必须机械禁用，不能默认可用。角色仍不得实际远端 mutation。
 
-子步骤草案: [rel1b_static.md](rel1b_static.md) 和 [rel1b_runtime.md](rel1b_runtime.md)，均 `DRAFT / AWAITING HUMAN APPROVAL`。这是同一任务顶层 Step 1 的细化，不更改父 Static，不启动新 run；批准后以子 Runtime 为唯一当前执行状态入口，父 Runtime 只保留指针及历史。
+子步骤合同: [rel1b_static.md](rel1b_static.md) 为 AUTHORIZED，[rel1b_runtime.md](rel1b_runtime.md) 为 ACTIVE / READY FOR MANUAL START。属于同一任务顶层 Step 1 的细化，不更改父 Static；子 Runtime 为唯一当前执行状态入口，本文只保留指针及历史。Human已指定模型并要求手动启动，助手尚未执行 run。
 
 ### QUEUED REL1C: 构建/Human gate/发布 workflow 完成
 
@@ -248,6 +248,10 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 ## 18. REL1B 文档准备 -- 2026-09-29
 
 Human 要求 "你来准备REL1B的static和runtime，准备好之后我审核"。已按中文模板建立上面的独立子步骤草案，明确批准/journal/分叉集成/测试 gate/恢复/只读 status 验收；父 Static保持不变，当前仍无 Active Step。生产 trust-anchor/key 部署未获新授权，fixture 可验证协议但不能被生产接受。未创建启动 config/machine block，未调用Agent、merge/build/push target/tag/Release。本次只修正第4节过期 Active表述并增加导航，不改 REL1A machine state或transition record。
+
+## 19. REL1B 手动启动准备 -- 2026-09-29
+
+Human 随后指定 Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`，要求完成配置并给启动指令，由Human手动启动。据此授权 REL1B 实施准备，子 Static为AUTHORIZED、子 Runtime新增REL1B唯一ACTIVE machine block、独立 `workload_rel1b.json` 和state identity。模型只修改两个专用role runtime的顶层model值，推理强度/认证/额度账号隔离机制不变，不修改canonical配置或退休A/B。父Static、本文REL1A机器块/transition record、旧configs及失败evidence不变；生产trust部署与真实集成/发布仍受原gate限制。模型服务可用性不由doctor/preflight证明，拒绝时fail closed，不自动fallback。助手未调用Agent；以子Runtime为实际启动入口。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->

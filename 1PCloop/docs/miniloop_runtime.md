@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1A ACCEPTED / NO ACTIVE EXECUTION STEP`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B READY FOR MANUAL START`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -45,14 +45,19 @@ Most recently closed engineering task
 
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
-= NO ACTIVE EXECUTION STEP / REL1B QUEUED
+= REL1B ACTIVE / READY FOR MANUAL START / NO RUN RESULT YET
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1B STATIC/RUNTIME DRAFT / AWAITING HUMAN APPROVAL
+= REL1B STATIC AUTHORIZED / RUNTIME ACTIVE
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_runtime.md
 = NO NEW RUN OR PRODUCTION RELEASE ACTION
+
+REL1B operator configuration
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b.json
+= REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
+= HUMAN MANUAL START / ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

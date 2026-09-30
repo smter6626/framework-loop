@@ -1,15 +1,15 @@
-# Whisper 1.1.0 REL1B -- Static 稳定合同草案
+# Whisper 1.1.0 REL1B -- Static 稳定合同
 
 ## 1. 身份、来源与生效条件
 
 - 父任务: `whisper_release_1_1_0_v1`；子步骤: `REL1B`，继承顶层 Step 1。
-- 状态: `DRAFT / AWAITING HUMAN APPROVAL`。
+- 状态: `AUTHORIZED`。
 - Human Owner: 本对话的项目 Owner。
 - 父合同: [workload_static.md](workload_static.md)，固定 SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 配套状态: [rel1b_runtime.md](rel1b_runtime.md)；父任务状态: [workload_runtime.md](workload_runtime.md)。
 - 模板来源: `/Users/smterpro/Workspace/framework-loop/1PCloop/templates/static_prompt_zh.md` 与 `runtime_prompt_zh.md`。
 
-Human 于 2026-09-29 要求先准备 REL1B Static/Runtime，准备好后由 Human 审核。本草案不是启动命令，不替代父合同。批准后只授权本子步骤的实现、测试和独立审核；实际生产集成仍须等 REL1C 及整个 Step 1 接受后进入 Step 2。父合同冲突、敏感操作或新增权限必须先取得 Owner 决定。
+Human 于 2026-09-29 先要求准备 REL1B Static/Runtime 供审核，随后指定本轮 Reviewer 为 `gpt-6.1-sol/xhigh`、Executor 为 `gpt-6.1-sol/high`，要求完成配置并提供指令由 Human 手动启动。该决定授权准备并执行本子步骤的实现、测试和独立审核，不授权助手自行启动。本合同不替代父合同；实际生产集成仍须等 REL1C 及整个 Step 1 接受后进入 Step 2。父合同冲突、敏感操作或新增权限必须先取得 Owner 决定。
 
 ## 2. 用人类语言说明本步
 
