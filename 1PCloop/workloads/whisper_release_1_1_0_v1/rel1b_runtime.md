@@ -3,12 +3,12 @@
 ## 1. 当前状态
 
 - 父 Task ID: `whisper_release_1_1_0_v1`；子步骤: `REL1B`；顶层编号仍为 `1`。
-- 状态: `ACTIVE / COMMITTED CANDIDATE PRESERVED / RECEIPT AND REVIEW CONTINUATION READY`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
-- 唯一 Active Step: REL1B。模型拒绝、1800s和3600s两次Executor超时均保留，尚无实施 ACCEPT；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
+- 状态: `COMPLETED / MACHINE AND INDEPENDENTLY ACCEPTED`；Verdict: `ACCEPT -- REL1B IMPLEMENTATION ONLY`。
+- 当前本任务无Active实施步骤: REL1A/REL1B均已接受，REL1C仍QUEUED，等待后续文档准备/Owner决定；整个Step 1和真实Step 2-5未完成。模型拒绝、1800s和3600s两次Executor超时均保留，不改写失败为成功。
 - 本步 Static: [rel1b_static.md](rel1b_static.md)；其 SHA-256 见第 10 节。
 - 父合同与权威总状态: [workload_static.md](workload_static.md)、[workload_runtime.md](workload_runtime.md)。
-- 最后更新: 2026-09-30，America/Phoenix。历史run timestamp采用UTC；不以当前日期改写旧记录。
-- Human 已指定本轮模型并要求准备手动启动指令；此决定授权 REL1B 实施准备，启动由 Human 执行。本轮建立独立 config/active machine block，但不调用 Agent，不创建生产 key/批准，不 merge/build/push target/tag/API。
+- 最后更新: 2026-10-01，America/Phoenix。历史run timestamp采用UTC；不以当前日期改写旧记录。
+- Human手动run `20261001T063859Z-6937` 正常结束，机器ACCEPT仅将REL1B完成一次。本对话独立验证及治理收尾见第17节；不resume终态、不调用新Agent、不创建生产key/批准、不merge/build/push target/tag/API。
 
 ## 2. 已完成与继续基线
 
@@ -47,7 +47,7 @@ REL1A 已机器和本对话独立接受，不重做:
 
 旧候选已知问题: 信任根由 caller 选择，journal self-hash 不证明批准/测试 authority，分叉与恢复 gate 尚未接受，后半段 gh argv/二进制下载曾不正确。不能因草稿或旧测试存在就沿用结论。`release_contract.json` 与 REL1A helper EXPECTED_CONTRACT 精确相等，不可直接添加 controller 字段破坏身份层；本步控制输入应独立建模。
 
-## 4. 唯一 Active Step -- 等待 Human 手动启动
+## 4. 已完成REL1B -- 以下保留实施范围与执行历史
 
 ### REL1B: 批准、持久 journal、分叉集成控制器
 
@@ -90,9 +90,9 @@ Objective: 在当前clean HEAD `91e547918a20383f9dc938440db890a7dae85226` 上，
 
 Self-check 命令逻辑: 在当前 target cwd 使用本 clone `.venv/bin/python -B -W error::ResourceWarning -m unittest discover -s testCodes -v`，`QT_QPA_PLATFORM=offscreen`，TMPDIR 指向新 Downloads fixture 目录。Focused 模块依实现结果列出，不预填未来测试数量。Python/uv/import、diff check 和精确文件 allowlist 一并核验。
 
-Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CLI/真实 Git facts/test artifacts，并自选至少一条 self-check 未充分覆盖的篡改或 crash 验证；依据 B-AC 逐项判断 sufficiency，不能继承"全绿即接受"。上述命令仍适用于需要重测的情形；当前第16节允许来源验证通过的既有测试复用，不要求每个未改码turn无条件重复所有昂贵验证。
+Independent Review 已完成，见第17节和独立summary；Reviewer原有直接读取diff/production CLI/Git事实、选择反例和按B-AC判断sufficiency的要求保留为历史。上述命令适用于重测；第16节证据复用编排已执行完成，不是重新启动此已关闭步骤的指令。
 
-## 6. 启动准备与机器边界
+## 6. 已执行的启动准备与机器边界 -- 历史
 
 Human 2026-09-29 决定: "1pcloop这次的reviewer和Executer的模型配置分别改成6.1sol xhigh和6.1sol high；完成后给出1pcloop的启动指令我手动启动"。据此完成以下准备，实际 run 由 Human 启动:
 
@@ -107,7 +107,7 @@ Doctor/preflight 只证明本机配置、认证 TTL、路径和治理门禁，�
 
 ## 7. Blockers、决策与 Pending
 
-- 当前等待 Human 手动启动；模型变更和 REL1B 实施准备已由上述决定授权，不是 implementation ACCEPT。
+- 本步已机器及独立ACCEPT，无剩余REL1B implementation blocker；不再等待启动，不自动激活REL1C。
 - 生产信任配置尚未存在: 不阻止批准后实现隔离 fixture/缺配置 fail-closed，但阻止真实 integration。执行中如必须部署 key 或新可信入口才能验证当前 criterion，停止给 Human 具体方案，不降级为普通 pending。
 - 自动 merge 若遇内容冲突必须停止，不能悄悄覆盖 main 文档；真实冲突结果尚未知。
 - 新 controller/测试量若仍无法在有界 turn 内完成，呈交更小编排，不牺牲 gate，也不自动把未来步骤算完成。
@@ -128,7 +128,7 @@ REL1B/repair 与 REL1C 都继承父级 1，不消耗顶层迁移次数。真实 
 
 ## 9. 后续方向与报告
 
-本步完成后先独立复核和治理收尾，再准备 REL1C；整个 Step 1接受后才做实际集成 -> fresh build/ZIP -> Human exact-artifact PASS -> same ZIP publication。
+本步独立复核和治理收尾已完成，下一方向是准备REL1C合同与执行计划，尚未激活。整个Step 1接受且生产trust/transport就绪后才做实际集成 -> fresh build/ZIP -> Human exact-artifact PASS -> same ZIP publication。
 
 Executor 报告应包含: 逻辑/依赖影响、批准信任模型与未部署边界、精确文件和 commit/parent、tests/log locator/hash、实际 CLI 与 Git反例、恢复覆盖、外部副作用零证明、限制/待决项。停止于 `IMPLEMENTED / VALIDATED -- AWAITING INDEPENDENT REVIEW`，不自行 ACCEPT，不推进 REL1C，不写治理。
 
@@ -227,7 +227,7 @@ Human手动run `20260930T222431Z-11603` 已结束。Reviewer instruction成功67
 
 本对话准备03时重新核验report日志hash和当前89个tracked文件的实际bytes，与report.source_sha256逐文件匹配。report共91项，另两项common.txt/feature.txt是测试分叉的fixture专用输入，不是新增产品文件。该核验只是source/evidence identity，不是独立B-AC ACCEPT或环境可信来源的最终结论。
 
-## 16. 当前continuation-03 -- 核验、回报、审核优先
+## 16. 已完成continuation-03的执行编排 -- 核验、回报、审核优先
 
 Human已批准保持Static、微调原Runtime并由其手动启动。两个Static及B-AC不变，REL1B仍唯一ACTIVE。新config/state、新run ID；target保持第15节clean91e5479，不新建clone或重建解释器，不修改模型/账号/认证。本轮助手仅准备文档/config，未调用Agent或启动loop。
 
@@ -243,6 +243,16 @@ Human已批准保持Static、微调原Runtime并由其手动启动。两个Stati
 8. Config无retry字段: 当前HEAD91e5479不等于旧失败target_initial b280279，不能冒充strict retry。continuation_of=20260930T222431Z-11603由本文历史关联，新state不覆盖旧checkpoint。首次启动用run；只有这个新run后续符合checkpoint恢复条件时才用resume。
 
 启动前doctor/preflight需通过，framework必须clean且local/remote main一致，targetbranch/HEAD/clean重验。Machine ACCEPT仍只关闭REL1B，不自动激活REL1C，不授权生产integration/build/tag/draft/upload/publication。
+
+## 17. Machine ACCEPT与本对话独立接受 -- 2026-10-01
+
+Human手动run `20261001T063859Z-6937` 正常结束，三turn成功，分别476.781s/614.758s/349.237s；原Reviewer同thread显式resume，Executor独立ephemeral；三turn auth恢复、active identity未变、actual credential hits=0。此次没有新增tracked代码或空commit；Executor验证旧candidate并提交完整receipt，Reviewer独立检查后ACCEPT。三层 `RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED`，exit0；framework evidence commit `8a75f703cb650dcc4b46f4601ec47c72f51c1c85`，[machine summary](../../evidence-summaries/20261001T063859Z-6937.md)。末尾原transition record与COMPLETED machine block原字节保留。
+
+本对话独立ACCEPT固定target `91e547918a20383f9dc938440db890a7dae85226`，并非继承Machine全绿。直接读累计11文件diff、四module/三test/四文档及B-AC；验证9项evidence hash、89源码/HEAD blobs与受测manifest、真实双父级和独立计算的95blob合并tree。额外构造合法重算COMPLETE/main receipt + forged9999-tests PASS + counterfeit ignored Python组合，实际gate=None恢复STOP ENVIRONMENT_UNTRUSTED，marker未创建、main push0、bare main不变。两次status的380项bytes/inodes/modes/mtime/refs不变；生产缺trust与caller signer/未来publish均拒绝。独立完整ResourceWarning-strict回归204/204，817.818s，exit0，无资源告警或skip；target HEAD/clean不变。
+
+完整复核逻辑、精确Downloads raw locator/hash、Machine reused与本对话fresh验证区别见 [REL1B独立复核summary](../../evidence-summaries/whisper-release-rel1b-independent-review-20261001.md)。治理更新后此文件的整体hash自然前进；保留的checkpoint postimage/hash只描述当时machine写入，不将人工治理收尾当作重新运行旧checkpoint的许可。
+
+REL1B CLOSED不关闭整个Step 1，不激活REL1C，不表示生产transport/trust可用。真实Step 2前需要Owner明确的trust/entry部署和认证transport方案及验证；当前不使用个人private key或安装生产root。REL1C和PT-REL-01仍待准备/实施，正式App/ZIP/Human artifact PASS/tag/draft/upload/publication均未发生；Downloads测试bundle不作为release产物。旧失败、REJECT、dirty目录与所有旧config/checkpoint/raw/summary不改写。
 
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->

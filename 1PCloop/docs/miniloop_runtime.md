@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B READY FOR MANUAL START`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C PREPARATION PENDING`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -45,20 +45,21 @@ Most recently closed engineering task
 
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
-= REL1B ACTIVE / COMMITTED CANDIDATE PRESERVED / RECEIPT AND REVIEW CONTINUATION READY
+= REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
+= NO ACTIVE IMPLEMENTATION / REL1C QUEUED FOR DOCUMENT PREPARATION
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1B STATIC AUTHORIZED / RUNTIME ACTIVE
+= REL1B STATIC AUTHORIZED / RUNTIME COMPLETED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_runtime.md
-= NEXT RUN NOT STARTED / NO PRODUCTION RELEASE ACTION
+= REL1C NOT ACTIVATED / NO PRODUCTION RELEASE ACTION
 
-REL1B operator configuration
+Most recently completed REL1B operator configuration (historical, not a new start)
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_continuation_03.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
-= HUMAN MANUAL START / ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
-= TURN TIMEOUT 3600s / CURRENT COMMITTED CANDIDATE EVIDENCE AND REVIEW FIRST
+= HUMAN RUN 20261001T063859Z-6937 / RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED
+= ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
 
 REL1B first run `20260930T060931Z-48717` failed on a model-service HTTP 400
 before Executor implementation. Failed evidence and restored authentication are
@@ -83,6 +84,17 @@ continuation_03, independent state, same clean target HEAD91e5479, source/log id
 checks and evidence reuse before receipt/review; changes require relevant retests.
 Both Static contracts, old evidence and production release gates remain unchanged.
 No new Agent run has been started by this preparation; Human will start manually.
+
+Human subsequently completed continuation_03 as run `20261001T063859Z-6937`:
+three successful turns, same-thread Reviewer ACCEPT, no new target code/empty commit,
+and machine evidence commit `8a75f703cb650dcc4b46f4601ec47c72f51c1c85`.
+Independent review on 2026-10-01 ACCEPTED target91e5479 after source/evidence/tree
+checks, a fresh COMPLETE/forged-PASS/counterfeit-Python refusal, repeated read-only
+status, and fresh ResourceWarning-strict 204/204 regression in817.818s.
+See child Runtime section17 and the independent summary. REL1B is closed;
+REL1C remains queued. Production trust/entry and authenticated transport require
+explicit Owner deployment decisions before real integration. No formal App/ZIP,
+tag, draft, upload, publication, or new Agent run was performed by this review.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
