@@ -146,11 +146,11 @@ REL1B Static SHA-256: `2f2503a27e174dbbd3064faa6cc1b22c3a0389a12176f78ae92ecc122
 {
   "active_step": {
     "id": "REL1B",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "98cbac4cbdae526af3dc73a744f5924402d805c401f6de4feae4ab370a278345",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_release_1_1_0_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
@@ -243,3 +243,84 @@ Human已批准保持Static、微调原Runtime并由其手动启动。两个Stati
 8. Config无retry字段: 当前HEAD91e5479不等于旧失败target_initial b280279，不能冒充strict retry。continuation_of=20260930T222431Z-11603由本文历史关联，新state不覆盖旧checkpoint。首次启动用run；只有这个新run后续符合checkpoint恢复条件时才用resume。
 
 启动前doctor/preflight需通过，framework必须clean且local/remote main一致，targetbranch/HEAD/clean重验。Machine ACCEPT仍只关闭REL1B，不自动激活REL1C，不授权生产integration/build/tag/draft/upload/publication。
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "b3d12a82c34f3f73c9185826bb1fb62d1d480973e4d66d21214a95e78070ac85",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "91e547918a20383f9dc938440db890a7dae85226",
+      "sha256": "700b423f5619644370311f4b9863102a9fbc5488c670706d419213b00853961d"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/provenance-manifest.json",
+      "sha256": "874582a2e692d21cef92858213088919967bc7d7bbe56dcae743cf98421d3a70"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/executor-fresh-verification.json",
+      "sha256": "4f830ae6f0310e18b9c6ac75c1b6a71ab204a3c5e7271b358b79e0174653e5e8"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/real-gate-report.json",
+      "sha256": "8880710d2eadd56cdbdec1bf95033d85118c0d8455c6bfd61439dc4db13fd5d0"
+    },
+    {
+      "kind": "test",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/bootstrap-585ff76559d848af88ce83091a0cf59c.log",
+      "sha256": "691cee49b706c6873c5f94a4e311f6338a98c5f76d60cfc6e7fc757b0a26b617"
+    },
+    {
+      "kind": "test",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/strict-bd48f9f5e8514966aeb1eeb909cad058.log",
+      "sha256": "5e589843ff435327d339d6d61743313c46b3c6266e348d97e7531d7fc50268e9"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/real-environment-fault-report.json",
+      "sha256": "4a0fe2c0468eb54abfc72ae4e9b3ea02769f549e7a6080b825876f6218e74b9d"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/reviewer-forged-gate-report.json",
+      "sha256": "11c046eb4d32d3e11153afb11608f41584561d308d031bc020475dde8d515c85"
+    },
+    {
+      "kind": "artifact",
+      "locator": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02/logs/rel1b-continuation-03-evidence/reviewer-readonly-cli-report.json",
+      "sha256": "81effb09a6c4ac6b1e605dc6cb17d304c8edeaf57f7dd8585c7ef1a92c9e1e74"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "REL1B",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "98cbac4cbdae526af3dc73a744f5924402d805c401f6de4feae4ab370a278345",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "REL1B",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20261001T063859Z-6937/cycle-01/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "f242ab9458c87738a1811c08cba759134fe3b8997fff29db3fef5e88869292ea",
+  "schema_version": 1,
+  "target_head": "91e547918a20383f9dc938440db890a7dae85226",
+  "timestamp": "2026-10-01T07:03:05.712+00:00",
+  "transition_id": "98cbac4cbdae526af3dc73a744f5924402d805c401f6de4feae4ab370a278345"
+}
+```
