@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C DRAFT DOCUMENTS READY`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 READY FOR HUMAN MANUAL START`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -46,14 +46,19 @@ Most recently closed engineering task
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
 = REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
-= NO ACTIVE IMPLEMENTATION / REL1C QUEUED FOR HUMAN DOCUMENT REVIEW
+= REL1C AUTHORIZED / REL1C1 ONLY ACTIVE / C2 AND C3 QUEUED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1C STATIC DRAFT / RUNTIME QUEUED / NO ACTIVE MACHINE BLOCK OR CONFIG
+= REL1C STATIC AUTHORIZED / RUNTIME ACTIVE REL1C1 / IMPLEMENTATION NOT EVALUATED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
-= REL1C NOT ACTIVATED / NO PRODUCTION RELEASE ACTION
+= HUMAN MANUAL START PENDING / NO PRODUCTION RELEASE ACTION
+
+Current C1 operator configuration
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1c1.json
+= REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
+= TURN TIMEOUT 3600s / MAX CYCLES4 / ONLY C1 ARTIFACT-HUMAN-GATE-NOTES IMPLEMENTATION
 
 Most recently completed REL1B operator configuration (historical, not a new start)
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_continuation_03.json
@@ -103,6 +108,12 @@ No step is active, no config/run exists, and no production deployment/build/API
 was performed. PT-REL-01 stays open with remaining1 at parentStep1; proposed C1
 will correct notes plus its fixed identity hashes/tests. Completed REL1A/REL1B
 contracts and sealed evidence remain unchanged.
+
+Human subsequently approved REL1C and requested manual-start instructions plus
+a self-handoff. Only REL1C1 is activated, with independent config/state and one
+reviewer_accept_once transition; C2/C3 remain queued. The assistant prepares and
+checks configuration without starting an Agent. Production deployment/transport,
+formal build, final artifact Human PASS, tag/API/publication remain separately gated.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

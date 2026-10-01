@@ -1,16 +1,16 @@
-# Whisper 1.1.0 REL1C -- Runtime 初始化草案
+# Whisper 1.1.0 REL1C -- Runtime
 
 ## 1. 现在做到哪里，用人类语言说明
 
 发布工具的"版本与验包基础层"和"合并管理员"已经审核通过。下一步不是你马上测App，而是让1PCloop补完构建、人工批准和发布管理员。代码完成并审核后，才真正集成/构建，再交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `QUEUED / DRAFT DOCUMENTS READY / AWAITING HUMAN REVIEW`。
-- Verdict: `NOT EVALUATED`；唯一Active Step: 无。
-- 建议首个实施子步骤: `REL1C1`；C1/C2/C3均QUEUED，不在本次文档准备激活。
-- Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `0078138f95b3bddac3065e8f4c9fa451391641e467b0e4df4ff101e843b23a83`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
+- 状态: `ACTIVE / REL1C1 READY FOR HUMAN MANUAL START`。
+- Verdict: `NOT EVALUATED -- REL1C1 IMPLEMENTATION`；唯一Active Step: `REL1C1`。
+- C1已获批准并激活；C2/C3保持QUEUED，每步machine + 本对话独立接受后才能继续，不在本run一起实现。
+- Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `ba7a0213b5040917c4cf9677bd30983a9bdc8810ce4f793f252e46608b0de077`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 最后更新: 2026-10-01，America/Phoenix。
-- Human本次要求准备Static/Runtime，未要求启动。无REL1C config、ACTIVE machine block、run或实现commit；后续批准后再创建独立config/state及C1的一次machine transition。
+- Human于2026-10-01明确批准并要求手动启动指令及自用交接。本次准备config和C1的一次ACTIVE machine transition，但不调用Agent、代替Human启动或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
 
@@ -30,7 +30,7 @@ REL1B曾模型拒绝、1800s与3600s超时。最后复用已核验evidence、补
 - 当前gh `/opt/homebrew/bin/gh`，version2.96.0；只查version/help，未检查或读取登录凭据、未运行真实API。
 - 当前无正式新App/ZIP、Human artifact PASS或发布对象验收。生产trust/entry与认证transport未部署/验证，REL1B的local bare成功不能补足这些事实。
 
-## 3. 编排建议 -- 三个小循环，不一次做完
+## 3. 已批准编排 -- 三个小循环，不一次做完
 
 | 子步骤 | 唯一交付 | Gate与后续 |
 | --- | --- | --- |
@@ -42,7 +42,7 @@ C1/C2/C3是父Step 1的子步骤，不消耗顶层pending倒计时。各自使�
 
 生产执行仍依父计划: 整体Step 1通过 + Owner部署/transport决定 -> Step 2受控集成并固定main source -> Step 3正式build/ZIP自动验包 -> Step 4你验收该ZIP中的App -> Step 5只发布同一ZIP。不是普通Agent loop一接受就直接发布。
 
-## 4. 待批准REL1C1 -- 精确执行范围
+## 4. 唯一Active Step REL1C1 -- 精确执行范围
 
 Objective: 在91e5479基础上，建立可测试的artifact/Human gate控制层，修正notes及直接hash绑定；以正确证据交回审核，不扩大到C2/C3。
 
@@ -75,7 +75,7 @@ Required evidence: 修改逻辑和依赖影响、精确diff/commit/parent/allowl
 ## 5. 测试预算、证据与报告习惯
 
 - 沿用"先逻辑 -> 读取影响/依赖 -> 微调 -> 最小实现 -> 测试 -> 审核/治理"的规则；Executor不改Static/Runtime。
-- 实现turn建议沿用3600s、maxcycles4、progress15s；这不是已创建的启动config。新run实际模型/账号/配置由启动gate再核。
+- C1 config固定3600s、maxcycles4、progress15s；Reviewer6.1-sol/xhigh、Executor6.1-sol/high不变，账号由新run preflight绑定当时active，不回用旧run账号。实际启动配置见第11节。
 - 当前完整回归已测约14分钟，至少预留15-20分钟用于必要full strict以及receipt/提交收尾；先完成小范围实现，不临近上限启动额外昂贵smoke，不把测试放后台后假装已结束。
 - 默认运行当步focused和当前完整 `.venv/bin/python -B -W error::ResourceWarning -m unittest discover -s testCodes -v`，QT offscreen、TMPDIR指向新Downloads fixture。不用其它worktree或system Python代替锁定环境。
 - 真实formal build不在实现turn执行。测试命令/产物清楚标注synthetic/callback/fake transport，不冒充正式包或Human PASS；昂贵端到端smoke留在C3，不加入discovery制造递归。
@@ -87,7 +87,7 @@ Required evidence: 修改逻辑和依赖影响、精确diff/commit/parent/allowl
 
 | 项目 | 当前影响 | 决定前禁止什么 |
 | --- | --- | --- |
-| Owner批准本REL1C草案及三循环安排 | 阻止启动C1，不是一般pending。 | 创建ACTIVE machine state、启动Agent。 |
+| Owner批准REL1C合同及三循环安排 | 已于2026-10-01满足，C1准备手动启动；不是implementation ACCEPT。 | 未通过实际doctor/preflight时不得启动；C2/C3不在C1一起执行。 |
 | 生产trust/entry及签署/receipt路径部署 | 不阻止批准后的local实现/fixture；阻止真实Step 2-5。 | 安装root目录、生成/读取生产私钥、自授批准或宣称生产已可用。 |
 | 被批准的Git/gh认证transport | 不阻止fake/local adapter测试；阻止真实push/API与生产可用性声明。 | 读取token/private key、改变auth/global Git配置或放松隔离。 |
 | 精确最终artifact的Human PASS | 未来Step 4，实际产物身份尚不存在。 | 提前tag/draft/upload/publish，不接受泛指的旧人工PASS。 |
@@ -108,6 +108,8 @@ C1/C2/C3不推进顶层k。Step 2前必须先整体Step 1接受及部署/transpo
 
 REL1C没有实施commit/测试输出，C-AC各项均 `NOT EVALUATED`。Reviewer必须直接检查实际代码、artifact/test输出、fake API请求字节/local Git refs和独立反例，不能继承Executor或旧REL1B结论。每个子步骤机器接受后仍有本对话独立复核；C3检查全父合同的实现coverage，而不是直接宣布真实发布AC全通过。
 
+本C1 run只判定C-AC-01至04，以及C-AC-07的build/artifact/Human gate恢复和C-AC-08的notes/说明/回归局部coverage。C-AC-05/06的GitHub发布、C-AC-07的远端恢复及C-AC-08全链验收明确留给C2/C3，不能因为本轮未实现未来步骤而要求Executor顺带完成它们，也不能把局部ACCEPT写成全部C-AC已通过。
+
 ## 9. 官方接口与已重读依赖的风险提示
 
 - 已读本机gh2.96.0的create/upload/edit/api help及官方[create手册](https://cli.github.com/manual/gh_release_create)、[upload手册](https://cli.github.com/manual/gh_release_upload)、[api手册](https://cli.github.com/manual/gh_api)。CLI/API细节在C2实现前重新核对，不复制早期未接受草稿的错误argv。
@@ -118,8 +120,32 @@ REL1C没有实施commit/测试输出，C-AC各项均 `NOT EVALUATED`。Reviewer�
 
 ## 10. 下一步及状态迁移
 
-Previous: REL1A/REL1B accepted，REL1C未准备。Human本次请求触发仅文档初始化；Current: REL1C DRAFT/QUEUED、无Active Step。
+Previous: REL1A/REL1B accepted，REL1C DRAFT/QUEUED文档已推送ac54da5。Human随后批准启动并要求指令；Current: REL1C AUTHORIZED、唯一REL1C1 ACTIVE/READY FOR MANUAL START；尚无实施run、commit或verdict。
 
-你审阅本Static/Runtime后，若批准三循环安排，下一次才激活C1、固定Static hash、创建独立operator config/state、核target/refs/认证/doctor/preflight并给启动指令。启动由当次Human选择手动或明确要求助手启动，不继承旧run启动方式自动执行。
+本轮固定授权后Static hash、独立C1 config/state、核target/refs/doctor/preflight并给指令。Human自行启动，助手不在本次调用Agent；完成后本对话独立审核，再准备下一子步骤。旧REL1B terminal config不能resume或拿来启动C1。
 
 本次无模型变更、Agent调用、新clone/正式build/集成/tag/API、Human receipt创建或清理删除。父/REL1B Static和封存Runtime保持原样，global只更新导航与高层方向。
+
+## 11. C1启动配置与机器边界
+
+- Config: [workload_rel1c1.json](workload_rel1c1.json)，固定target `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02`，branch `codex/release-1-1-0-automation`，启动前clean HEAD `91e547918a20383f9dc938440db890a7dae85226`。
+- 本次授权准备前framework main/local/origin/GitHub main同为 `ac54da574f4a556676796c2db321f11585d41578`，clean；授权文档及config提交正常前进framework，不改变上述target。
+- Workload ID仍 `whisper_release_1_1_0_v1`；workload governance改为本REL1C Static/Runtime，不改旧REL1B config或checkpoint。
+- 独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1c1`；初次命令run，新run ID，无retry字段，不resume旧终态。
+- Raw `1PCloop/.local/runs/<new-run-id>/`、tracked summary `1PCloop/evidence-summaries/<new-run-id>.md`；framework main/origin/refs/heads/main正常non-force证据提交/push，非target push。
+- 首轮Reviewer全文读取本合同/父合同/第4节必要依赖，只编译C1。必须核目标HEAD/clean，先评估耦合，再形成精确allowlist与可完成的指令；不要展开更早未接受整套controller，不能因为REL1C名字覆盖C2/C3。
+- 只有最终Reviewer review可ACCEPT C1；初始instruction不接受。下面machine block只准REL1C1一次ACCEPT -> COMPLETED、next_active_step=null，不宣称整个REL1C/Step1/Release完成。
+- 当step完成后Runtime整体hash可由合法机器transition前进，后续接手者须按preimage/postimage验证，不能把合法transition当漂移或自行重启终态。
+
+<!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
+{
+  "active_step": {
+    "id": "REL1C1",
+    "status": "ACTIVE"
+  },
+  "last_transition_id": null,
+  "schema_version": 1,
+  "transition_mode": "reviewer_accept_once",
+  "workload_id": "whisper_release_1_1_0_v1"
+}
+<!-- 1PCLOOP_RUNTIME_STATE_END -->

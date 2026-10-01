@@ -1,14 +1,14 @@
-# Whisper 1.1.0 REL1C -- Static 稳定合同草案
+# Whisper 1.1.0 REL1C -- Static 稳定合同
 
 ## 1. 身份与审批边界
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段: `REL1C`，属于顶层Step 1的实现工作。
-- 状态: `DRAFT -- AWAITING HUMAN REVIEW`。
+- 状态: `AUTHORIZED`。
 - Human Owner: 本对话项目Owner。
 - 父合同: [workload_static.md](workload_static.md)，SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 配套状态: [rel1c_runtime.md](rel1c_runtime.md)。模板参考framework现有中文Static/Runtime模板。
 
-Owner本次授权准备文档，不等于批准启动循环、生产信任部署或真实发布。本草案获批准后才激活第一个实施子步骤；普通Agent权限仍不含真实push/merge/tag/API写入、正式App构建或治理修改。父合同有冲突时暂停，不能用本子合同扩大权限。
+Owner于2026-10-01审阅草案后明确说"批准启动，给出启动指令；然后写一个交接文档-给你自己看"，据此批准REL1C合同及三个有界子循环，启动由Human手动执行，首先只激活REL1C1。该决定不授权生产信任部署或真实发布；普通Agent权限仍不含真实push/merge/tag/API写入、正式App构建或治理修改。父合同有冲突时暂停，不能用本子合同扩大权限。
 
 ## 2. 用人类语言说明目标
 
@@ -90,6 +90,6 @@ tracked compact evidence及进度留在framework，稳定产品说明和工具�
 ## 8. 仍需Owner决定的生产事项
 
 - 独立生产trust、protected entry及可信签署/receipt控制路径如何部署；方案可继承REL1B，但本阶段不安装或生成生产key。
-- Git普通push和GitHub API如何使用被批准的现有认证，最小权限与工具来源怎样固定；本草案不选择个人key、token存储方式或扩大读取权限。
+- Git普通push和GitHub API如何使用被批准的现有认证，最小权限与工具来源怎样固定；本合同不选择个人key、token存储方式或扩大读取权限。
 
 以上不阻止批准后的纯实现/local测试，但阻止真实Step 2-5和生产可用性声明。若实现必须先获得新增敏感权限才满足criterion，立即停机请求Owner，不将缺权限降级为普通pending。父合同定义的最终产物Human PASS仍独立生效。
