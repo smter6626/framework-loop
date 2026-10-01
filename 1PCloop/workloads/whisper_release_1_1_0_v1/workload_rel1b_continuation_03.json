@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "workload_id": "whisper_release_1_1_0_v1",
+  "target": {
+    "repo": "/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/implementation-rel1b-continuation-02",
+    "branch": "codex/release-1-1-0-automation"
+  },
+  "governance": {
+    "workload_static": "rel1b_static.md",
+    "workload_runtime": "rel1b_runtime.md",
+    "framework_repo": "/Users/smterpro/Workspace/framework-loop",
+    "framework_static": "../../docs/miniloop_static.md",
+    "framework_runtime": "../../docs/miniloop_runtime.md"
+  },
+  "profiles": {
+    "account_source": "codex_mix_active",
+    "reviewer_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer",
+    "executor_home": "/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor"
+  },
+  "execution": {
+    "codex_bin": "/Users/smterpro/.local/share/fnm/node-versions/v24.18.0/installation/bin/codex",
+    "max_cycles": 4,
+    "timeout_seconds": 3600,
+    "progress_interval_seconds": 15,
+    "enable_runtime_transition": true
+  },
+  "evidence": {
+    "runs_root": "../../.local/runs",
+    "state_root": "../../.local/state/whisper_release_1_1_0_v1-rel1b-continuation-03",
+    "summary_root": "../../evidence-summaries"
+  },
+  "framework_git": {
+    "branch": "main",
+    "remote": "origin",
+    "push_ref": "refs/heads/main"
+  }
+}

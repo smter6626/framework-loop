@@ -3,8 +3,8 @@
 ## 1. 当前状态
 
 - 父 Task ID: `whisper_release_1_1_0_v1`；子步骤: `REL1B`；顶层编号仍为 `1`。
-- 状态: `ACTIVE / TIMEOUT DRAFT PRESERVED / CONTINUATION READY FOR MANUAL START`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
-- 唯一 Active Step: REL1B。模型拒绝与后续Executor超时均保留，尚无实施 ACCEPT；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
+- 状态: `ACTIVE / COMMITTED CANDIDATE PRESERVED / RECEIPT AND REVIEW CONTINUATION READY`；Verdict: `NOT EVALUATED -- IMPLEMENTATION`。
+- 唯一 Active Step: REL1B。模型拒绝、1800s和3600s两次Executor超时均保留，尚无实施 ACCEPT；REL1A 已完成，REL1C 和真实 Step 2-5 仍 QUEUED。
 - 本步 Static: [rel1b_static.md](rel1b_static.md)；其 SHA-256 见第 10 节。
 - 父合同与权威总状态: [workload_static.md](workload_static.md)、[workload_runtime.md](workload_runtime.md)。
 - 最后更新: 2026-09-30，America/Phoenix。历史run timestamp采用UTC；不以当前日期改写旧记录。
@@ -43,7 +43,7 @@ REL1A 已机器和本对话独立接受，不重做:
    - `packaging/release_contract.json`、`runtime_manifest.json`、正式 spec；`pyproject.toml`、`uv.lock`、`.python-version`、`.gitignore`。
    - 双语 README、`PACKAGING.md`、`docs/repo_map.md` 和相关 `testCodes/`。
 4. 必要时读取 framework 现有 runner/operator 以理解只读角色与普通后继 commit 边界，但不得修改它们。
-5. 本轮主要候选是第13节七文件固定快照 `rel1b-timeout-draft-source-only-20260930.tgz`，必须核hash并直接评估代码，不从头重写。更早 `quota-stopped-rel1-draft.tgz` 等仅为历史参考；若无特定依赖问题，不重新逐份完整展开旧候选或恢复其authority。原所有dirty目录均不可编辑。
+5. 当前主要候选是第15-16节已提交HEAD `91e547918a20383f9dc938440db890a7dae85226` 和匹配的完整测试evidence。第13节七文件archive及第14节执行编排已成为历史输入，不再次应用archive或回退到b280279。更早候选只在具体问题需要时读取，所有旧dirty目录保持只读。
 
 旧候选已知问题: 信任根由 caller 选择，journal self-hash 不证明批准/测试 authority，分叉与恢复 gate 尚未接受，后半段 gh argv/二进制下载曾不正确。不能因草稿或旧测试存在就沿用结论。`release_contract.json` 与 REL1A helper EXPECTED_CONTRACT 精确相等，不可直接添加 controller 字段破坏身份层；本步控制输入应独立建模。
 
@@ -51,7 +51,7 @@ REL1A 已机器和本对话独立接受，不重做:
 
 ### REL1B: 批准、持久 journal、分叉集成控制器
 
-Objective: 接续第13节已有七文件草稿，按第14节完成必要修复、完整回归、四份文档和普通提交，满足Static B-AC-01至08，再做最终Reviewer审核。不从零重建四模块，不重复REL1A，不在本run做生产集成/build/publication。
+Objective: 在当前clean HEAD `91e547918a20383f9dc938440db890a7dae85226` 上，按第16节核验现有候选和测试evidence、补完整Executor receipt，再做最终Reviewer审核。发现缺口才窄修复和重测；不重新应用archive、不从零实现、不无条件重复昂贵smoke。Static B-AC-01至08不变，不在本run做生产集成/build/publication。
 
 允许文件:
 
@@ -69,10 +69,10 @@ Objective: 接续第13节已有七文件草稿，按第14节完成必要修复�
 
 执行顺序:
 
-1. 全文读当前合同/状态和直接必要依赖，检查新target基线/clean；核第13节archive与晚完成测试，Reviewer直接评估现有草稿后给收尾指令。不能把24/24当最终接受，也不要重复从零设计。
-2. Executor只在新target内按Reviewer指定七文件候选重用/修复，补缺少的验证/操作文档，不实现REL1C。具体步骤见第14节。
-3. 运行 focused 和完整 strict 回归，保存原始测试日志、失败反例、SHA/locator。所有临时 fixtures/logs 在 Downloads 下精确目录，不污染 source。
-4. 普通后继 commit/clean，交回同 Reviewer 审核；REJECT 后仅做有界 repair，再测试/re-review。
+1. 全文读现行合同/状态及必要依赖，核当前target基线/clean；Reviewer直接评估b280279到91e5479的完整diff和第15节evidence，再给有界核验/回报指令。旧全绿不是ACCEPT。
+2. Executor验证日志hash、测试来源和当前源码/环境匹配，按第16节补完整receipt，不默认扩大实现或重做已有文档，不实现REL1C。
+3. 未改码且来源充分匹配时可复用真实完整回归与smoke，不伪称是新run执行；Reviewer自选必要反例。改码或证据失效时重跑相应focused/full/gate验证。新fixtures/logs仍在Downloads独立目录。
+4. 无需改码时允许保持HEAD，不制造空commit。确有修复才普通后继commit/clean，交回同Reviewer审核；REJECT后遵循既有repair路由，不保证未改HEAD的REJECT会自动进入下一cycle。
 5. Machine ACCEPT 只关闭 REL1B implementation；本对话再独立复核。未接受整个 Step 1 前不运行真正的 controller integration。
 
 ## 5. 测试与 Reviewer 的直接验证路线
@@ -90,14 +90,14 @@ Objective: 接续第13节已有七文件草稿，按第14节完成必要修复�
 
 Self-check 命令逻辑: 在当前 target cwd 使用本 clone `.venv/bin/python -B -W error::ResourceWarning -m unittest discover -s testCodes -v`，`QT_QPA_PLATFORM=offscreen`，TMPDIR 指向新 Downloads fixture 目录。Focused 模块依实现结果列出，不预填未来测试数量。Python/uv/import、diff check 和精确文件 allowlist 一并核验。
 
-Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CLI/真实 Git facts/test artifacts，并自选至少一条 self-check 未充分覆盖的篡改或 crash 验证；依据 B-AC 逐项判断 sufficiency，不能继承"全绿即接受"。
+Independent Review 尚未进行。Reviewer 必须直接读取 diff/production CLI/真实 Git facts/test artifacts，并自选至少一条 self-check 未充分覆盖的篡改或 crash 验证；依据 B-AC 逐项判断 sufficiency，不能继承"全绿即接受"。上述命令仍适用于需要重测的情形；当前第16节允许来源验证通过的既有测试复用，不要求每个未改码turn无条件重复所有昂贵验证。
 
 ## 6. 启动准备与机器边界
 
 Human 2026-09-29 决定: "1pcloop这次的reviewer和Executer的模型配置分别改成6.1sol xhigh和6.1sol high；完成后给出1pcloop的启动指令我手动启动"。据此完成以下准备，实际 run 由 Human 启动:
 
 1. Static 为 AUTHORIZED，记录上述 Human 决定并重新固定 hash；父 Runtime/global 指向本 Runtime，唯一 Active Step 为 REL1B。
-2. 首轮及CLI retry config/state均保留。当前启动用 [workload_rel1b_continuation_02.json](workload_rel1b_continuation_02.json)，同Static/Runtime，但target为新的干净 `implementation-rel1b-continuation-02`；独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-continuation-02`。这是同任务fresh continuation，不是要求相同target路径的strict retry，也不resume旧终态；见第13-14节。
+2. 所有旧config/state均保留。当前启动用 [workload_rel1b_continuation_03.json](workload_rel1b_continuation_03.json)，同target `implementation-rel1b-continuation-02`，clean HEAD已前进到91e5479；独立state root `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-continuation-03`。这是同任务fresh continuation，命令为run，不resume已结束的02，也不伪造要求失败初始HEAD相同的strict retry；见第15-16节。
 3. 本 Runtime 新建唯一 REL1B `ACTIVE / reviewer_accept_once` machine block，只准 `ACCEPT -> COMPLETED`。父 Runtime 原 REL1A COMPLETED machine block/transition record 不改写，旧 run 不 resume。
 4. Max cycles 4、每turn timeout 3600s、progress interval 15s；旧配置1800s不改写。Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`，role配置不变；operator只选择独立runtime homes。Human 2026-09-30采纳保留草稿/收尾/60分钟建议，详见第14节。不自动换模型或账号。
 5. 新 run 固定启动时 Codex Mix active account；用户此前报告 acc3/marker C 只是历史观察，不能据此硬编码。双 role 独立 runtime、temporary auth projection/restoration/scan 与 A/B read-only snapshot沿用既有机制，不打印凭据。
@@ -184,7 +184,7 @@ Run `20260930T062228Z-49634` 使用升级后CLI及6.1-sol，Reviewer instruction
 - SHA-256 `a29e2520ec1028027506826556d652e152276d8d9b532cffd9868799d347cb7d`，仅上述七个普通source/test文件，逐成员bytes核对通过；不含AppleDouble/xattr、`.git`、auth、fixture私钥、环境或用户数据。先生成的带macOS元数据archive保持本地，不作为本轮输入。
 - 原dirty `implementation-phased/`、两种失败state/raw/summary和fixture/logs全部保持不变，没有reset/stash/清理/助手提交草稿。
 
-## 14. 本轮fresh continuation -- 有界收尾，不重新实现
+## 14. 已结束continuation-02的准备历史 -- 不再作为当前执行指令
 
 Human于2026-09-30采纳“保留草稿、干净延续、限定修复/测试/文档/提交、单turn60分钟”建议。Static职责与验收条件保持原样；只更新Runtime执行编排/输入/timeout。保持同任务、同唯一REL1B，不将continuation当新产品目标或terminal resume。
 
@@ -199,3 +199,47 @@ Human于2026-09-30采纳“保留草稿、干净延续、限定修复/测试/文
 5. 普通后继commit、diff/clean与测试logs/hash -> 同Reviewer最终审核 -> 本对话独立复核。REJECT保持repair链；ACCEPT只关闭本REL1B，不激活REL1C。
 
 新config `workload_rel1b_continuation_02.json`无`retry`字段，因为target路径改变，不满足既有strict retry API的same-target条件；第13-14节提供显式continuation provenance。新state/run不覆写原checkpoint；原config不改。本轮仅准备并给指令，由Human手动启动。
+
+## 15. 3600s超时后的已提交候选与测试 -- 2026-09-30
+
+Human手动run `20260930T222431Z-11603` 已结束。Reviewer instruction成功678.909s；Executor3606.782s，达到3600s上限，未生成final.txt/完整JSON receipt，原Reviewer最终review未执行。总run4295.192s，三层 `FAILED_CLOSED / NOT_APPLIED / PUSHED`，exit1；不是Reviewer REJECT或实现ACCEPT。process exit_code=0不能覆盖明确的timeout与缺失回报。
+
+- Framework evidence commit `3ad2d60132c06b92cefa38f2c936f79ecdc469b3`；[tracked summary](../../evidence-summaries/20260930T222431Z-11603.md)。
+- Raw `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20260930T222431Z-11603/`。
+- 旧checkpoint `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/state/whisper_release_1_1_0_v1-rel1b-continuation-02/whisper_release_1_1_0_v1/checkpoint.json`，SHA-256 `531c09a9e747662cf38f49ee2ece122c9749de87397bb8720bf2e20d615ed877`。原config/checkpoint/raw/summary不改写。
+- 两role auth restored、active identity unchanged、actual credential hits=0；本对话检查时无相关run/fixture路径匹配的存活进程。这是当时检查，不宣称已普遍证明所有子进程清理。
+- Target同原路径和branch，普通后继 `b28027927f23c3a2333b1ae9da0dd6989901e616 -> 47b6e4132ec0f71281926f3323a6885517213238 -> 91e547918a20383f9dc938440db890a7dae85226`，clean。四模块、三测试、双语README/PACKAGING/repo_map共11个tracked文件；没有真实产品remote mutation。
+- 初始Reviewer直接复现counterfeit clone-local环境可跳过测试的缺口，证据在旧instruction receipt/summary。Executor补环境来源与invocation proof，并修复隔离fixture的origin读取后重跑。没有最终Reviewer验证证明这些修复充分，保留为候选。
+
+固定证据目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr/rel1b-fixtures.executor-x9s02cpi/`，以下相对locator均基于该目录。
+
+| 文件 | SHA-256 | 实际观察及限制 |
+| --- | --- | --- |
+| real-gate-report.json | 8880710d2eadd56cdbdec1bf95033d85118c0d8455c6bfd61439dc4db13fd5d0 | 实际gate无callback替代，clone/bootstrap/strict/local bare main顺序成功，882.049s；不是生产GitHub集成。 |
+| real-gate-smoke.log | 9998cafbaf91370877dda1557e86d1e44b6d3e6375e9d2084199576f01ceea3c | REAL_GATE_SMOKE_VALIDATED，命令在Executor超时前已返回0。 |
+| case-86cb034756d34f3a8f77520aae952604/managed/evidence/bootstrap-585ff76559d848af88ce83091a0cf59c.log | 691cee49b706c6873c5f94a4e311f6338a98c5f76d60cfc6e7fc757b0a26b617 | 集成clone Python3.12.14/uv0.12.5/frozen lock，environment5/5。 |
+| case-86cb034756d34f3a8f77520aae952604/managed/evidence/strict-bd48f9f5e8514966aeb1eeb909cad058.log | 5e589843ff435327d339d6d61743313c46b3c6266e348d97e7531d7fc50268e9 | 完整strict204/204，785.090s，包含最终repair后的源码。 |
+| real-environment-fault-report.json | 4a0fe2c0468eb54abfc72ae4e9b3ea02769f549e7a6080b825876f6218e74b9d | 环境替换STOP ENVIRONMENT_CHANGED；resume STOP ENVIRONMENT_UNTRUSTED；untrusted_code_executed=false，本地bare main不变。 |
+| real-environment-fault.log | 2c9c3cf54a744993adcf25253a584e73f39c3f7c48f4c8d164fe26a113a26b25 | 上述故障smoke实际返回0，不是部署生产trust。 |
+| pre-final-focused-diagnostic.log | e55e631a5eca2aa412521839cbc09b8a332c42e41a8746801ea459b8af9f9a34 | 31/31，623.117s；在最后origin repair之前，不能当作最终HEAD专项全绿。 |
+| fixture-reader-repair.log | d9bc43c7d25e6908b69153bd6cdfd97d8414fffb935bdf6734bb4d8d8ab7506b | 最后origin repair的单项测试；完整204/204再覆盖最终修复。 |
+| final-boundaries.json | 9bda4fa48500347b37f910949ba5531a37188dfc64c890044719c49a88ccb5de | 当时commit/allowlist/source/governance审计；旧治理hash只描述旧run，不冒充新run治理hash。 |
+
+本对话准备03时重新核验report日志hash和当前89个tracked文件的实际bytes，与report.source_sha256逐文件匹配。report共91项，另两项common.txt/feature.txt是测试分叉的fixture专用输入，不是新增产品文件。该核验只是source/evidence identity，不是独立B-AC ACCEPT或环境可信来源的最终结论。
+
+## 16. 当前continuation-03 -- 核验、回报、审核优先
+
+Human已批准保持Static、微调原Runtime并由其手动启动。两个Static及B-AC不变，REL1B仍唯一ACTIVE。新config/state、新run ID；target保持第15节clean91e5479，不新建clone或重建解释器，不修改模型/账号/认证。本轮助手仅准备文档/config，未调用Agent或启动loop。
+
+必须给Reviewer/Executor的有界指令:
+
+1. 阅读现行合同和本节，再读b280279到91e5479的累计diff、直接相关源码/测试/四文档及第15节evidence。优先使用已提交候选，不重新解包七文件archive，不重新设计整套controller或补REL1C。旧交接用于历史恢复，不覆盖本节当前HEAD和状态。
+2. Reviewer在instruction turn独立检查现有候选，要求Executor核验并形成receipt；instruction turn不发ACCEPT。之后仍须原thread最终review和本对话独立复核。具体缺口可REJECT/窄repair，不能为赶时间放过B-AC。
+3. 未修改代码、依赖、测试和受测环境，且日志hash/来源、被测试源码覆盖当前HEAD、环境/调用链和Git facts足够一致时，允许明确标为reused evidence的204/204与真实gate结果。不得说“本run重新执行204 tests”；旧31项结果有时间顺序限制，最终全量覆盖与单项repair证据分别报告。不无条件重复bootstrap/full smoke；若证据缺失/被改写、环境不可信或实现变化，重跑相关focused/full及实际gate，不能猜测通过。
+4. 新Reviewer保留独立证据判断，并自选至少一条不同的CLI/tamper/crash/readonly检查；新测试fixture在Downloads独立0700目录，原日志/fixtures不修改。生产trust仍未部署，真实GitHub transport尚未通过production验证，不使用私钥或放松隔离来解决它；需要新增权限先Human Gate。
+5. 若只需核验回报，无需改target或创建空commit；Executor输出完整schema-valid executor_receipt，列current commit/parent、实际文件、reused与fresh测试、locator/hash、B-AC对照和未部署限制。不能自行ACCEPT或修改Runtime。若确有修复，只改第4节allowlist并普通后继提交，再跑受影响验证。
+6. 结构化ACCEPT的file/artifact/test locator只能是当前target或当前新run_root内的现存绝对文件。第15节Downloads外置日志可作为只读审查输入，但不能直接当作满足该boundary的ACCEPT locator。Executor可将通过hash和隐私核验的非秘密report/log字节复制到target已ignored的 `logs/rel1b-continuation-03-evidence/`，这是允许的本地evidence，不是tracked产品实现；先git check-ignore并确认无tracked路径覆盖，原件不改，不复制fixture keys/auth/raw prompt/session。复制后记录source/destination/SHA与reused provenance；Reviewer须亲自重验。其它新fixtures继续在Downloads，不改.gitignore。
+7. 预算仍每turn3600s、maxcycles4。先保存必要证据，及时输出最终JSON；若必须重测，预留约15分钟完整suite和回报收尾时间。不要临近上限再开启可超预算的全量smoke或放后台；不能为了交receipt省略必须验证。缺口/预算不足如实报告，不fabricate完成。
+8. Config无retry字段: 当前HEAD91e5479不等于旧失败target_initial b280279，不能冒充strict retry。continuation_of=20260930T222431Z-11603由本文历史关联，新state不覆盖旧checkpoint。首次启动用run；只有这个新run后续符合checkpoint恢复条件时才用resume。
+
+启动前doctor/preflight需通过，framework必须clean且local/remote main一致，targetbranch/HEAD/clean重验。Machine ACCEPT仍只关闭REL1B，不自动激活REL1C，不授权生产integration/build/tag/draft/upload/publication。

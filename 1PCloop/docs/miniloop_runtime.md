@@ -45,7 +45,7 @@ Most recently closed engineering task
 
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
-= REL1B ACTIVE / TIMEOUT DRAFT PRESERVED / CLEAN CONTINUATION READY
+= REL1B ACTIVE / COMMITTED CANDIDATE PRESERVED / RECEIPT AND REVIEW CONTINUATION READY
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
@@ -55,10 +55,10 @@ Next-step document preparation
 = NEXT RUN NOT STARTED / NO PRODUCTION RELEASE ACTION
 
 REL1B operator configuration
-= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_continuation_02.json
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1b_continuation_03.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
 = HUMAN MANUAL START / ORIGINAL AUTHENTICATION AND RELEASE GATES UNCHANGED
-= TURN TIMEOUT 3600s / EXISTING DRAFT COMPLETION ONLY
+= TURN TIMEOUT 3600s / CURRENT COMMITTED CANDIDATE EVIDENCE AND REVIEW FIRST
 
 REL1B first run `20260930T060931Z-48717` failed on a model-service HTTP 400
 before Executor implementation. Failed evidence and restored authentication are
@@ -73,6 +73,16 @@ Human adopted draft-preserving completion with a 3600s turn budget. Both Static
 contracts and acceptance gates are unchanged. A clean same-task continuation clone,
 fixed draft archive and new state/config are prepared; manual start remains pending.
 Detailed timeout/process-lifetime observations and evidence are in the child Runtime.
+
+Human-started continuation `20260930T222431Z-11603` also hit the 3600s Executor
+limit. Target commits 47b6e41/91e5479, clean tree, real local integration gate,
+204/204 strict tests and environment-fault evidence were preserved, but no complete
+Executor receipt or final Reviewer verdict exists. FAILED_CLOSED/NOT_APPLIED/PUSHED
+is not acceptance. Human authorized Runtime-only completion replanning: new config
+continuation_03, independent state, same clean target HEAD91e5479, source/log identity
+checks and evidence reuse before receipt/review; changes require relevant retests.
+Both Static contracts, old evidence and production release gates remain unchanged.
+No new Agent run has been started by this preparation; Human will start manually.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
