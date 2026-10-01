@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C PREPARATION PENDING`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C DRAFT DOCUMENTS READY`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -46,13 +46,13 @@ Most recently closed engineering task
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
 = REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
-= NO ACTIVE IMPLEMENTATION / REL1C QUEUED FOR DOCUMENT PREPARATION
+= NO ACTIVE IMPLEMENTATION / REL1C QUEUED FOR HUMAN DOCUMENT REVIEW
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1B STATIC AUTHORIZED / RUNTIME COMPLETED
-= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_static.md
-= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1b_runtime.md
+= REL1C STATIC DRAFT / RUNTIME QUEUED / NO ACTIVE MACHINE BLOCK OR CONFIG
+= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
+= 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
 = REL1C NOT ACTIVATED / NO PRODUCTION RELEASE ACTION
 
 Most recently completed REL1B operator configuration (historical, not a new start)
@@ -95,6 +95,14 @@ See child Runtime section17 and the independent summary. REL1B is closed;
 REL1C remains queued. Production trust/entry and authenticated transport require
 explicit Owner deployment decisions before real integration. No formal App/ZIP,
 tag, draft, upload, publication, or new Agent run was performed by this review.
+
+Human requested REL1C preparation on2026-10-01. Chinese task-local Static/Runtime
+drafts are ready for review, proposing C1 artifact/Human gate, C2 publication adapter
+and recovery, C3 unified workflow/parent-contract coverage as separate small loops.
+No step is active, no config/run exists, and no production deployment/build/API
+was performed. PT-REL-01 stays open with remaining1 at parentStep1; proposed C1
+will correct notes plus its fixed identity hashes/tests. Completed REL1A/REL1B
+contracts and sealed evidence remain unchanged.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

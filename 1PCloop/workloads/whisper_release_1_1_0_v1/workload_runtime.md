@@ -3,14 +3,14 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A AND REL1B ACCEPTED / REL1C PREPARATION PENDING`。
-- Verdict: `ACCEPT -- REL1B IMPLEMENTATION ONLY`；REL1A保持ACCEPTED，整个Step 1和发布未完成。
-- 当前无Active实施步骤: REL1A/REL1B均已COMPLETED，REL1C仍QUEUED待文档准备和Owner决定，真实Step 2-5未运行。权威REL1B接受状态见 [rel1b_runtime.md](rel1b_runtime.md)；模型失败及两次Executor超时全部保留。
+- 状态: `REL1A AND REL1B ACCEPTED / REL1C DRAFT DOCUMENTS READY`。
+- Verdict: `NOT EVALUATED -- REL1C`；REL1A/REL1B的已接受结果不变，整个Step 1和发布未完成。
+- 当前无Active实施步骤: REL1A/REL1B均已COMPLETED，REL1C仍QUEUED，中文Static/Runtime已准备待Owner审阅；真实Step 2-5未运行。REL1B接受状态见 [rel1b_runtime.md](rel1b_runtime.md)；模型失败及两次Executor超时全部保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-01，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human手动REL1B延续已机器及独立ACCEPT；下一方向REL1C尚未激活，真实生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
+- 执行门禁: Human手动REL1B延续已机器及独立ACCEPT；[REL1C Static草案](rel1c_static.md)/[Runtime草案](rel1c_runtime.md)只完成文档准备，尚未批准/激活。生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
 - 最近已结束Config: `workload_rel1b_continuation_03.json`，run `20261001T063859Z-6937`，机器ACCEPT，三层COMMITTED/APPLIED/PUSHED。旧3600s超时见子Runtime第15节，本次及独立接受见第17节；不resume终态，所有旧config/checkpoint保留。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
 - 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；accepted target保持其 `implementation-rel1b-continuation-02/`，branch `codex/release-1-1-0-automation`，clean HEAD `91e547918a20383f9dc938440db890a7dae85226`。当前无待运行REL1B，原dirty目录/archive和用户worktrees不变。
@@ -70,7 +70,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 状态: 整体实现目标未完成；按第16节拆分为1a/1b/1c。REL1A/REL1B已接受，REL1C仍QUEUED待准备；接受证据见子Runtime和第23节，第18-22节保留此前准备/失败历史。本文不重复编译子步骤，不要求单turn完成父级范围。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
-- 实现基线: `0388fa9daf65d5b5d0efae0e86eec824e33eab15`；在 Downloads 隔离 clone 新建 `codex/release-1-1-0-automation` 分支。若基线漂移先核对，不自动改为旧 main 或别的功能分支。原工作区的相对源码路径在本 clone 下均保持一致，实际 target 以 `workload.json` 为准。
+- 初始功能基线为0388fa9，REL1A/REL1B后已前进到accepted91e5479；当前实现分支及建议target见第1节和REL1C Runtime，不再从初始feature重建。实际启动以新config绑定的当前branch/HEAD/clean为准，不使用旧终态配置或改为main。
 - Permitted changes: target 的版本/lock 本项目元数据、必要 Release/Debug spec 与直接版本来源、`scripts/` 发布工具及直接打包依赖、相关 `testCodes/`、中英 README、PACKAGING、必要 repo map/技术说明、发布说明源文件。普通后继 commit，代码逻辑变化前先读依赖。
 - Prohibited changes: 普通 Agent 的 push/merge/tag/真实 Release API；Static/Runtime；framework runner/schema/roles/认证；ASR/audio/model/Clean 功能；用户数据；第三方依赖升级；历史 tag/assets；未来 GUI/LLM/公证工程。
 - 实现要求: fixed repo/ref/version/asset、阶段 journal/恢复、普通 loop acceptance 绑定、受控 integration/build、独立 artifact identity、可信 Human receipt、draft/asset 对账与 final publication、safe read-only status。公共终端以简明阶段/结论为主，安全 metadata 和详细日志落本地，不 dump 环境或凭据。
@@ -131,7 +131,7 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 1. Human 明确批准本文和 Static 并开始；批准若带修订先同步合同，不自行认为当前草案已生效。
 2. 重新核对全部 branch/local/tracking/GitHub refs、clean 和版本占用；创建经批准的实现分支，但不先 merge/tag/release。
 3. 准备独立 workload config/state root/evidence roots、唯一 Step 1 implementation machine block；全局 Runtime 仅指向本任务，旧 task freeze。
-4. 模型先沿用最近已接受的 operational choice: Reviewer `gpt-5.6-sol / xhigh`、Executor `gpt-5.6-sol / high`。这是启动配置候选，不改变角色 config；启动前核对实际可用性，有变更须明确决定，不 auto fallback。
+4. 模型沿用最近Owner批准且REL1B使用的Reviewer `gpt-6.1-sol/xhigh`、Executor `gpt-6.1-sol/high`；2026-10-01只读配置一致。启动前重验，不在文档准备改role配置、自动fallback或硬编码旧账号。更早5.6配置属于历史，不是REL1C默认。
 5. Codex Mix active account 新 run 固定、双 role runtime 隔离、认证事务完整恢复、凭据扫描零、A/B retirement snapshot 不变；不读取/打印 auth 来生成文档。
 6. doctor/preflight、Runtime/Static exact hashes、目标/治理树不重叠、工具/read/write路径边界通过。新增发布 workflow 尚待 Step 1 实现，不能把原 runner config 的 capability 当作已有真实发布能力。
 
@@ -143,7 +143,7 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 无新Active实施步骤。REL1B已关闭，不重新使用其第4节或旧config启动；后续先准备REL1C合同/Runtime供Owner审阅。
+- Current Executor Handoff: 无Active实施步骤。REL1B已关闭；待Owner批准的首个C1任务见 [rel1c_runtime.md](rel1c_runtime.md)第4节，不使用旧config启动。
 - Next Direction: REL1C实现 -> 整个Step 1独立接受及生产部署/transport门禁 -> 受控集成与构建 -> Human最终ZIP验收。当前无可人工验收的新App/ZIP，本次未调用新Agent。
 
 ## 11. 直接输入导航
@@ -226,6 +226,8 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 
 在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。
 
+现已准备 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)，DRAFT/QUEUED。建议C1构建与Human gate、C2发布adapter/恢复、C3统一workflow/父合同覆盖三个小循环，逐项machine+独立接受，不把整个后半程塞进单turn。尚无config/Active machine block/run，须Owner审阅后再激活C1。
+
 ## 17. REL1A machine acceptance 与本对话独立复核
 
 - Run `20260930T041657Z-42494` 自行完成，不是对话中断后停止；三轮 target commits 为 `a6bf16df8c7dfd85d67c5631119bc7ea73d1131a` -> `b51c0eb9c16c598cebddbc9a915b7e4b0b37fe26` -> `b28027927f23c3a2333b1ae9da0dd6989901e616`，均普通后继，clean。
@@ -277,6 +279,12 @@ Human手动run `20261001T063859Z-6937` 正常完成，三turn成功，原Reviewe
 本对话独立ACCEPT同HEAD：直接读完整累计diff/依赖/B-AC，核89源码、9项verdict evidence、真实95blob双父级merge，新增COMPLETE/forged PASS/counterfeit Python组合拒绝和380项只读快照检查；fresh完整ResourceWarning-strict204/204，817.818s，exit0，无资源告警。详情见 [独立summary](../../evidence-summaries/whisper-release-rel1b-independent-review-20261001.md) 和子Runtime第17节。原REL1A machine block及record原字节不改；REL1B machine record由orchestrator完成，人工收尾只更新说明/导航。
 
 当前无Active implementation，REL1C仍QUEUED，整个Step 1未关闭。下一步先准备REL1C文档；生产trust/entry及认证transport需Owner明确决策和验证，不能直接集成/发布。PT-REL-01仍在顶层k=1、remaining1，待REL1C修正notes；未创建正式App/ZIP或执行真实tag/draft/upload/publication，不要求此刻做产品黑盒验收。
+
+## 24. REL1C草案初始化 -- 2026-10-01
+
+Human询问下一阶段是否需要1PCloop，并要求需要时准备Static/Runtime。已重读父合同、中文模板、accepted REL1A身份/正式build/ZIP返回接口、REL1B复核与未部署限制、notes及hash/tests依赖，并核本机gh2.96.0的只读help和官方手册。只创建REL1C中文DRAFT/QUEUED文档，未把“准备”解释为批准或启动。
+
+建议按C1/C2/C3拆分，当前无Active Step。C1修正PT-REL-01并同步notes/contract/EXPECTED_CONTRACT固定hash，未实施前不关闭pending；顶层k仍1、remaining1。REL1A/REL1B的Static/封存Runtime及machine records、旧configs/checkpoints/evidence不改。未来真实部署/transport仍需Owner决定，最终ZIP人工PASS仍是父Step 4；无产品改码、模型/账号更改、Agent调用、正式build/集成/tag/API或清理删除。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
