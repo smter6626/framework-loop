@@ -189,11 +189,77 @@ Human在换号后明确要求resume。已结束的旧run只能核验/收尾，�
 {
   "active_step": {
     "id": "REL1C1",
-    "status": "ACTIVE"
+    "status": "COMPLETED"
   },
-  "last_transition_id": null,
+  "last_transition_id": "9899fb7ad8a4f3b01e1ad414ae0a1ff6bd7e62c58eb0b75e9b68f2d6951695c7",
   "schema_version": 1,
-  "transition_mode": "reviewer_accept_once",
+  "transition_mode": "disabled",
   "workload_id": "whisper_release_1_1_0_v1"
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
+
+
+<!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
+```json
+{
+  "accepted_preimage_sha256": "ada47cdff44b8b37054e2bffe54fb0a353df8a3117b154a1fc225e9dcbefe2b0",
+  "evidence": [
+    {
+      "kind": "commit",
+      "locator": "52237ae4ac893d7b46a8b0b48a10be137b90c6fc",
+      "sha256": "5e0dfca60eb22eba623071249ace8065525b02ab205a585b3a7970aec02cc81a"
+    },
+    {
+      "kind": "test",
+      "locator": "/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation/logs/rel1c1-wheel-cache-repair/full-strict.log",
+      "sha256": "383b104131b806f6db7334ea28f8464de162d92adb5cb2a79dbb239f26615829"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation/logs/rel1c1-wheel-cache-repair/evidence-manifest.json",
+      "sha256": "e610c8931e78bdc9f80ff9a488d9ea2b95deba1514a667d7ca7eda82350c537d"
+    },
+    {
+      "kind": "test",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20261002T023023Z-10810/reviewer-cycle-02-independent-probes.json",
+      "sha256": "b62ef83bfa014389f75761e5e4a595dd15a31289199dc9ae4cb08ffb26a685ef"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20261002T023023Z-10810/reviewer-cycle-02-evidence-verification.json",
+      "sha256": "1da7877ee6854312b2365fed364092a23ff0bf3a112879b0b78aa72113f60607"
+    },
+    {
+      "kind": "file",
+      "locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20261002T023023Z-10810/reviewer-cycle-02-test-source-bindings.json",
+      "sha256": "85640eca87bc5a2e0f97353aa35cf035d44ee6049556aaa6450c4c35780c5780"
+    }
+  ],
+  "new_state": {
+    "active_step": {
+      "id": "REL1C1",
+      "status": "COMPLETED"
+    },
+    "last_transition_id": "9899fb7ad8a4f3b01e1ad414ae0a1ff6bd7e62c58eb0b75e9b68f2d6951695c7",
+    "schema_version": 1,
+    "transition_mode": "disabled",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "old_state": {
+    "active_step": {
+      "id": "REL1C1",
+      "status": "ACTIVE"
+    },
+    "last_transition_id": null,
+    "schema_version": 1,
+    "transition_mode": "reviewer_accept_once",
+    "workload_id": "whisper_release_1_1_0_v1"
+  },
+  "reviewer_verdict_locator": "/Users/smterpro/Workspace/framework-loop/1PCloop/.local/runs/20261002T023023Z-10810/cycle-02/reviewer-review/final.txt",
+  "reviewer_verdict_sha256": "ce64bbf7133876ea38d9416d769f5515c08286847195bb40fa351d05c66c81a1",
+  "schema_version": 1,
+  "target_head": "52237ae4ac893d7b46a8b0b48a10be137b90c6fc",
+  "timestamp": "2026-10-02T05:13:47.906+00:00",
+  "transition_id": "9899fb7ad8a4f3b01e1ad414ae0a1ff6bd7e62c58eb0b75e9b68f2d6951695c7"
+}
+```
