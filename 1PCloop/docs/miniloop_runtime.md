@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 READY FOR HUMAN MANUAL START`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 DRAFT-PRESERVING CONTINUATION AUTHORIZED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -53,10 +53,11 @@ Next-step document preparation
 = REL1C STATIC AUTHORIZED / RUNTIME ACTIVE REL1C1 / IMPLEMENTATION NOT EVALUATED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
-= HUMAN MANUAL START PENDING / NO PRODUCTION RELEASE ACTION
+= C1 TWO REJECTS THEN USAGE-LIMIT FAILURE / NEW-ACCOUNT CONTINUATION AUTHORIZED
+= NO PRODUCTION RELEASE ACTION
 
 Current C1 operator configuration
-= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1c1.json
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1c1_continuation_01.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
 = TURN TIMEOUT 3600s / MAX CYCLES4 / ONLY C1 ARTIFACT-HUMAN-GATE-NOTES IMPLEMENTATION
 
@@ -114,6 +115,18 @@ a self-handoff. Only REL1C1 is activated, with independent config/state and one
 reviewer_accept_once transition; C2/C3 remain queued. The assistant prepares and
 checks configuration without starting an Agent. Production deployment/transport,
 formal build, final artifact Human PASS, tag/API/publication remain separately gated.
+
+Human-started C1 run20261001T225813Z-10352 produced two tested ordinary
+commits and two explicit Reviewer REJECTs, then hit usage limit during the
+third narrow repair with three uncommitted files. Final state is
+FAILED_CLOSED/NOT_APPLIED/PUSHED, not acceptance. Human switched accounts
+and authorized continuation. Preserve the old checkpoint/account binding,
+raw evidence and dirty clone; use a new clean same-task clone at01cb904,
+hash-fixed three-path draft input, independent config/state and current-account
+binding. The assistant does not apply/accept the product draft; implementation
+and final review remain with1PCloop. Detailed rejection metadata and completion
+instructions are in REL1C Runtime sections12-13. C2/C3 and production gates
+remain unchanged; no direct terminal resume or cross-account replay is claimed.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

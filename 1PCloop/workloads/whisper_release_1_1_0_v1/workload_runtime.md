@@ -3,18 +3,18 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A AND REL1B ACCEPTED / REL1C1 ACTIVE / READY FOR HUMAN MANUAL START`。
+- 状态: `REL1A AND REL1B ACCEPTED / REL1C1 ACTIVE / DRAFT-PRESERVING CONTINUATION AUTHORIZED`。
 - Verdict: `NOT EVALUATED -- REL1C1 IMPLEMENTATION`；REL1A/REL1B的已接受结果不变，整个Step 1和发布未完成。
 - 唯一Active实施步骤: `REL1C1`，权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)。C2/C3保持QUEUED；真实Step 2-5未运行。REL1A/REL1B均已COMPLETED，模型失败及两次Executor超时全部保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-01，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human于2026-10-01明确批准REL1C并要求手动启动指令及交接；合同AUTHORIZED、C1 ACTIVE，启动仍由Human操作。生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
-- 最近已结束Config: `workload_rel1b_continuation_03.json`，run `20261001T063859Z-6937`，机器ACCEPT，三层COMMITTED/APPLIED/PUSHED。旧3600s超时见子Runtime第15节，本次及独立接受见第17节；不resume终态，所有旧config/checkpoint保留。
-- 当前启动Config: [workload_rel1c1.json](workload_rel1c1.json)，独立state root `1PCloop/.local/state/whisper_release_1_1_0_v1-rel1c1`；新run ID，不reuse或resume旧REL1B终态。
+- 执行门禁: Human于2026-10-01批准并手动启动REL1C1，额度中断后换号并授权助手继续；合同AUTHORIZED、C1 ACTIVE。当前改用保留草稿的新run，不改旧账号binding。生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
+- 最近已结束Config: `workload_rel1c1.json`，run `20261001T225813Z-10352`，两次REJECT后第三次repair额度用尽，FAILED_CLOSED/NOT_APPLIED/PUSHED。REL1B accepted结果不变；原config/checkpoint/dirty target保留。
+- 当前启动Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，独立state root `1PCloop/.local/state/whisper_release_1_1_0_v1-rel1c1-continuation-01`；新run绑定换号后当前active账号，继承同C1目标，不resume旧终态或跨账号改旧binding。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 隔离目录: `/Users/smterpro/Downloads/whisper-release-1.1.0.zFGKQr`；C1沿用其 `implementation-rel1b-continuation-02/`，branch `codex/release-1-1-0-automation`，clean启动HEAD `91e547918a20383f9dc938440db890a7dae85226`。原dirty目录/archive和用户worktrees不变；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，clean启动HEAD `01cb90414350eff310996db6f299cb32b644d298`。原implementation-rel1b-continuation-02的三文件dirty草稿已固定patch供Executor审查，原件和用户worktrees不动；不是正式release_source。
 
 ## 2. 已完成的准备与直接事实
 
@@ -227,7 +227,7 @@ Static SHA-256: `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a
 
 在 1b 接受后，完成正式 build 与 1a 绑定、durable artifact/extraction、可信精确 Human receipt、字节安全生产 gh adapter、tag/draft/upload/public download/latest verification、恢复与 docs completion；补齐完整失败矩阵和 end-to-end disposable workflow fixture，独立 review全 Step 1 合同再进入真实 Step 2。没有真实 Human PASS 前不能进行公开发布。
 
-Owner已批准 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md) 及三循环编排，仅C1 ACTIVE/READY FOR MANUAL START；C2/C3仍QUEUED。独立config/C1 machine block准备完毕，未由助手启动run。当前授权仅实现/测试/审核，不部署生产trust/transport或正式build/publish。
+Owner已批准 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md) 及三循环编排，仅C1 ACTIVE；C2/C3仍QUEUED。首轮两次REJECT和usage-limit中断见子Runtime第12节，换号后已授权草稿保留延续，当前config/新target见第13节。当前授权仅实现/测试/审核，不部署生产trust/transport或正式build/publish。
 
 ## 17. REL1A machine acceptance 与本对话独立复核
 
@@ -292,6 +292,12 @@ Human询问下一阶段是否需要1PCloop，并要求需要时准备Static/Runt
 Human随后明确"批准启动，给出启动指令；然后写一个交接文档-给你自己看"。据此REL1C Static转AUTHORIZED、重新固定hash，Runtime唯一REL1C1 ACTIVE，创建workload_rel1c1.json和独立state identity；C2/C3不在本run实施。沿用Reviewer6.1-sol/xhigh、Executor6.1-sol/high及受事务保护Codex Mix active quota，未改role配置或账号。
 
 准备目标clean91e5479，newrun/newstate，无retry字段。仅C1一次machine ACCEPT -> COMPLETED、next_active_step=null；machine结果仍需本对话独立复核，不等于整个REL1C或发布完成。实际doctor/preflight以提交push后的最新refs为准；助手不调用Agent或启动循环。父Static、REL1A/REL1B封存状态及旧失败证据不变，PT-REL-01仍k1/remaining1待C1实施和审核。生产部署/transport/实际App/ZIP/tag/API仍不在本轮授权内。
+
+## 26. C1两次REJECT、额度中断与换号延续 -- 2026-10-01
+
+首轮run20261001T225813Z-10352在focused127/full231和focused139/full243全绿后仍分别被Reviewer拒绝build/helper/ZIP对应缺口与真实uv cache lock兼容缺口；独立路线和证据详见子Runtime第12节。第三次repair未提交便usage limit，未取得新verdict，FAILED_CLOSED/NOT_APPLIED/PUSHED不是实施接受。
+
+Human换号后授权继续。为不改旧binding/checkpoint或丢草稿，准备同任务fresh continuation: clean clone01cb904、三路径patch固定SHA、新config/state/current-account绑定。助手只保存/检查patch，代码应用、测试、commit仍交1PCloop；没有把草稿提交为accepted或从零重写。Static、封存REL1B与历史evidence不变，唯一C1 ACTIVE，PT-REL-01仍待独立接受，不激活C2或真实发布。恢复完成前保留原dirty clone与新Downloads目录，稍后提醒Human有界清理。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
