@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 DRAFT-PRESERVING CONTINUATION AUTHORIZED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 INDEPENDENT REJECT / REPAIR REQUIRED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -46,17 +46,17 @@ Most recently closed engineering task
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
 = REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
-= REL1C AUTHORIZED / REL1C1 ONLY ACTIVE / C2 AND C3 QUEUED
+= REL1C AUTHORIZED / C1 MACHINE ACCEPTED BUT INDEPENDENT REJECT / C2 AND C3 QUEUED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1C STATIC AUTHORIZED / RUNTIME ACTIVE REL1C1 / IMPLEMENTATION NOT EVALUATED
+= REL1C STATIC AUTHORIZED / C1 BOUNDED REPAIR REQUIRED / NO NEW RUN ACTIVE
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
-= C1 TWO REJECTS THEN USAGE-LIMIT FAILURE / NEW-ACCOUNT CONTINUATION AUTHORIZED
+= C1 PRIOR FAILURES PRESERVED / LATEST MACHINE ACCEPT THEN INDEPENDENT REJECT
 = NO PRODUCTION RELEASE ACTION
 
-Current C1 operator configuration
+Most recently completed C1 operator configuration (historical, not resumable implementation)
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1c1_continuation_01.json
 = REVIEWER gpt-6.1-sol/xhigh / EXECUTOR gpt-6.1-sol/high
 = TURN TIMEOUT 3600s / MAX CYCLES4 / ONLY C1 ARTIFACT-HUMAN-GATE-NOTES IMPLEMENTATION
@@ -127,6 +127,18 @@ binding. The assistant does not apply/accept the product draft; implementation
 and final review remain with1PCloop. Detailed rejection metadata and completion
 instructions are in REL1C Runtime sections12-13. C2/C3 and production gates
 remain unchanged; no direct terminal resume or cross-account replay is claimed.
+
+Continuation run20261002T023023Z-10810 was resumed manually after host shutdown
+and verified authentication recovery. Machine Reviewer rejected native wheel-cache
+directory links, then accepted repaired52237ae after Executor5/251 passed. The
+machine transition and terminal evidence are preserved. Independent review on
+2026-10-02 verified cumulative source/evidence and six local probes but REJECTED
+the original Python acquisition/controller path: successful uv lock --check --offline
+adds an interpreter cache record after C1 freezes its snapshot, causing its own
+ENVIRONMENT_CHANGED refusal before Runtime. Three fresh fixtures reproduce it.
+Independent full was interrupted with168 completed OK lines, not a full PASS.
+Details: REL1C Runtime sections14-15 and whisper-release-rel1c1-independent-review-20261002.md.
+No new repair config/run or C2 activation was performed; production gates remain.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

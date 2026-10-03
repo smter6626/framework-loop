@@ -5,11 +5,11 @@
 发布工具的"版本与验包基础层"和"合并管理员"已经审核通过。下一步不是你马上测App，而是让1PCloop补完构建、人工批准和发布管理员。代码完成并审核后，才真正集成/构建，再交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `ACTIVE / REL1C1 DRAFT-PRESERVING CONTINUATION AUTHORIZED`。
-- Verdict: `NOT EVALUATED -- REL1C1 IMPLEMENTATION`；唯一Active Step: `REL1C1`。
-- C1已获批准并激活；C2/C3保持QUEUED，每步machine + 本对话独立接受后才能继续，不在本run一起实现。
+- 状态: `REL1C1 MACHINE ACCEPTED / INDEPENDENT REJECT / BOUNDED REPAIR REQUIRED`。
+- Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；C1未通过最终独立验收。历史machine block已COMPLETED，不回滚或改写；当前无运行中的Active Agent step，待准备新的有界repair状态/config。
+- C2/C3保持QUEUED；C1独立re-review通过前不得激活，不将机器ACCEPT当作整个阶段通过。
 - Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `ba7a0213b5040917c4cf9677bd30983a9bdc8810ce4f793f252e46608b0de077`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
-- 最后更新: 2026-10-01，America/Phoenix。
+- 最后更新: 2026-10-02，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -42,7 +42,7 @@ C1/C2/C3是父Step 1的子步骤，不消耗顶层pending倒计时。各自使�
 
 生产执行仍依父计划: 整体Step 1通过 + Owner部署/transport决定 -> Step 2受控集成并固定main source -> Step 3正式build/ZIP自动验包 -> Step 4你验收该ZIP中的App -> Step 5只发布同一ZIP。不是普通Agent loop一接受就直接发布。
 
-## 4. 唯一Active Step REL1C1 -- 精确执行范围
+## 4. REL1C1原执行范围 -- 未最终接受，新的修复要求见第15节
 
 Objective: 完成可测试的artifact/Human gate控制层及notes绑定。初始91e5479上的两次候选已到01cb904，当前只延续最后cache-lock缺口及未提交草稿，详见第13节；不重新实现已完成部分，不扩大到C2/C3。
 
@@ -106,7 +106,7 @@ C1/C2/C3不推进顶层k。Step 2前必须先整体Step 1接受及部署/transpo
 
 ## 8. Independent Review初始状态
 
-REL1C1已有两次候选与两次明确REJECT，尚无实施ACCEPT。当前结论为 `REJECT / REPAIR INCOMPLETE`，详见第12节。Reviewer必须直接检查实际代码、artifact/test输出和独立反例，不能继承Executor全绿或旧REL1B结论。每个子步骤机器接受后仍有本对话独立复核；C3检查全父合同的实现coverage，而不是直接宣布真实发布AC全通过。
+REL1C1首轮两次REJECT、额度失败及延续run的新REJECT/REPAIR/机器ACCEPT分别见第12和14节。本对话独立复核又发现原Python获取/验证副作用缺口，当前权威结论是 `INDEPENDENT REJECT / REPAIR REQUIRED`，详见第15节。不能继承Executor全绿、机器ACCEPT或旧REL1B结论。C3检查全父合同的实现coverage，而不是直接宣布真实发布AC全通过。
 
 本C1 run只判定C-AC-01至04，以及C-AC-07的build/artifact/Human gate恢复和C-AC-08的notes/说明/回归局部coverage。C-AC-05/06的GitHub发布、C-AC-07的远端恢复及C-AC-08全链验收明确留给C2/C3，不能因为本轮未实现未来步骤而要求Executor顺带完成它们，也不能把局部ACCEPT写成全部C-AC已通过。
 
@@ -120,7 +120,7 @@ REL1C1已有两次候选与两次明确REJECT，尚无实施ACCEPT。当前结�
 
 ## 10. 下一步及状态迁移
 
-Previous: REL1A/REL1B accepted；REL1C获授权后首轮实施遭两次REJECT，第三次repair因额度用尽中断。Current: REL1C AUTHORIZED、唯一REL1C1 ACTIVE，Human已换号并授权延续；当前config及草稿恢复路线以第13节为准。
+Previous: REL1A/REL1B accepted；REL1C1首轮失败后延续run机器ACCEPT。Current: 本对话独立REJECT，等待窄repair准备和新run。第13节是已结束延续配置，不直接run/resume它；C2/C3和真实发布仍QUEUED。
 
 本轮固定授权后Static hash、独立C1 config/state、核target/refs/doctor/preflight并给指令。Human自行启动，助手不在本次调用Agent；完成后本对话独立审核，再准备下一子步骤。旧REL1B terminal config不能resume或拿来启动C1。
 
@@ -155,7 +155,7 @@ Run `20261001T225813Z-10352`，原target为implementation-rel1b-continuation-02�
 - 旧checkpoint SHA-256 `3203348452d27dbf38165a7be46e53e9f2b8250accc9b6913387c4324dc430a0`；旧manifest `2ffbcd27d4e1b61e9684183faca4d7d0e2cf25e60f52ac6a26f993e7a7356188`。不为了resume匹配而修改其中account/config/governance/cycle。
 - 第三轮role auth restored=true，active_identity_unchanged=true，actual_credential_hits=0。此事实不授权旧run换账号继续；下一新run独立绑定当前账号。
 
-## 13. 当前延续入口与精确执行路线
+## 13. 已结束延续入口与精确执行路线 -- 历史
 
 Human在换号后明确要求resume。已结束的旧run只能核验/收尾，不能重播第三轮；旧账号binding和dirty约束也不能绕过。按原同任务草稿保留模式准备fresh continuation，不使用strict retry字段: target路径及初始HEAD不同于旧checkpoint的initial target，不符合validate_retry_preflight条件。没有修改Static、runner、认证或旧失败历史。
 
@@ -184,6 +184,34 @@ Human在换号后明确要求resume。已结束的旧run只能核验/收尾，�
 6. 普通后继commit只包含三allowlisted路径，clean后返回完整schema-valid receipt。不要push/merge/tag/API、正式App build、信任部署、改治理或accept自己。
 
 最终Reviewer检查当前实际代码和新证据，重跑独立native-lock/controller反例，按C1局部AC判定；通过只推进下面REL1C1 machine block，不激活C2或授予生产artifact PASS。助手独立验收仍在机器接受之后。
+
+## 14. 延续run恢复、再次REJECT与机器ACCEPT -- 历史事实
+
+Run `20261002T023023Z-10810`初始instruction在约6.8分钟因宿主退出中断，非额度错误；没有Executor mutation。预检恢复一份认证事务，Human在系统终端resume同账号A，未完成instruction以attempt-02重跑，旧attempt保留。
+
+- Cycle1 commit `46eb6545e92fd833a6ed2f2814f4b4c262eb4f55`只三allowlisted路径。Executor准确回报partial: workflow16/16、broader92项有4个inside-source TMPDIR触发的ZIP guard错误、修正outside-source ZIP18/18、full未运行。Reviewer核34证据/97源码/10,563环境后仍REJECT: 真uv offline安装synthetic wheel产生合法wheels-v6目录link，snapshot误拒绝；signed synthetic controller包含该link后不能进入Runtime。
+- Cycle2普通后继 `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`仍只三路径，selected5/5、240.664s；full strict251/251、2008.293s、exit0。97源码、19,158环境和98项证据匹配；机器Reviewer验证native cache/controller/ZIP反例后ACCEPT C1-local。
+- 五turn成功，原Reviewer同threadresume verified，Executor隔离ephemeral；账号A，auth restored/identity unchanged/actual hits0，无残留事务。
+- Final `RUNTIME_TRANSITION_COMMITTED / APPLIED / PUSHED`，exit0；framework evidence `072980ffa4277a65df2333df2d8cdc36250d3ad5`；[summary](../../evidence-summaries/20261002T023023Z-10810.md)。
+- transition `9899fb7ad8a4f3b01e1ad414ae0a1ff6bd7e62c58eb0b75e9b68f2d6951695c7`。原preimage ada47cdf.../postimage590ab390...、machine record、run checkpoint/manifest原样保留；本文治理后bytes正常变化，不重写旧postimage使之匹配。
+
+## 15. 本对话独立REJECT元信息 -- 2026-10-02
+
+Verdict: `REJECT -- REL1C1 IMPLEMENTATION AT 52237ae4ac893d7b46a8b0b48a10be137b90c6fc`。
+
+直接核四个普通后继/20个累计changed paths及完整C1/相关正式build、ZIP、trust、receipt依赖；核6项verdict evidence、97source/current/committed blobs、98Executor evidence、实际5/251测试日志及hash、machine preimage/postimage、role/thread/auth恢复。没有直接采纳全绿作为验收。
+
+新Downloads root `/Users/smterpro/Downloads/rel1c1-fixtures.independent-review.7tQftM`完成六项独立局部probe: 真uv两个offline wheels/中文文件、实际six-checkpoint synthetic controller/原ZIP链/只读status、同bytes不同inode cache替换拒绝、signed/rehashed Frameworks ZIP/App mismatch拒绝、伪造HUMAN_RECORDED缺Owner receipt拒绝、四个生产命令缺trust拒绝。
+
+唯一已确认阻塞来自进一步走原始Python获取路径，而不是再次模拟空cache/uv输出。独立fixture在签署前补完整当前tracked源码，原bootstrap_python_env.sh实际获取固定uv0.12.5/Python3.12.14、frozen sync、环境smoke5/5通过。C1在after:python先冻结snapshot再复用Integration.verify_environment；它调用的uv lock --check --offline正常exit0并新增 `.tools/cache/interpreter-v4/<key>/<workspace-specific>.msgpack`，随后C1 exact proof误报ENVIRONMENT_CHANGED。三份新fixture均复现，最后命令级审计确定仅该uv lock验证新增文件。仅before:python完成、state BUILDING、未进入Runtime/App。
+
+这违反C-AC-02和C-AC-01正常受控链要求。不是凭据、额度、timeout或未授权正式build导致，不能把正常验证副作用解释为恶意漂移。既有native wheel tests使用旧已获取interpreter，synthetic uv不会产生解释器缓存，故即使Executor251/251和机器ACCEPT仍漏掉本路线。
+
+本对话fresh strict曾启动，但前turn主动中断时测试进程停止，仅168个已完成OK行、无完整summary/result；明确 `INTERRUPTED / NOT PASS`，不写成168/168或251/251独立通过。已确认阻塞后不重复昂贵full以制造更多绿灯；修复后必须补组合正负向和fresh full。
+
+完整理由、实测逻辑、paths/hash和限制: [独立summary](../../evidence-summaries/whisper-release-rel1c1-independent-review-20261002.md)。原始机器结论与下方COMPLETED记录仍作为历史有效事实，但不授予C1独立接受或C2启动。PT-REL-01保持OPEN_NON_BLOCKING，Static/REL1A/B封存合同不变。
+
+窄repair要求: 默认仍只scripts/release_workflow.py、testCodes/test_release_workflow.py、PACKAGING.md。在C1明确处理trusted validation的新增解释器缓存，不exclude整cache、不跳lock check、不任意更新proof、不开caller-selected trust。既有inputs/source/tools须完整保留并验证，正常变化只在受控操作边界精确识别。原REL1B helper不直接修改，额外路径先bounded proposal。加入实际原Python获取+controller验证组合，保留所有cache/input drift、ZIP/App、receipt、恢复负向验证；不正式build、不做C2/C3/部署/API。下一步需新repair Runtime/config/state和新run，不能resume本已ACCEPT终态。本次只审核/记录，未准备或启动修复run。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
