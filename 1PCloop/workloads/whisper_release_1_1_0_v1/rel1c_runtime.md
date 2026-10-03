@@ -226,6 +226,17 @@ Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确pro
 - 已全文阅读自用handoff `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-rel1c1-native-cache-repair-subagent-handoff-20261003.md`，并重读实际父/子合同、独立拒绝记录和相关源码。handoff是恢复索引，不替代验收。
 - C2/C3仍QUEUED；PT-REL-01仍OPEN_NON_BLOCKING，顶层k=1不变；真实发布门禁未通过。此记录先于子Agent派发，不声称已完成测试或修复。
 
+## 17. 子Executor首版自检后主Reviewer再次REJECT -- 2026-10-03
+
+当前verdict: `REJECT -- NATIVE VERIFICATION TIME BUDGET`。仅针对本次未提交三路径修复，不回滚旧machine接受，不激活C2/C3。
+
+- Executor初版增加固定lock命令的一次性受限cache delta，并保留Python/version/prior-input检查。初版原生组合1/1、191.128s及20-shape/9-command边界两项294.093s通过；真实checkpoint约26-27s，只比原30s ack少约3s。
+- 主Reviewer独立首次原生获取/完整controller也通过六checkpoint，after:python26.923s、before:runtime26.730s、before:app26.698s、after:app26.597s。独立实际子进程七case确认合法新增通过、version新增/two-records/prior-cache-change/second-lock-replacement/lock-failure/extra-directory拒绝。这不是正式Runtime/App build。
+- 随后Executor按Reviewer要求补专属verifier进程组超时/后台子孙清理；真实owned-process小测试1/1、1.055s通过。最终候选 `release_workflow.py` SHA-256 `a233e5d6298d4ac89cdc3520c2a012f384f89a0ef71764be9b575c821e5fe891`，test SHA `af983e97fcc509e289bddb8b842685683fed5692aebf3e20a4929a2a89e2c1ce`，PACKAGING SHA `d6b57b7aeebc1e8cbb06df68467f7e1dac6f99e49cb578402423157202cd6a97`；baseline仍52237ae，未提交，不把初版结果继承为最终PASS。
+- 主Reviewer在新Downloads fixture对该最终候选重新获取固定uv/Python、执行原frozen sync/environment smoke，再走实际controller。仅加checkpoint耗时观察，没有跳gate或patch verifier。结果 `ENVIRONMENT_VERIFY_TIMEOUT`，events仅before:python、stateBUILDING，原smoke成功后未进入Runtime。与小型实际child反例同时运行，无full/formal build。正常本机负载下已复现新增20s budget缺口，不能归因为quota或宣称所有新增验证通过。
+- 直接失败证据: `/Users/smterpro/Downloads/rel1c1-fixtures.subagent-final-native-review.VHocNx/native-python-controller-result.json`；build log为该root下 `case-9adbde183d214e8895b8e582e42c6fe5/workflow/evidence/attempt-e380b81bbf2c4a7597141631ea7ddb64/build.log`。前版通过与七case在 `/Users/smterpro/Downloads/rel1c1-fixtures.subagent-independent-review.92QTtA/` 保留。主Reviewer首个正向fixture曾错误地每次重写既有msgpack，代码正确拒绝；修正fixture后正常通过，错误fixture/log独立保留，不冒充产品finding。
+- 已给同一子Executor窄repair instruction: 定位并减少重复source/Git/full-environment扫描，保留逐命令输入门禁、精确delta、最终冻结及30s ack/lifetime。禁止无限提高timeout、忽略失败或直接改accepted REL1B/shell；额外路径/协议变更先proposal。暂不准入昂贵full，修复后重新原生正负向与fresh strict。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
