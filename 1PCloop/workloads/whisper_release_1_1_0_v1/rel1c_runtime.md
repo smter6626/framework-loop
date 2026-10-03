@@ -217,7 +217,7 @@ Verdict: `REJECT -- REL1C1 IMPLEMENTATION AT 52237ae4ac893d7b46a8b0b48a10be137b9
 
 Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确prompt并控制一个Executor子智能体修复；本次再次明确授权"读完后继续，你来当reviewer启动subagent修复"。这只替换第15节末尾的新loop/config执行路线，不扩大Static、产品、认证或生产权限。
 
-- 修复状态: `AUTHORIZED / EXECUTOR DISPATCH PREPARATION`；独立verdict仍为REJECT，非ACCEPT。
+- 修复状态: `AUTHORIZED / SUBAGENT EXECUTOR RUNNING`；独立verdict仍为REJECT，非ACCEPT。委派任务名 `/root/c1_native_cache_repair`，主助手负责独立re-review；不是1PCloop角色thread或新的machine run。
 - 基线: target `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，HEAD `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`，直接检查clean。Framework main/local/origin为 `5fdeddaabe752c2dfad6922ea57242fb16ce30a0`，clean；本次治理提交正常前进。
 - 只修C1 trusted validation正常新增解释器缓存与exact snapshot冲突；默认仅 `scripts/release_workflow.py`、`testCodes/test_release_workflow.py`、`PACKAGING.md`。额外路径须先报告必要性/影响/回归，不直接修改已接受REL1B helper。
 - 保留完整已有input/cache/source/tool/interpreter身份，不排除整个cache、不任意接受post-snapshot、不跳lock验证；正常变化须在精确受控操作边界验证。补实际原Python获取 + lock-check + controller组合、负向漂移及fresh strict；Runtime/App可显式synthetic，不是正式build。
