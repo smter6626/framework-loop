@@ -2,14 +2,14 @@
 
 ## 1. 现在做到哪里，用人类语言说明
 
-发布工具的"版本与验包基础层"和"合并管理员"已经审核通过。下一步不是你马上测App，而是让1PCloop补完构建、人工批准和发布管理员。代码完成并审核后，才真正集成/构建，再交给你验收最终ZIP解压App。
+发布工具的"版本与验包基础层"和"合并管理员"已经审核通过。当前由主助手作为Reviewer、一个子Executor修复C1原生验证缓存缺口，不启动1PCloop。代码完成并独立审核后，才能继续后续实现；真正集成/构建后再交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
 - 状态: `REL1C1 MACHINE ACCEPTED / INDEPENDENT REJECT / BOUNDED REPAIR REQUIRED`。
-- Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；C1未通过最终独立验收。历史machine block已COMPLETED，不回滚或改写；当前无运行中的Active Agent step，待准备新的有界repair状态/config。
+- Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；C1未通过最终独立验收。历史machine block已COMPLETED，不回滚或改写；当前有界修复任务为 `C1-NATIVE-CACHE-REPAIR / ASSISTANT-REVIEWER + SUBAGENT-EXECUTOR`，不是新的machine run/config，详见第16节。
 - C2/C3保持QUEUED；C1独立re-review通过前不得激活，不将机器ACCEPT当作整个阶段通过。
 - Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `ba7a0213b5040917c4cf9677bd30983a9bdc8810ce4f793f252e46608b0de077`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
-- 最后更新: 2026-10-02，America/Phoenix。
+- 最后更新: 2026-10-03，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -212,6 +212,19 @@ Verdict: `REJECT -- REL1C1 IMPLEMENTATION AT 52237ae4ac893d7b46a8b0b48a10be137b9
 完整理由、实测逻辑、paths/hash和限制: [独立summary](../../evidence-summaries/whisper-release-rel1c1-independent-review-20261002.md)。原始机器结论与下方COMPLETED记录仍作为历史有效事实，但不授予C1独立接受或C2启动。PT-REL-01保持OPEN_NON_BLOCKING，Static/REL1A/B封存合同不变。
 
 窄repair要求: 默认仍只scripts/release_workflow.py、testCodes/test_release_workflow.py、PACKAGING.md。在C1明确处理trusted validation的新增解释器缓存，不exclude整cache、不跳lock check、不任意更新proof、不开caller-selected trust。既有inputs/source/tools须完整保留并验证，正常变化只在受控操作边界精确识别。原REL1B helper不直接修改，额外路径先bounded proposal。加入实际原Python获取+controller验证组合，保留所有cache/input drift、ZIP/App、receipt、恢复负向验证；不正式build、不做C2/C3/部署/API。下一步需新repair Runtime/config/state和新run，不能resume本已ACCEPT终态。本次只审核/记录，未准备或启动修复run。
+
+## 16. Human切换执行主体 -- 2026-10-03
+
+Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确prompt并控制一个Executor子智能体修复；本次再次明确授权"读完后继续，你来当reviewer启动subagent修复"。这只替换第15节末尾的新loop/config执行路线，不扩大Static、产品、认证或生产权限。
+
+- 修复状态: `AUTHORIZED / EXECUTOR DISPATCH PREPARATION`；独立verdict仍为REJECT，非ACCEPT。
+- 基线: target `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，HEAD `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`，直接检查clean。Framework main/local/origin为 `5fdeddaabe752c2dfad6922ea57242fb16ce30a0`，clean；本次治理提交正常前进。
+- 只修C1 trusted validation正常新增解释器缓存与exact snapshot冲突；默认仅 `scripts/release_workflow.py`、`testCodes/test_release_workflow.py`、`PACKAGING.md`。额外路径须先报告必要性/影响/回归，不直接修改已接受REL1B helper。
+- 保留完整已有input/cache/source/tool/interpreter身份，不排除整个cache、不任意接受post-snapshot、不跳lock验证；正常变化须在精确受控操作边界验证。补实际原Python获取 + lock-check + controller组合、负向漂移及fresh strict；Runtime/App可显式synthetic，不是正式build。
+- 子Executor只实施、测试、普通后继commit，不push target、不改治理/Static/auth、不自ACCEPT、不激活C2/C3、不正式build/部署/tag/API。主Reviewer核实际diff/evidence并独立反例复测，通过后才记录局部独立接受。
+- 旧machine COMPLETED、transition、checkpoint/manifest和所有REJECT/partial/failed证据原样保留；不伪造1PCloop run、same-thread机械receipt或machine ACCEPT。本次子Agent使用桌面委派，不手工读取/投影Codex Mix凭据。
+- 已全文阅读自用handoff `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-rel1c1-native-cache-repair-subagent-handoff-20261003.md`，并重读实际父/子合同、独立拒绝记录和相关源码。handoff是恢复索引，不替代验收。
+- C2/C3仍QUEUED；PT-REL-01仍OPEN_NON_BLOCKING，顶层k=1不变；真实发布门禁未通过。此记录先于子Agent派发，不声称已完成测试或修复。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

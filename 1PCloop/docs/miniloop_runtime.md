@@ -50,7 +50,7 @@ Current external engineering task
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1C STATIC AUTHORIZED / C1 BOUNDED REPAIR REQUIRED / NO NEW RUN ACTIVE
+= REL1C STATIC AUTHORIZED / C1 ASSISTANT-REVIEWER + SUBAGENT-EXECUTOR REPAIR / NO NEW LOOP RUN
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
 = C1 PRIOR FAILURES PRESERVED / LATEST MACHINE ACCEPT THEN INDEPENDENT REJECT
@@ -139,6 +139,13 @@ ENVIRONMENT_CHANGED refusal before Runtime. Three fresh fixtures reproduce it.
 Independent full was interrupted with168 completed OK lines, not a full PASS.
 Details: REL1C Runtime sections14-15 and whisper-release-rel1c1-independent-review-20261002.md.
 No new repair config/run or C2 activation was performed; production gates remain.
+
+On 2026-10-03 the Human Owner explicitly switched the narrow C1 cache repair to
+the main assistant as Reviewer and one Executor subagent, without starting1PCloop.
+Task-local REL1C Runtime section16 records the exact three-path scope, real Python
+acquisition/controller regression requirement and independent re-review gate.
+Historical machine COMPLETED/transition and rejected evidence remain unchanged;
+C2/C3, production deployment/build and release actions remain gated.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED

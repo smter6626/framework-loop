@@ -5,14 +5,14 @@
 - Task ID: `whisper_release_1_1_0_v1`
 - 状态: `REL1A AND REL1B ACCEPTED / REL1C1 MACHINE ACCEPTED BUT INDEPENDENT REJECT / REPAIR REQUIRED`。
 - Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；REL1A/REL1B的已接受结果不变，整个Step 1和发布未完成。
-- 当前方向: `REL1C1`窄repair准备，权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)。旧machine step已COMPLETED且不改写，目前无运行中Active Agent step；C2/C3保持QUEUED。真实Step 2-5未运行，历史失败和拒绝全部保留。
+- 当前方向: `REL1C1`窄repair由主助手Reviewer + 一个子Executor完成，Human于2026-10-03明确授权，不启动1PCloop。权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)第16节。旧machine step已COMPLETED且不改写；C2/C3保持QUEUED。真实Step 2-5未运行，历史失败和拒绝全部保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
-- 更新日期: 2026-10-02，America/Phoenix。
+- 更新日期: 2026-10-03，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: Human批准REL1C1及额度中断后的延续；该run现已机器结束，但C1独立REJECT，等待新窄repair准备，不改旧账号binding。生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT，COMMITTED/APPLIED/PUSHED；本对话独立REJECT，原因见子Runtime第15节。更早usage-limit失败/dirty target仍保留。
-- 当前无可启动的新repair config，不run/resume旧终态；后续新run需固定最新repair状态与当前账号，保留原binding/checkpoint/evidence。
+- 当前不准备或启动新repair config/run，不run/resume旧终态；采用桌面子Agent修复、主助手独立复核，保留原binding/checkpoint/evidence。该执行主体切换不授予新生产权限，也不伪称为machine ACCEPT。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
 - 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，独立复核HEAD `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`，clean；原延续启动HEAD01cb904。原implementation-rel1b-continuation-02的dirty草稿和固定patch保留，用户worktrees不动；不是正式release_source。
 
