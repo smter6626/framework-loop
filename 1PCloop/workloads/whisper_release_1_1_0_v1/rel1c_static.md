@@ -64,7 +64,7 @@ REL1C交付的是实现、测试和操作说明。它不是实际生产集成、
 
 ## 5. 可修改范围与变更控制
 
-允许范围是产品仓库的release workflow/helper、直接测试、notes及直接身份绑定、双语README/PACKAGING/repo_map。每次loop只处理Runtime所编译的一项，Reviewer须固定具体路径，不能一次实现整个REL1C。
+允许范围是产品仓库的release workflow/helper、直接测试、notes及直接身份绑定、双语README/PACKAGING/repo_map。原安排为每次loop只处理Runtime所编译的一项。Human于2026-10-03明确将C2/C3及人工验收前工作合并交付，改由主助手Reviewer控制一个桌面Executor子智能体；因此允许在C1已接受基线上联合实现C2/C3，Reviewer仍须固定具体路径、检查耦合及独立审核。此安排替代原小循环交付方式，不启动新1PCloop、不扩大生产trust/认证权限、不取消内部阶段门禁或最终artifact Human PASS。
 
 直接耦合到accepted基础层时，先说明必要性和影响，保留旧安全性质及回归。更改父/已关闭子Static、framework、认证、pins、产品行为、可信来源/签名路线或真实外部权限均需要新Owner决定；不由Runtime静默批准。
 

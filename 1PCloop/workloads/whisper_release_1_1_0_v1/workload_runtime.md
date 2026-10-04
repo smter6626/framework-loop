@@ -3,16 +3,16 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A AND REL1B ACCEPTED / REL1C1 INDEPENDENTLY ACCEPTED / REL1C2 AND REL1C3 QUEUED`。
+- 状态: `REL1A/B/C1 ACCEPTED / C2-C3 COMBINED IMPLEMENTATION ACTIVE`。
 - Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`；整个Step 1和发布未完成。
-- 当前方向: `REL1C1`主助手Reviewer + 子Executor窄repair已独立接受并关闭，未启动1PCloop。权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)第16-18节。旧machine step已COMPLETED且不改写；C2/C3保持QUEUED、尚未启动。真实Step 2-5未运行，历史失败和拒绝全部保留。
+- 当前方向: C1-local已独立接受；Human明确合并C2/C3和人工验收前自动化，由主助手Reviewer + 一个新桌面子Executor继续，不启动1PCloop。权威安排见 [rel1c_runtime.md](rel1c_runtime.md)第19节。旧machine COMPLETED/记录不改；真实Step 2-5尚未运行，敏感部署/认证与精确artifact Human gate保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-03，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: Human批准REL1C1、旧延续及主Reviewer/子Executor修复。最新C1-local已独立接受，不改旧run/account binding；生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
-- 当前无active repair Agent/run；不run/resume旧终态，保留原binding/checkpoint/evidence。C2/C3等待下一步安排，执行主体切换不授予新生产权限。
+- 当前唯一桌面任务为C2-C3联合实现；不run/resume旧terminal配置，保留原binding/checkpoint/evidence，不自授生产权限。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
 - 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新独立接受HEAD `5d33416af100a480f8a43f345a163b3b02e696f1`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
@@ -316,6 +316,12 @@ Human明确改用桌面委派，不启动1PCloop。同一子Executor完成三路
 PT-REL-01的候选notes语义、三个固定hash及direct tests独立接受，登记RESOLVED；顶层k=1不变。旧machine records、原preimage/postimage/CP/manifest及所有失败不改，未构造新machine ACCEPT或覆写历史。REL1A/REL1B封存合同与Static不变。
 
 C1-local关闭，C2/C3仍QUEUED/未启动，整体Step 1未关闭；生产trust/transport、真实集成/build/最终ZIP Human PASS/tag/API/publication仍未完成。测试目录继续用于活跃任务审计，不自动清理。
+
+## 29. C2/C3与人工验收前工作联合执行 -- 2026-10-03
+
+Human批准主Reviewer + 一个新桌面Executor合并交付，详见子Runtime第19节及同步的子Static编排条款。先C2 adapter/C3串联实现与local验证，独立接受后才进入实际生产门禁。父Static、安全边界、旧machine块/transition、所有拒绝历史及PT-REL-01 RESOLVED原样保留，顶层k=1不变。
+
+当前生产trust/entry/签署receipt及Git/gh transport未部署/验证，需具体Owner决定后才能真实集成/build；最终ZIP Human PASS前禁止真实tag/draft/upload/publication。尚无正式产物，不把统一交付批准写成发布或人工验收通过。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

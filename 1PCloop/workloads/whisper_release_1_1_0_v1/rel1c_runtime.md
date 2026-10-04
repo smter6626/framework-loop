@@ -2,13 +2,13 @@
 
 ## 1. 现在做到哪里，用人类语言说明
 
-发布工具的"版本与验包基础层"、"合并管理员"和C1构建/人工批准控制层已独立审核通过。C1最后缓存修复由主助手Reviewer + 一个子Executor完成，未启动1PCloop。下一项是尚未启动的C2发布adapter，再由C3补全串联；整个实现通过且真正集成/构建后，才交给你验收最终ZIP解压App。
+发布工具的"版本与验包基础层"、"合并管理员"和C1构建/人工批准控制层已独立审核通过。Human已批准将C2/C3和人工验收前自动化合并交付，继续由主助手Reviewer + 一个新桌面子Executor执行，不启动1PCloop。先完成并审核实现，再处理生产部署/认证门禁；真正集成/构建后才交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `REL1C1 INDEPENDENTLY ACCEPTED / LOCAL IMPLEMENTATION CLOSED / C2 AND C3 QUEUED`。
+- 状态: `C1 INDEPENDENTLY ACCEPTED / C2-C3 COMBINED IMPLEMENTATION ACTIVE`。
 - Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`。最后修复为主助手Reviewer + 桌面子Executor，非新machine run/config；历史machine COMPLETED/transition原样保留，不将旧52237ae机器接受伪造为新提交的machine verdict。详见第16-18节。
-- C2/C3保持QUEUED，未启动或自动激活；整个REL1C、父Step 1和发布未完成。
-- Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `ba7a0213b5040917c4cf9677bd30983a9bdc8810ce4f793f252e46608b0de077`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
+- 唯一当前桌面任务为C2-C3联合实现，详见第19节；不是旧machine block激活。整个REL1C、父Step 1和发布未完成。
+- Static: [rel1c_static.md](rel1c_static.md)，当前SHA-256 `c5992a640555c421e782f840591c0bb15842b05702baacda1f2e8ca970bfa810`；原编排版本hash ba7a0213...只用于历史。父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 最后更新: 2026-10-03，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
@@ -30,7 +30,7 @@ REL1B曾模型拒绝、1800s与3600s超时。最后复用已核验evidence、补
 - 当前gh `/opt/homebrew/bin/gh`，version2.96.0；只查version/help，未检查或读取登录凭据、未运行真实API。
 - 当前无正式新App/ZIP、Human artifact PASS或发布对象验收。生产trust/entry与认证transport未部署/验证，REL1B的local bare成功不能补足这些事实。
 
-## 3. 已批准编排 -- 三个小循环，不一次做完
+## 3. 原三循环编排 -- 历史，当前合并安排见第19节
 
 | 子步骤 | 唯一交付 | Gate与后续 |
 | --- | --- | --- |
@@ -249,6 +249,22 @@ Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确pro
 - 仅接受C1-local AC-01至04、AC-07本地恢复、AC-08 notes/回归部分，不接受C2/C3、完整父Step 1、生产trust/transport或真实App/ZIP/Human PASS/发布。旧machine block/transition/checkpoint/manifest、历史REJECT与中断证据不改。
 - 候选notes已逐段复核，三个固定hash同步且直接tests通过；父PT-REL-01可RESOLVED，k仍1。这里仅引用父pending authority，不建立新倒计时。
 - 当前无active子Executor/1PCloop run；C2/C3尚未启动，等待下一步安排。Downloads审计目录保持，不自动清理。
+
+## 19. Human批准C2/C3及人工验收前工作合并交付 -- 2026-10-03
+
+Human先要求"下一步C2和人工验收前的所有其他步骤一起合并做掉，还是你来做reviewer，模仿1pcloop启动Executer"，本次明确要求读handoff后继续。已全文阅读 `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-c2-c3-prehuman-combined-subagent-handoff-20261003.md`，并重读实际父/子合同、Runtime、C1最终独立summary与发布依赖。
+
+- 唯一当前任务: `C2-C3 COMBINED IMPLEMENTATION ACTIVE`。一个新桌面子Executor实施，主助手独立review/REJECT/repair；非1PCloop run，不改旧machine state/transition/account/evidence。原第3/10节小循环及手动启动安排被本决定替代，验收及权限不放宽。
+- 派发前直接核framework main/local/origin `d7948068de061d48e6ae69285ff675a48a02c564` clean；target `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，HEAD `5d33416af100a480f8a43f345a163b3b02e696f1` clean。产品GitHub main只读快照仍d0f581bb70379239c3147e5c8469d2285ad6620b，不据此永久假设refs不变。
+- 交付: 固定GitHub adapter和恢复、REL1B/C1/C2统一受控入口、真实fake-gh子进程/本地bare全链、全父AC实现coverage和生产部署/人工验收说明。C1已接受缓存/20s验证/30s ack与原build/ZIP边界不放宽；REL1B默认scope保持不变。
+- 初始产品allowlist: scripts/release_approval.py、release_workflow.py、release_workflow_state.py；新增scripts/release_publication.py、release_publication_state.py、release_pipeline.py；对应testCodes/test_release_approval.py、test_release_workflow.py、test_release_workflow_state.py与三个新增test_release_publication.py、test_release_publication_state.py、test_release_pipeline.py；README.md、README.zh-CN.md、PACKAGING.md、repo_map.md。新增helpers需实际职责，不强制制造空模块。其余已接受底层如必须耦合，先具体proposal、由Reviewer检查后记录补充，不静默扩大。
+- Executor只实现/测试/本地普通后继commit，不写治理、不自ACCEPT、不push target、不真实merge/tag/API、不正式build、不读取个人凭据/生产key或部署trust。测试仅新Downloads fixture、本地bare、fixture key/synthetic App/fake gh；真实GitHub接口以本机gh2.96.0 help及官方文档核对，argv/stdin直接实测，不凭mock返回全绿。
+- 测试顺序: 小反馈和策略审阅 -> 独立反例 -> 最终源一次fresh strict全量及source/environment前后绑定；当前255项约44分钟，避免重复昂贵全套或未完成伪PASS。后续改码须重验实际最终字节，不继承旧全绿。
+- 实现独立通过后检查生产trust/entry/签署receipt与Git/gh transport具体缺口。当前未部署/验证；合并任务不授权sudo信任根、选择个人key/token或放松隔离。所需新敏感权限必须Human明确决定；已批准的无敏感实现继续进行，不以未来gate放弃本步。
+- 门禁齐备后仅通过已审核controller实际集成、固定main source、fresh formal App/ZIP、自动验包，停在父Step4。当前没有正式ZIP或Human PASS；真实tag/draft/upload/publish/latest严格在精确artifact Human PASS后，不能提前执行。
+- PT-REL-01仍RESOLVED，k=1不变；C1接受与所有REJECT/partial/失败历史保留。父Static及封存REL1A/B不改；子Static仅同步Human明确批准的合并交付/执行主体文字，不改变安全合同。
+
+以上是派发安排，不是实现、测试、整体Step1或发布验收。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
