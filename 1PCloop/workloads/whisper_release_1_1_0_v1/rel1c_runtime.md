@@ -2,12 +2,12 @@
 
 ## 1. 现在做到哪里，用人类语言说明
 
-发布工具的"版本与验包基础层"和"合并管理员"已经审核通过。当前由主助手作为Reviewer、一个子Executor修复C1原生验证缓存缺口，不启动1PCloop。代码完成并独立审核后，才能继续后续实现；真正集成/构建后再交给你验收最终ZIP解压App。
+发布工具的"版本与验包基础层"、"合并管理员"和C1构建/人工批准控制层已独立审核通过。C1最后缓存修复由主助手Reviewer + 一个子Executor完成，未启动1PCloop。下一项是尚未启动的C2发布adapter，再由C3补全串联；整个实现通过且真正集成/构建后，才交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `REL1C1 MACHINE ACCEPTED / INDEPENDENT REJECT / BOUNDED REPAIR REQUIRED`。
-- Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；C1未通过最终独立验收。历史machine block已COMPLETED，不回滚或改写；当前有界修复任务为 `C1-NATIVE-CACHE-REPAIR / ASSISTANT-REVIEWER + SUBAGENT-EXECUTOR`，不是新的machine run/config，详见第16节。
-- C2/C3保持QUEUED；C1独立re-review通过前不得激活，不将机器ACCEPT当作整个阶段通过。
+- 状态: `REL1C1 INDEPENDENTLY ACCEPTED / LOCAL IMPLEMENTATION CLOSED / C2 AND C3 QUEUED`。
+- Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`。最后修复为主助手Reviewer + 桌面子Executor，非新machine run/config；历史machine COMPLETED/transition原样保留，不将旧52237ae机器接受伪造为新提交的machine verdict。详见第16-18节。
+- C2/C3保持QUEUED，未启动或自动激活；整个REL1C、父Step 1和发布未完成。
 - Static: [rel1c_static.md](rel1c_static.md)，SHA-256 `ba7a0213b5040917c4cf9677bd30983a9bdc8810ce4f793f252e46608b0de077`；父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 最后更新: 2026-10-03，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -100,13 +100,13 @@ Required evidence: 修改逻辑和依赖影响、精确diff/commit/parent/allowl
 
 | ID | 内容 | deadline / k / remaining | 状态与关闭条件 |
 | --- | --- | --- | --- |
-| PT-REL-01 | notes事实/新增旧功能区分/GUI说明 | 3 / 1 / max(3-1-1,0)=1 | OPEN_NON_BLOCKING；拟在C1修正notes及固定hash/tests并独立接受，再由父Runtime登记RESOLVED。未实施前不关闭。 |
+| PT-REL-01 | notes事实/新增旧功能区分/GUI说明 | 原deadline3，k=1不变；已关闭 | RESOLVED；C1候选notes/hash/direct tests独立接受，父Runtime第28节登记。不是公开Release或artifact Human PASS。 |
 
 C1/C2/C3不推进顶层k。Step 2前必须先整体Step 1接受及部署/transport门禁就绪；Step 3前PT-REL-01必须RESOLVED。没有为赶进度延期或把它改为永久pending。
 
 ## 8. Independent Review初始状态
 
-REL1C1首轮两次REJECT、额度失败及延续run的新REJECT/REPAIR/机器ACCEPT分别见第12和14节。本对话独立复核又发现原Python获取/验证副作用缺口，当前权威结论是 `INDEPENDENT REJECT / REPAIR REQUIRED`，详见第15节。不能继承Executor全绿、机器ACCEPT或旧REL1B结论。C3检查全父合同的实现coverage，而不是直接宣布真实发布AC全通过。
+REL1C1首轮两次REJECT、额度失败及延续run的新REJECT/REPAIR/机器ACCEPT分别见第12和14节。第15节独立REJECT后，Human切换为主Reviewer + 子Executor修复；第17节另一次超时REJECT也保留。最终C1局部独立ACCEPT见第18节，不能继承旧全绿或扩张为完整Step 1/发布接受。C3仍需检查全父合同的实现coverage。
 
 本C1 run只判定C-AC-01至04，以及C-AC-07的build/artifact/Human gate恢复和C-AC-08的notes/说明/回归局部coverage。C-AC-05/06的GitHub发布、C-AC-07的远端恢复及C-AC-08全链验收明确留给C2/C3，不能因为本轮未实现未来步骤而要求Executor顺带完成它们，也不能把局部ACCEPT写成全部C-AC已通过。
 
@@ -120,7 +120,7 @@ REL1C1首轮两次REJECT、额度失败及延续run的新REJECT/REPAIR/机器ACC
 
 ## 10. 下一步及状态迁移
 
-Previous: REL1A/REL1B accepted；REL1C1首轮失败后延续run机器ACCEPT。Current: 本对话独立REJECT，等待窄repair准备和新run。第13节是已结束延续配置，不直接run/resume它；C2/C3和真实发布仍QUEUED。
+Previous: REL1A/REL1B accepted；C1旧machine ACCEPT后独立REJECT，最后通过主Reviewer/子Executor修复独立ACCEPT。Current: C1局部实现关闭，C2/C3仍QUEUED。第13节是历史配置，不run/resume它；真实发布未激活。
 
 本轮固定授权后Static hash、独立C1 config/state、核target/refs/doctor/preflight并给指令。Human自行启动，助手不在本次调用Agent；完成后本对话独立审核，再准备下一子步骤。旧REL1B terminal config不能resume或拿来启动C1。
 
@@ -217,7 +217,7 @@ Verdict: `REJECT -- REL1C1 IMPLEMENTATION AT 52237ae4ac893d7b46a8b0b48a10be137b9
 
 Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确prompt并控制一个Executor子智能体修复；本次再次明确授权"读完后继续，你来当reviewer启动subagent修复"。这只替换第15节末尾的新loop/config执行路线，不扩大Static、产品、认证或生产权限。
 
-- 修复状态: `AUTHORIZED / SUBAGENT EXECUTOR RUNNING`；独立verdict仍为REJECT，非ACCEPT。委派任务名 `/root/c1_native_cache_repair`，主助手负责独立re-review；不是1PCloop角色thread或新的machine run。
+- 修复状态: `CLOSED / INDEPENDENTLY ACCEPTED`，最终证据见第18节；委派任务名 `/root/c1_native_cache_repair`，主助手完成独立re-review。不是1PCloop角色thread或新的machine run；下列准备/约束保留为派发历史。
 - 基线: target `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，HEAD `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`，直接检查clean。Framework main/local/origin为 `5fdeddaabe752c2dfad6922ea57242fb16ce30a0`，clean；本次治理提交正常前进。
 - 只修C1 trusted validation正常新增解释器缓存与exact snapshot冲突；默认仅 `scripts/release_workflow.py`、`testCodes/test_release_workflow.py`、`PACKAGING.md`。额外路径须先报告必要性/影响/回归，不直接修改已接受REL1B helper。
 - 保留完整已有input/cache/source/tool/interpreter身份，不排除整个cache、不任意接受post-snapshot、不跳lock验证；正常变化须在精确受控操作边界验证。补实际原Python获取 + lock-check + controller组合、负向漂移及fresh strict；Runtime/App可显式synthetic，不是正式build。
@@ -228,7 +228,7 @@ Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确pro
 
 ## 17. 子Executor首版自检后主Reviewer再次REJECT -- 2026-10-03
 
-当前verdict: `REJECT -- NATIVE VERIFICATION TIME BUDGET`。仅针对本次未提交三路径修复，不回滚旧machine接受，不激活C2/C3。
+该轮verdict: `REJECT -- NATIVE VERIFICATION TIME BUDGET`。仅针对当时未提交三路径修复，不回滚旧machine接受，不激活C2/C3；后来修复后的接受见第18节，本理由不删除。
 
 - Executor初版增加固定lock命令的一次性受限cache delta，并保留Python/version/prior-input检查。初版原生组合1/1、191.128s及20-shape/9-command边界两项294.093s通过；真实checkpoint约26-27s，只比原30s ack少约3s。
 - 主Reviewer独立首次原生获取/完整controller也通过六checkpoint，after:python26.923s、before:runtime26.730s、before:app26.698s、after:app26.597s。独立实际子进程七case确认合法新增通过、version新增/two-records/prior-cache-change/second-lock-replacement/lock-failure/extra-directory拒绝。这不是正式Runtime/App build。
@@ -236,6 +236,19 @@ Human明确要求不启动1PCloop，由主助手担任Reviewer、编译精确pro
 - 主Reviewer在新Downloads fixture对该最终候选重新获取固定uv/Python、执行原frozen sync/environment smoke，再走实际controller。仅加checkpoint耗时观察，没有跳gate或patch verifier。结果 `ENVIRONMENT_VERIFY_TIMEOUT`，events仅before:python、stateBUILDING，原smoke成功后未进入Runtime。与小型实际child反例同时运行，无full/formal build。正常本机负载下已复现新增20s budget缺口，不能归因为quota或宣称所有新增验证通过。
 - 直接失败证据: `/Users/smterpro/Downloads/rel1c1-fixtures.subagent-final-native-review.VHocNx/native-python-controller-result.json`；build log为该root下 `case-9adbde183d214e8895b8e582e42c6fe5/workflow/evidence/attempt-e380b81bbf2c4a7597141631ea7ddb64/build.log`。前版通过与七case在 `/Users/smterpro/Downloads/rel1c1-fixtures.subagent-independent-review.92QTtA/` 保留。主Reviewer首个正向fixture曾错误地每次重写既有msgpack，代码正确拒绝；修正fixture后正常通过，错误fixture/log独立保留，不冒充产品finding。
 - 已给同一子Executor窄repair instruction: 定位并减少重复source/Git/full-environment扫描，保留逐命令输入门禁、精确delta、最终冻结及30s ack/lifetime。禁止无限提高timeout、忽略失败或直接改accepted REL1B/shell；额外路径/协议变更先proposal。暂不准入昂贵full，修复后重新原生正负向与fresh strict。
+
+## 18. 子Executor修复与主Reviewer独立ACCEPT -- 2026-10-03
+
+最终Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`。
+
+- 普通后继parent52237ae，branch `codex/release-1-1-0-automation`，target仍 `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，clean、无target push。仅release_workflow.py、test_release_workflow.py、PACKAGING.md，362新增/7删除；主Reviewer未修改产品代码。
+- 固定lock命令after:python一次性受限新增缓存，完整旧inputs不变，Python/version/失败/再调用无例外。专属verifier进程组有界清理；移除冗余扫描后仍20s验证/30s ack，不跳门禁或接受caller snapshot。
+- Executor唯一fresh严格全量255/255、2624.287s、wall2624.740s、exit0；97 source与19157项开发环境文件系统身份/hash前后相同。主Reviewer核实际完整log/receipt/快照及committed blobs，没有另跑第二份昂贵full或把旧251/251当当前结果。
+- 主Reviewer独立原Python获取/5-smoke/实际controller原shell六checkpoint及原ZIP通过，19027项proof，checkpoint约22-23s；Runtime/App明确synthetic。另七实际子进程缓存反例与六独立ZIP/App/receipt/cache/readonly/缺trust反例均符合预期。
+- `final-evidence-audit.json` SHA `d89b98ffc60aab8748c4ee6798345b7fba3ea8a057cde8667fa8b6f31b7cadc7` 直接绑定97 tested/current/committed bytes、三路径/sole-parent/clean、full inputs和独立probe。Full log SHA `92ebe52cc1a563a56f3b9f1a70e8cd1ebf91c0d1c273b7010ecbc869db6d4e82`。完整locator/hash、第一次自检/再次REJECT/优化repair元信息见 [独立summary](../../evidence-summaries/whisper-rel1c1-native-cache-repair-independent-review-20261003.md)。
+- 仅接受C1-local AC-01至04、AC-07本地恢复、AC-08 notes/回归部分，不接受C2/C3、完整父Step 1、生产trust/transport或真实App/ZIP/Human PASS/发布。旧machine block/transition/checkpoint/manifest、历史REJECT与中断证据不改。
+- 候选notes已逐段复核，三个固定hash同步且直接tests通过；父PT-REL-01可RESOLVED，k仍1。这里仅引用父pending authority，不建立新倒计时。
+- 当前无active子Executor/1PCloop run；C2/C3尚未启动，等待下一步安排。Downloads审计目录保持，不自动清理。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

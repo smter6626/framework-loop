@@ -3,18 +3,18 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A AND REL1B ACCEPTED / REL1C1 MACHINE ACCEPTED BUT INDEPENDENT REJECT / REPAIR REQUIRED`。
-- Verdict: `REJECT -- INDEPENDENT REL1C1 REVIEW`；REL1A/REL1B的已接受结果不变，整个Step 1和发布未完成。
-- 当前方向: `REL1C1`窄repair由主助手Reviewer + 一个子Executor完成，Human于2026-10-03明确授权，不启动1PCloop。权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)第16节。旧machine step已COMPLETED且不改写；C2/C3保持QUEUED。真实Step 2-5未运行，历史失败和拒绝全部保留。
+- 状态: `REL1A AND REL1B ACCEPTED / REL1C1 INDEPENDENTLY ACCEPTED / REL1C2 AND REL1C3 QUEUED`。
+- Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`；整个Step 1和发布未完成。
+- 当前方向: `REL1C1`主助手Reviewer + 子Executor窄repair已独立接受并关闭，未启动1PCloop。权威输入为 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_runtime.md)第16-18节。旧machine step已COMPLETED且不改写；C2/C3保持QUEUED、尚未启动。真实Step 2-5未运行，历史失败和拒绝全部保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-03，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human批准REL1C1及额度中断后的延续；该run现已机器结束，但C1独立REJECT，等待新窄repair准备，不改旧账号binding。生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
-- 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT，COMMITTED/APPLIED/PUSHED；本对话独立REJECT，原因见子Runtime第15节。更早usage-limit失败/dirty target仍保留。
-- 当前不准备或启动新repair config/run，不run/resume旧终态；采用桌面子Agent修复、主助手独立复核，保留原binding/checkpoint/evidence。该执行主体切换不授予新生产权限，也不伪称为machine ACCEPT。
+- 执行门禁: Human批准REL1C1、旧延续及主Reviewer/子Executor修复。最新C1-local已独立接受，不改旧run/account binding；生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
+- 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
+- 当前无active repair Agent/run；不run/resume旧终态，保留原binding/checkpoint/evidence。C2/C3等待下一步安排，执行主体切换不授予新生产权限。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，独立复核HEAD `52237ae4ac893d7b46a8b0b48a10be137b90c6fc`，clean；原延续启动HEAD01cb904。原implementation-rel1b-continuation-02的dirty草稿和固定patch保留，用户worktrees不动；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新独立接受HEAD `5d33416af100a480f8a43f345a163b3b02e696f1`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
 ## 2. 已完成的准备与直接事实
 
@@ -68,7 +68,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: 整体实现目标未完成；REL1A/REL1B已接受，REL1C合同已批准，当前唯一C1 ACTIVE；C2/C3依次等待独立接受再激活。接受/准备证据见子Runtime和第23-25节，原准备/失败历史保留，不要求单turn完成父级范围。
+状态: 整体实现目标未完成；REL1A/REL1B/C1-local已独立接受，C1修复关闭、无active Agent；C2/C3尚未启动。最终C1证据见子Runtime第18节和本Runtime第28节，原准备/失败历史保留。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 初始功能基线为0388fa9，REL1A/REL1B后已前进到accepted91e5479；当前实现分支及建议target见第1节和REL1C Runtime，不再从初始feature重建。实际启动以新config绑定的当前branch/HEAD/clean为准，不使用旧终态配置或改为main。
@@ -244,7 +244,7 @@ Owner已批准 [rel1c_static.md](rel1c_static.md) / [rel1c_runtime.md](rel1c_run
 
 | ID | 非阻塞性后续事项 | 截止Step | 剩余安全迁移次数 | 状态 | 关闭要求 |
 | --- | --- | --- | --- | --- | --- |
-| PT-REL-01 | 候选notes完整性与新增/已有功能区分 | 3，正式build前 | max(3-1-1,0)=1 | OPEN_NON_BLOCKING | REL1C补多语言、移除icon/model-feedback/download-progress为1.1.0新增的错误暗示，补标准GUI打开说明；同步fixed notes hash/tests并独立审核。当前不宣告正式release notes已接受。 |
+| PT-REL-01 | 候选notes完整性与新增/已有功能区分 | 3，正式build前，原deadline不变 | 已关闭；顶层k仍1，不消耗迁移 | RESOLVED -- 2026-10-03 | C1最终独立接受；多语言/已有1.0功能区分/GUI/候选限制逐段核验，notes/contract/EXPECTED_CONTRACT固定SHA9901c141...一致，direct tests在255项fresh回归通过。只接受候选notes，不声明已发布；见第28节及C1最终summary。 |
 
 本轮不激活REL1B。接下来还需完成1b/1c及真实集成build，才有最终ZIP交Human验收；旧源码Human PASS不能代替该artifact gate。
 
@@ -306,6 +306,16 @@ Run20261002T023023Z-10810宿主中断后经事务恢复和Human终端resume，�
 本对话直接累计代码/证据核验与六项独立局部probe通过，但原始固定Python bootstrap接实际C1 controller后复现 `ENVIRONMENT_CHANGED`: 获取/smoke5/5成功，随后的uv lock --check --offline正常新增解释器cache，而C1冻结后要求cache绝对不变，误拒绝自身正常验证。三份新fixture复现，最终命令级审计定位。独立Verdict REJECT，C1未最终接受，C2/C3不激活，PT-REL-01不关闭。Fresh full被前turn主动中断，168个OK行不是完整PASS；不伪称已完成独立251/251。
 
 依据: [C1独立summary](../../evidence-summaries/whisper-release-rel1c1-independent-review-20261002.md)、子Runtime第14-15节。下一步新有界repair准备，不resume旧成功终态、不改Static/封存B/认证。助手未改target或启动新run，未进行正式构建、生产部署、tag/API。
+
+## 28. 主Reviewer + 子Executor修复独立接受 -- 2026-10-03
+
+Human明确改用桌面委派，不启动1PCloop。同一子Executor完成三路径窄repair，主Reviewer再次REJECT真实20s预算被重复扫描耗尽的候选，再经优化/独立原生复测后准入唯一full。普通后继5d33416(parent52237ae)在255/255、2624.287s及97source/19157环境身份前后不变后独立ACCEPT C1-local，当前target clean且未push。
+
+主Reviewer不同路线验证原Python获取/原smoke5/实际controller/shell六checkpoint、7实际child反例、6安全复测；97tested/current/committed blobs及log/receipt/probes全部直接audit通过。checkpoint约22-23s，20s verifier/30s shell不变。完整理由、候选hash/REJECT/修复及限制: [最终独立summary](../../evidence-summaries/whisper-rel1c1-native-cache-repair-independent-review-20261003.md)、子Runtime第16-18节。
+
+PT-REL-01的候选notes语义、三个固定hash及direct tests独立接受，登记RESOLVED；顶层k=1不变。旧machine records、原preimage/postimage/CP/manifest及所有失败不改，未构造新machine ACCEPT或覆写历史。REL1A/REL1B封存合同与Static不变。
+
+C1-local关闭，C2/C3仍QUEUED/未启动，整体Step 1未关闭；生产trust/transport、真实集成/build/最终ZIP Human PASS/tag/API/publication仍未完成。测试目录继续用于活跃任务审计，不自动清理。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

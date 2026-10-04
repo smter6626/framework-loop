@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1B ACCEPTED / REL1C1 INDEPENDENT REJECT / REPAIR REQUIRED`
+`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 REL1C1 INDEPENDENTLY ACCEPTED / C2 AND C3 QUEUED`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -46,14 +46,14 @@ Most recently closed engineering task
 Current external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
 = REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
-= REL1C AUTHORIZED / C1 MACHINE ACCEPTED BUT INDEPENDENT REJECT / C2 AND C3 QUEUED
+= REL1C AUTHORIZED / C1 INDEPENDENTLY ACCEPTED AT5d33416 / C2 AND C3 QUEUED
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
 Next-step document preparation
-= REL1C STATIC AUTHORIZED / C1 ASSISTANT-REVIEWER + SUBAGENT-EXECUTOR REPAIR / NO NEW LOOP RUN
+= REL1C STATIC AUTHORIZED / C1 ASSISTANT-SUBAGENT REPAIR ACCEPTED / NO NEW LOOP RUN
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
-= C1 PRIOR FAILURES PRESERVED / LATEST MACHINE ACCEPT THEN INDEPENDENT REJECT
+= C1 PRIOR FAILURES PRESERVED / LATEST DESKTOP REPAIR INDEPENDENTLY ACCEPTED
 = NO PRODUCTION RELEASE ACTION
 
 Most recently completed C1 operator configuration (historical, not resumable implementation)
@@ -146,6 +146,18 @@ Task-local REL1C Runtime section16 records the exact three-path scope, real Pyth
 acquisition/controller regression requirement and independent re-review gate.
 Historical machine COMPLETED/transition and rejected evidence remain unchanged;
 C2/C3, production deployment/build and release actions remain gated.
+
+The bounded subagent repair is now independently ACCEPTED at5d33416(parent52237ae).
+A further native verification-timeout REJECT and narrow scan optimization are
+preserved in REL1C Runtime sections17-18. One fresh strict255/255 regression passed
+in2624.287s;97 source and19157 environment filesystem identities were unchanged.
+The main Reviewer verified tested/current/committed bytes, a separate original
+Python acquisition/controller probe,7 actual-child counterexamples and6 safety
+probes. C1-local is closed; this is not a new machine verdict or release acceptance.
+PT-REL-01 candidate-notes facts/hashes/tests are RESOLVED in parent Runtime.
+C2/C3 remain QUEUED/not started; no production deployment, formal App/ZIP,
+target push/merge/tag/API or Human artifact PASS was performed. Details:
+1PCloop/evidence-summaries/whisper-rel1c1-native-cache-repair-independent-review-20261003.md.
 
 Prior external workload disposition
 = whisper_clean_rename_integrity_repair_v1 / R1 HUMAN_GATE / NOT_APPLIED
