@@ -257,12 +257,16 @@ Human先要求"下一步C2和人工验收前的所有其他步骤一起合并做
 - 唯一当前任务: `C2-C3 COMBINED IMPLEMENTATION ACTIVE`。一个新桌面子Executor实施，主助手独立review/REJECT/repair；非1PCloop run，不改旧machine state/transition/account/evidence。原第3/10节小循环及手动启动安排被本决定替代，验收及权限不放宽。
 - 派发前直接核framework main/local/origin `d7948068de061d48e6ae69285ff675a48a02c564` clean；target `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，HEAD `5d33416af100a480f8a43f345a163b3b02e696f1` clean。产品GitHub main只读快照仍d0f581bb70379239c3147e5c8469d2285ad6620b，不据此永久假设refs不变。
 - 交付: 固定GitHub adapter和恢复、REL1B/C1/C2统一受控入口、真实fake-gh子进程/本地bare全链、全父AC实现coverage和生产部署/人工验收说明。C1已接受缓存/20s验证/30s ack与原build/ZIP边界不放宽；REL1B默认scope保持不变。
-- 初始产品allowlist: scripts/release_approval.py、release_workflow.py、release_workflow_state.py；新增scripts/release_publication.py、release_publication_state.py、release_pipeline.py；对应testCodes/test_release_approval.py、test_release_workflow.py、test_release_workflow_state.py与三个新增test_release_publication.py、test_release_publication_state.py、test_release_pipeline.py；README.md、README.zh-CN.md、PACKAGING.md、repo_map.md。新增helpers需实际职责，不强制制造空模块。其余已接受底层如必须耦合，先具体proposal、由Reviewer检查后记录补充，不静默扩大。
+- 初始产品allowlist: scripts/release_approval.py、release_workflow.py、release_workflow_state.py；新增scripts/release_publication.py、release_publication_state.py、release_pipeline.py；对应testCodes/test_release_approval.py、test_release_workflow.py、test_release_workflow_state.py与三个新增test_release_publication.py、test_release_publication_state.py、test_release_pipeline.py；README.md、README.zh-CN.md、PACKAGING.md、docs/repo_map.md。repo_map已直接核实际路径，非根目录。新增helpers需实际职责，不强制制造空模块。其余已接受底层如必须耦合，先具体proposal、由Reviewer检查后记录补充，不静默扩大。
 - Executor只实现/测试/本地普通后继commit，不写治理、不自ACCEPT、不push target、不真实merge/tag/API、不正式build、不读取个人凭据/生产key或部署trust。测试仅新Downloads fixture、本地bare、fixture key/synthetic App/fake gh；真实GitHub接口以本机gh2.96.0 help及官方文档核对，argv/stdin直接实测，不凭mock返回全绿。
 - 测试顺序: 小反馈和策略审阅 -> 独立反例 -> 最终源一次fresh strict全量及source/environment前后绑定；当前255项约44分钟，避免重复昂贵全套或未完成伪PASS。后续改码须重验实际最终字节，不继承旧全绿。
 - 实现独立通过后检查生产trust/entry/签署receipt与Git/gh transport具体缺口。当前未部署/验证；合并任务不授权sudo信任根、选择个人key/token或放松隔离。所需新敏感权限必须Human明确决定；已批准的无敏感实现继续进行，不以未来gate放弃本步。
 - 门禁齐备后仅通过已审核controller实际集成、固定main source、fresh formal App/ZIP、自动验包，停在父Step4。当前没有正式ZIP或Human PASS；真实tag/draft/upload/publish/latest严格在精确artifact Human PASS后，不能提前执行。
 - PT-REL-01仍RESOLVED，k=1不变；C1接受与所有REJECT/partial/失败历史保留。父Static及封存REL1A/B不改；子Static仅同步Human明确批准的合并交付/执行主体文字，不改变安全合同。
+
+### 第19节耦合补充 -- 派发后只读proposal
+
+Executor指出REL1B Integration内部固定调用legacy authorize、tools仅验legacy minimum，直接接WorkflowPolicy不能证明完整新工具closure。Reviewer重读这些调用后批准额外两个精确路径: `scripts/release_integration.py`、`testCodes/test_release_controller.py`。只允许code-defined精确Policy/WorkflowPolicy选择器及Workflow作用域的完整tool集合检查；legacy默认scope/namespace、双父级/Git审计/live环境gate/test-before-push/恢复及认证隔离逻辑不改。不得使用payload或caller字段任意选择较弱scope。专项legacy及Workflow实际分叉反例须补验。必要publication目录只在C1 StateStore中增加固定单一名称，不重写C1 artifact/Human状态字段。此补充不授权生产认证/部署/真实远端副作用。
 
 以上是派发安排，不是实现、测试、整体Step1或发布验收。
 
