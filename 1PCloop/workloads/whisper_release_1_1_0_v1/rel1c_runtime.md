@@ -5,9 +5,9 @@
 发布工具的"版本与验包基础层"、"合并管理员"和C1构建/人工批准控制层已独立审核通过。Human已批准将C2/C3和人工验收前自动化合并交付，继续由主助手Reviewer + 一个新桌面子Executor执行，不启动1PCloop。先完成并审核实现，再处理生产部署/认证门禁；真正集成/构建后才交给你验收最终ZIP解压App。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `C1 INDEPENDENTLY ACCEPTED / C2-C3 COMBINED IMPLEMENTATION ACTIVE`。
-- Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`。最后修复为主助手Reviewer + 桌面子Executor，非新machine run/config；历史machine COMPLETED/transition原样保留，不将旧52237ae机器接受伪造为新提交的machine verdict。详见第16-18节。
-- 唯一当前桌面任务为C2-C3联合实现，详见第19节；不是旧machine block激活。整个REL1C、父Step 1和发布未完成。
+- 状态: `C1/C2/C3 LOCAL IMPLEMENTATION ACCEPTED / AWAITING OWNER PRODUCTION DEPLOYMENT AND TRANSPORT DECISION`。
+- Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`。主助手独立复核，非新machine run/config；历史machine COMPLETED/transition原样保留，详见第20节及独立summary。
+- C2/C3联合local实现关闭，无运行Agent/test；当前门禁为Owner生产部署/认证决定，不是产物人工验收。整体父Step1的生产交付及Step2-5未完成；不得对旧terminal配置resume。
 - Static: [rel1c_static.md](rel1c_static.md)，当前SHA-256 `c5992a640555c421e782f840591c0bb15842b05702baacda1f2e8ca970bfa810`；原编排版本hash ba7a0213...只用于历史。父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
 - 最后更新: 2026-10-03，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -283,7 +283,29 @@ Executor只读指出，原9901c141... notes明确写"candidate bytes未built/pub
 - 新统一恢复入口拟固定 `pipeline-resume`，在现allowlist内，保留C1原resume退休/UNVERIFIED语义；publication重验签署ownership、缺状态不自动开始。先让已启动的有界组合测试自然结束，再一次定稿路由，避免中途源码漂移。整套full尚未运行，未给最终C2/C3或Step1 ACCEPT。
 - 主Reviewer只读确认生产trust目录不存在，并向Human提出部署/认证权限问题。未得到具体Owner决定前不生成生产key/安装root入口/读取个人GitHub凭据或解除Git隔离。无正式App/ZIP、真实main集成或发布，尚不具备产物人工验收条件。
 
+### 第19节额度中断后的继续 -- 2026-10-03
+
+Human报告usage limitation后明确要求继续。直接核target clean候选 `0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`、sole-parent5d33416、21个allowlisted路径；普通localcommit，不是target push或实现最终ACCEPT。
+
+唯一最终full root `/Users/smterpro/Downloads/rel1c1-fixtures.c2c3-final-full.RgzBtG`：原收集父进程3979已经退出，但其精确owned Python3991以PPID1继续运行，约49分钟时日志已推进publication矩阵，无最终summary/after/result。不重跑、不kill、不声称已完成。新桌面子任务 `/root/c2_c3_evidence_recovery` 只等待该测试并恢复本地after/source/environment/log证据收尾，不改代码或治理、不启动第二full。
+
+测试结束后若原OS退出码不能由非父进程取得，必须明确记录不可用，不写exit0；以真实完整unittest结尾及逐项结果、无资源异常、来源/环境/committed字节一致、进程结束和独立反例综合评价证据。原full-process和日志保留，新收集结果另命名，不覆盖历史。最终verdict仍待直接审核，不把usage中断当产品REJECT或伪造新machine run。
+
+稳定最终候选的独立9反例PASS(66.442s)、7个protected-entry probe、105blob组合证据audit已直接重读，原源码/notes身份与当前匹配。生产部署/认证proposal仍未获具体Human执行授权；无真实集成/正式包/产物Human PASS/发布。
+
 以上是派发/预审事实，不是实现、整体Step1或发布最终验收。
+
+## 20. C2/C3完整测试恢复与独立接受 -- 2026-10-03
+
+主Reviewer接受普通local候选0c3449b(parent5d33416)，21批准路径/clean/无target push。固定GitHub adapter、签署ownership恢复、统一prepare/status/resume/publish路由与中性notes69013bca...已直接审核；C1缓存/20s/30s/包/Human边界与legacy权限未放宽。
+
+唯一fresh strict原测试在额度中断后继续执行，最终完整 `279/279 OK`，4602.486s。原收集父进程丢失，OS退出码无法由非父进程恢复，因此明确exit_code=null，未伪造exit0。主Reviewer逐项核279 complete OK blocks(272单行+7插入Qt/ZIP diagnostics后的独立ok)、当前discovery279、无ResourceWarning/traceback/FAILERROR、103 source tested/current/committed一致、19157环境身份/content前后不变、无owned残留/日志writable handle。新recovery文件另命名，旧before/process/缺失result事实原样保留，未重跑。
+
+最终原生组合1/1、257.656s、真实exit0；原Python5smoke/实际双父级/六checkpoint/原ZIP/fakeGH通过，但Integration strictgate和Runtime/App明确synthetic。主Reviewer另核9反例66.442s、7入口反例、105merged blobs推导和最终full audit，不谎称第二份独立full。Full logSHA9fa8bc59...，recovery result ef66b0ce...，final audit9e1be3e2...。完整locator/hash、早期fixture失败/源变化/全绿边界和AC mapping见 [独立summary](../../evidence-summaries/whisper-c2-c3-independent-review-20261003.md)。
+
+该接受仅local实现，不构造新的1PCloop machine ACCEPT/transition。PT-REL-01仍RESOLVED，k=1不变；父Static/封存B及历史拒绝不改。产品README的candidate审核语义是实现提交当时快照，未来生产/发布文档更新仍须按真实阶段，不用它证明已部署。
+
+当前停在 [生产部署方案](production_deployment_proposal.md) 的Owner gate。固定trust/root入口/可信Python/签署receipt未部署；Git ordinary push认证桥尚未实现且须先具体Owner授权再有界实现/复核，现gh协议也未部署。不得直接关闭整体Step1生产交付、执行main集成或把synthetic ZIP交人工；无正式App/ZIP/Human产物PASS/真实tag/draft/upload/publication。下一步是Owner决定部署/transport方案，之后受控程序才可继续至父Step4。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

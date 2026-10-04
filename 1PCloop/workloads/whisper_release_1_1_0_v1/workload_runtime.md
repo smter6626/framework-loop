@@ -3,18 +3,18 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REL1A/B/C1 ACCEPTED / C2-C3 COMBINED IMPLEMENTATION ACTIVE`。
-- Verdict: `ACCEPT -- C1 LOCAL IMPLEMENTATION AT 5d33416af100a480f8a43f345a163b3b02e696f1`；整个Step 1和发布未完成。
-- 当前方向: C1-local已独立接受；Human明确合并C2/C3和人工验收前自动化，由主助手Reviewer + 一个新桌面子Executor继续，不启动1PCloop。权威安排见 [rel1c_runtime.md](rel1c_runtime.md)第19节。旧machine COMPLETED/记录不改；真实Step 2-5尚未运行，敏感部署/认证与精确artifact Human gate保留。
+- 状态: `REL1A/B/C1/C2/C3 LOCAL IMPLEMENTATION ACCEPTED / OWNER PRODUCTION GATE`。
+- Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`；整个Step1生产交付和发布未完成。
+- 当前方向: C2/C3联合local实现已由主Reviewer独立接受，不启动1PCloop；详细证据见 [rel1c_runtime.md](rel1c_runtime.md)第20节。旧machine COMPLETED/记录不改。下一步是Owner确认生产部署/认证方案，真实Step2-5尚未运行，精确artifact Human gate保留。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-03，America/Phoenix。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: Human批准REL1C1、旧延续及主Reviewer/子Executor修复。最新C1-local已独立接受，不改旧run/account binding；生产trust/transport未部署或验证，无正式构建/集成/tag/draft/upload/publication。
+- 执行门禁: Human批准local实施/联合交付；最新C2/C3-local已独立接受，不改旧run/account binding。生产trust/transport未部署或验证、认证桥尚缺具体授权/实现；无正式构建/集成/tag/draft/upload/publication。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
-- 当前唯一桌面任务为C2-C3联合实现；不run/resume旧terminal配置，保留原binding/checkpoint/evidence，不自授生产权限。
+- C2/C3联合local实现关闭，当前无运行Agent/test。下一门为Owner生产部署/认证决定，不是最终ZIP人工验收；不run/resume旧terminal配置，保留原binding/checkpoint/evidence，不自授生产权限。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新独立接受HEAD `5d33416af100a480f8a43f345a163b3b02e696f1`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新local独立接受HEAD `0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
 ## 2. 已完成的准备与直接事实
 
@@ -68,7 +68,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: 整体实现目标未完成；REL1A/REL1B/C1-local已独立接受，C1修复关闭、无active Agent；C2/C3尚未启动。最终C1证据见子Runtime第18节和本Runtime第28节，原准备/失败历史保留。
+状态: REL1A/B/C1/C2/C3 local实现已独立接受，无active Agent/test；整体Step1生产可执行交付仍受Owner部署/transport和必要认证桥扩展复核限制。最新C2/C3证据见子Runtime第20节和本Runtime第30节，原准备/失败历史保留。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 初始功能基线为0388fa9，REL1A/REL1B后已前进到accepted91e5479；当前实现分支及建议target见第1节和REL1C Runtime，不再从初始feature重建。实际启动以新config绑定的当前branch/HEAD/clean为准，不使用旧终态配置或改为main。
@@ -144,7 +144,7 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: 唯一C1任务见 [rel1c_runtime.md](rel1c_runtime.md)第4/11节，使用workload_rel1c1.json手动run，不使用旧REL1B config或同时实现C2/C3。
+- Current Executor Handoff: local实现已关闭，当前无派发任务；下一门见 [production_deployment_proposal.md](production_deployment_proposal.md) 及子Runtime第20节。第4/11节C1配置仅历史，不run/resume旧terminal配置。
 - Next Direction: REL1C实现 -> 整个Step 1独立接受及生产部署/transport门禁 -> 受控集成与构建 -> Human最终ZIP验收。当前无可人工验收的新App/ZIP，本次未调用新Agent。
 
 ## 11. 直接输入导航
@@ -322,6 +322,12 @@ C1-local关闭，C2/C3仍QUEUED/未启动，整体Step 1未关闭；生产trust/
 Human批准主Reviewer + 一个新桌面Executor合并交付，详见子Runtime第19节及同步的子Static编排条款。先C2 adapter/C3串联实现与local验证，独立接受后才进入实际生产门禁。父Static、安全边界、旧machine块/transition、所有拒绝历史及PT-REL-01 RESOLVED原样保留，顶层k=1不变。
 
 当前生产trust/entry/签署receipt及Git/gh transport未部署/验证，需具体Owner决定后才能真实集成/build；最终ZIP Human PASS前禁止真实tag/draft/upload/publication。尚无正式产物，不把统一交付批准写成发布或人工验收通过。
+
+## 30. C2/C3 local接受与生产Owner gate -- 2026-10-03
+
+最终候选0c3449b(parent5d33416)经主Reviewer独立接受local adapter/串联/恢复/notes。完整strict原测试额度中断后继续，279/279 OK、4602.486s；原父进程丢失故OS exit不可恢复/null，未编造exit0。103 source/current/committed与19157环境前后完全一致，逐项结果/当前discovery279/资源异常检查及独立9反例/7入口/105blob组合audit通过。证据见 [C2/C3独立summary](../../evidence-summaries/whisper-c2-c3-independent-review-20261003.md) 及子Runtime第20节。
+
+local实现关闭，无active Agent/test。整体Step1生产交付未关闭，Step2-5未启动：Owner仍需具体决定生产trust/entry/可信Python/签署及Git/gh transport；Git认证桥未实现，不能仅凭local绿或gh目录protocol声称可生产push。当前 [部署proposal](production_deployment_proposal.md) 未授权/未部署。最终ZIP尚不存在，无Human产物PASS或真实tag/API；旧机器块/失败/Static/封存B和PT-REL-01 RESOLVED不改，k=1不变。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
