@@ -268,7 +268,22 @@ Human先要求"下一步C2和人工验收前的所有其他步骤一起合并做
 
 Executor指出REL1B Integration内部固定调用legacy authorize、tools仅验legacy minimum，直接接WorkflowPolicy不能证明完整新工具closure。Reviewer重读这些调用后批准额外两个精确路径: `scripts/release_integration.py`、`testCodes/test_release_controller.py`。只允许code-defined精确Policy/WorkflowPolicy选择器及Workflow作用域的完整tool集合检查；legacy默认scope/namespace、双父级/Git审计/live环境gate/test-before-push/恢复及认证隔离逻辑不改。不得使用payload或caller字段任意选择较弱scope。专项legacy及Workflow实际分叉反例须补验。必要publication目录只在C1 StateStore中增加固定单一名称，不重写C1 artifact/Human状态字段。此补充不授权生产认证/部署/真实远端副作用。
 
-以上是派发安排，不是实现、测试、整体Step1或发布验收。
+### 第19节notes事实补充 -- 正式构建前准备
+
+Executor只读指出，原9901c141... notes明确写"candidate bytes未built/published"及真实integration/build/Human review pending；C2若在未来真实PASS后逐字发布原文，便出现状态事实冲突。Reviewer全文重读原notes及release_identity/contract/direct tests后批准额外精确路径: `RELEASE_NOTES_1.1.0.md`、`packaging/release_contract.json`、`scripts/release_identity.py`、`testCodes/test_release_identity.py`。仅把发布说明改为可在准备期/正式发布时均保持真实的中英文中性版本说明与安装/限制/验收门禁表述；不提前声称已构建、已人工通过或已发布。保持新增/已有功能区分、硬件/语言覆盖限制、模型外置/ad-hoc/未公证、固定产品/repo/tag/asset和其余合同字段。计算新固定notes SHA并同步EXPECTED_CONTRACT、JSON、Publisher硬编码与direct hash tests，禁止从输入自动学习hash。
+
+这是父/子Static已允许的notes及直接身份绑定修正，非新增产品或生产权限。原C1已接受9901...及PT-REL-01 RESOLVED作为历史保留，不能改旧evidence或假装旧测试覆盖新bytes。正在运行的early focused先完整结束，之后才改notes；新notes及所有最终字节必须进入后续fresh regression和独立审核。Runtime记录新SHA要以实际最终文件为准，本文不猜测。
+
+### 第19节执行与预审快照 -- 非最终验收
+
+- 桌面子任务 `/root/c2_c3_release_implementation`。首个265.597s测试在产品fake链完成后，fixture方法名被旧calls列表遮蔽而TypeError；明确NOT PASS。随后修fixture并减少同一边界重复校验，保留写前/写后/下载/恢复/complete完整authority，普通GET只验transport；新小正向1/1、84.266s通过。这不是独立最终接受。
+- early focused8/8、529.533s、exit0，覆盖三个crash/外部签署对账恢复、三个publish-intent后漂移拒绝、HTTP错误/POST200、原子状态/权限/只读及实际Workflow集成/类型scope。该旧notes版本log `/Users/smterpro/Downloads/rel1c1-fixtures.c2c3-focused.ifP2Ux/early-focused.log`，SHA `2dda2fb90c4c70eaaa0fd1f5e19aca428b2517b11a93c911604214deaaa063a8`，不把旧源结果继承为最终源full。
+- 主Reviewer独立root `/Users/smterpro/Downloads/rel1c23-review.Cx5eMC`。首9反例符合预期，但运行中pipeline.py更新，记录SOURCE_CHANGED_RETEST_REQUIRED并保留初始report；稳定旧notes源重跑9/9、81.400s，PASS。匹配字段的陌生draft+合法重算COMPLETE、签署正确但phase/ID/artifact/source/plan/Human hash错误的receipt均零API写；实际fakegh UTF8控制文本和真实混合header/POST201语义通过。report SHA `e0cce5c59ad0bfb18cab4e909aaa597245a4e024a5d6630c8d481e076cdf4aeb`。后续notes/route变化仍需最终字节重验。
+- 中性notes实际SHA `69013bcae2de876202b3c6d2633fcb75a659b1f5f413cd905295eb6431a12703`，已全文语义预审并核JSON/EXPECTED_CONTRACT/Publisher/direct test固定绑定。只移除会在未来发布时失真的当前未完成断言，保留实际特性及验收规范，不声明已产包/已发布。其余release identity合同字段不改，静态candidate label非live outcome。最终接受仍待完整fresh回归/独立review。
+- 新统一恢复入口拟固定 `pipeline-resume`，在现allowlist内，保留C1原resume退休/UNVERIFIED语义；publication重验签署ownership、缺状态不自动开始。先让已启动的有界组合测试自然结束，再一次定稿路由，避免中途源码漂移。整套full尚未运行，未给最终C2/C3或Step1 ACCEPT。
+- 主Reviewer只读确认生产trust目录不存在，并向Human提出部署/认证权限问题。未得到具体Owner决定前不生成生产key/安装root入口/读取个人GitHub凭据或解除Git隔离。无正式App/ZIP、真实main集成或发布，尚不具备产物人工验收条件。
+
+以上是派发/预审事实，不是实现、整体Step1或发布最终验收。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
