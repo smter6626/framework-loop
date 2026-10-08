@@ -399,6 +399,18 @@ source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739
 
 先交Reviewer v2/局部验证/draft，再登记核准并EXECUTE；未重新启动。预计原Integration会向已经exact存在的feature调用一次无变更push，必须诚实区分调用和实际ref变化。Step2仍active(监控repair/retry准备)，Step3-5 queued，无正式包/Human PASS或publication。
 
+### Retry v2 独立验证与实际启动
+
+新root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry.EXfYF9/`，普通approval.draft SHA51f45bd0212fa40c7e020a1c4fe565e44eec92e84940298b2a20b4674c2b5634。主Reviewer重读v2 helper/actual launcher与六个fixtures，独立复跑6/6、0.029s、exit0；排除只读atime但身份/字节/权限/inode/mtime/ctime/link及in-read变化仍拒绝，观测不可用仅UNAVAILABLE/REVIEW_REQUIRED不授予gate或PASS。真实synthetic CLI exit0/7/source/env收据也验证，不能当正式controller证据。observer helper SHAd9f60802951acc29e284d35cc5fb00ce554c93e91e4354fd352a4cdccaa4ea89，Executor最终局部log SHA1a32b89d415210d607b1420297c2417a2d45f75a0d0e23f62583c2ad07ed338a。
+
+主Reviewer另核当前真实refs/main d0f/feature6cb、newdraft schema/tools/current6cb clean/newroot边界与合同hash，feature_prior明确6cb；apply_patch登记相同bytes为正式approval.json并chmod0600。只有外置collector/operation inputs改变，产品源码6cb及独立ACCEPT/292full不改。旧失败LRqhAz完整保留。
+
+启动尝试01只返回nohup shell PID83419，但在创建process/source/result/journal/managed前消失，只有空collector.log，没有真实controller或新副作用；`startup-attempt-01.md`保留。不假报RUNNING、不称产品controller失败。主Reviewer批准external-only微修: 立即setsid再import，启动端有界等待真实owned-session acknowledgment；旧空log不覆盖。最终launcher SHA562b76dc663d2e7757f09a5a5fb3a1d52cb6d4413d4ff0c9c59fc431af0b5f97。
+
+启动尝试02已获实证: collector83499(PPID1/PGID/SID83499)、controller83721(PGID83721)、caffeinate83722(-w83721)，`integration-operation/process.json`和startup-receipt.json已落盘，log为collector-launch02.log/controller.log。原CLI唯一实际retry已执行exact已有feature的no-op push调用(无ref改变)、同aaf/b939真正merge/fresh原Python5/5，进入 `MERGED / intent STRICT`。实际strict child86227/PPID83721/PGID83721，日志 `integration/evidence/strict-ad5f8a6d84f64497b6a8f6a9f6f015f4.log`。这些PID是启动locator，后续操作必须重新验证身份，不按旧PID批量kill。
+
+v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不谎称child启动前baseline或persisted live proof；真正gate是原controller内fresh invocation proof/full。当前 `STEP2 ACTUAL MERGED-SOURCE STRICT RUNNING`，尚无最终operation-result或main receipt，不重跑、不改源/合同。main仍d0f，Step3正式App/ZIP及Human/pass/tag/Release均未开始。完成后先核真实退出码、完整merged-source测试、source/tree/parents/refs，再独立final-main接受，不能用旧implementation full替代。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
