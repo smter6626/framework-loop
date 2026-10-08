@@ -326,6 +326,28 @@ Human报告usage limitation后明确要求继续。直接核target clean候选 `
 
 当前 verdict: `NOT EVALUATED -- LIGHTWEIGHT IMPLEMENTATION`，尚无正式包或 Human PASS。实际派发、必要 allowlist 补充、测试与复核结果追加到本节；不把桌面子任务伪造为新 1PCloop run。
 
+### 派发与最小复用方案
+
+新桌面 Executor `/root/lightweight_release` 已完整读取治理/交接并核 clean0c；主 Reviewer 在依赖方案回报后批准实施。计划用独立 `LightweightPolicy`、普通本地 purpose-specific 决定和明确 native transport 作用域，复用原 Integration/BuildController/Publisher/pipeline/状态与原六 checkpoint/验包链，不复制三套控制流程。旧签署入口默认不变，新 CLI 不要求生产 root/key/group，不能用旧 fixture Policy 或 monkeypatch 授权当生产入口。
+
+最终当前 allowlist 共11路径:
+
+- 新 `scripts/release_lightweight.py`、`scripts/release_lightweight_approval.py`、`testCodes/test_release_lightweight.py`。
+- 耦合 `scripts/release_approval.py`、`scripts/release_integration.py`、`scripts/release_artifact.py`、`scripts/release_publication.py`。
+- `README.md`、`README.zh-CN.md`、`PACKAGING.md`、`docs/repo_map.md`。
+
+四耦合路径的原因: 原 controller 内部直接固定授权/tool closure、Git 禁认证和 gh 受保护 credential 目录，wrapper 本身无法让当前原生登录工作。只允许 exact code-defined policy 分派、轻量工具 closure 与 native Git/gh 分支；legacy 默认不变。新增 approval helper 分离普通审计合同与 CLI，避免继续扩大 runner/CLI 单文件。原 shell、build/ZIP/Runtime helper、产品/pins/notes均不改。
+
+Reviewer 指令明确: 作用域 ContextVar 必须 finally reset，不让 legacy/嵌套误用；普通审批不包含 signers/epoch/revocation 模拟签署，不声明密码学不可伪造；Human 必须真实 PASS 且 explicit publish_allowed=true，并绑定 source/完整 artifact/reference；只有 PASS 没有发布允许仍零 tag/API 写。未知结果需实际对象核验及明确 Reviewer reconciliation，而非重算 state 接管。Production CLI 不提供 fixture/root/fake remote override；测试 seam 另有新 Downloads/local bare/fakegh 的代码边界，不向真实 GitHub 写入。
+
+先 fast tests/实际 local 分叉/fakegh/原 native checkpoint 小组合，主 Reviewer 看稳定候选并独立反例，再准入最终必要回归。子 Executor 暂无最终 ACCEPT/commit/完整测试结果；旧279/279不是新实现结果。
+
+### 当前原生认证非秘密检查
+
+主 Reviewer 只读检查现有工具，无凭据导出或配置读取/复制。SSH Git 能访问固定 origin；远端 main 精确 `d0f581bb70379239c3147e5c8469d2285ad6620b`，release feature ref 和 tag1.1.0 不存在。native gh2.96.0 repo API 返回固定 full_name/default_branch main、pull=true/push=true；release列表没有1.1.0。该快照不是未来恒定事实，真正副作用前重新核验。当前无需新认证桥或重新登录。
+
+治理首轮 commit `0bef6c48bf97803b25711acb31d4edd045fc7e9b` 已普通 non-force push，local/origin/GitHub main一致，旧机器块与封存B hash核验未变。此提交只授权当前机制，不是产品实现/产物人工验收或发布完成。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
