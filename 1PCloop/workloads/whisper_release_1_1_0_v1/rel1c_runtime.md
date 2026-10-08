@@ -375,6 +375,16 @@ source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739
 
 父Step1轻量实现已接受，Step2实际集成准备active，Step3build/Step4精确ZIP人工测试/Step5publication仍queued。此刻尚无正式main接受、App/ZIP或Human artifact PASS；零tag/draft/upload/publication。原Owner root/key/group/桥gate不再作为阻塞，Git/gh正常认证实际可用；需要真正新敏感权限或远端冲突才向Human报告具体事项。
 
+### Step2 真实集成 EXECUTE -- 准备核验完成
+
+新管理根 `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-delivery.LRqhAz/`。只读新bare audit.git实对象证明: main仍d0f581bb70379239c3147e5c8469d2285ad6620b、feature/tag/Release未占用；solebase b5188ccc6aef591398fd8d31e162a29390b120e4、实际两侧分叉，merge-tree无冲突，预期tree b939a29649147fabba297981b528f30cd9845d4d、预期ordered-parent commit aaf023593b7c0fdf1c888c1fe65e815eb45e2c45。与接受的feature差异仅七个docs/navigation，main四份streaming文档逐字节完整保留，接受工具hash不变。
+
+主Reviewer另从实际bare objects推导base/tree工具hash/四docs及确定性raw commit SHA，重验真实source/refs/CLI schema、无integration/workflow目录，结果PASS。普通正式记录已由主Reviewer apply_patch写入 `decisions/approval.json`，0600、与核准draft字节相同，SHA023c4d09f5e09ec8c67e5e71b92a8c252ffd2151fb546773bd151af7f91e0d7c。reference `reviewer-20261007-lightweight-6cbba5d-ACCEPT` 映射第22节真正独立接受，`human-20261003-lightweight-20261007-start` 映射Human轻量选择与继续授权；不是精确artifact PASS。准备facts SHA2cce3235c4483e0201b8007cc85db865cd16381354c194052e8f5ba811fa93c。
+
+同一Executor已获实际集成EXECUTE: 仅原审核CLI `release_lightweight.py --approval <本root>/decisions/approval.json prepare` 调用原Integration，实际clone/普通feature push/两父级merge/fresh pinned Python/full merged-source严格gate/普通main push，停FINAL_MAIN_REVIEW_REQUIRED。source/refs/合同/tools重新验，不能用feature292替代merged full或在CLI外拼手工操作。独立durable日志/退出码/源码环境证明，owned PID防休眠；失败保留原状态/环境，未知副作用先对账，不盲目resume或删除重试。
+
+当前唯一 Active Step 为 `STEP2 -- ACTUAL INTEGRATION EXECUTING`。本授权不含正式App构建、编造final-main ACCEPT、Human包PASS或真实tag/draft/upload/publication；真实集成成功后仍由主Reviewer独立核source/refs/tests再给plain integration receipt。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
