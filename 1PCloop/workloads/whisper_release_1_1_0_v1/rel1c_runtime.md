@@ -348,6 +348,19 @@ Reviewer 指令明确: 作用域 ContextVar 必须 finally reset，不让 legacy
 
 治理首轮 commit `0bef6c48bf97803b25711acb31d4edd045fc7e9b` 已普通 non-force push，local/origin/GitHub main一致，旧机器块与封存B hash核验未变。此提交只授权当前机制，不是产品实现/产物人工验收或发布完成。
 
+### 固定候选与完整回归准入 -- 非最终 ACCEPT
+
+子 Executor 本地候选 `6cbba5d02074311467be56ac349e44dea097a804`，sole-parent0c3449b，11批准路径/841新增5删除/clean，未 push target。新增两个轻量模块与受限 Python-only fixture seam，普通 purpose-specific 记录替代签署；只改已批准四个耦合 helper 的 exact-policy dispatch/native transport/tool closure。原 controller/state/shell/build/ZIP/Runtime/pins/notes字节不变。
+
+- 首轮专项12/12，473.188s，真实exit0；它早于最终 CLI 固定错误输出/测试/文档补充，仅为早期结果，不冒充最终源full。log `/Users/smterpro/Downloads/rel1c-lightweight-check.wNr3ld/focused-first.log`，SHA b0d126d49b902184bc83a266e3eca6bfcb33a20c7e62e1d942a59691884e9031。
+- 最终 delta6/6，85.533s，真实exit0，覆盖 typed Human allow/reference/purpose/schema、rehashed COMPLETE 无归属、旧缺 trust/exact-type/CLI边界。log同目录 `focused-final-delta.log`，SHA8e44a693424945527bb92f2526f96bd1175092a390ca37c1935454566e7887d5。
+- 原生组合360.405s、真实exit0，实际获取固定uv/Python/frozen sync/5smoke、原6checkpoint、原ZIP、local双父级和fakegh。Integration strict gate、Runtime/App、Human记录明确synthetic，不是正式包。结果 `/Users/smterpro/Downloads/rel1c-lightweight-fixtures.z7t_0vw2/native-combined-result.json`，SHA9e0f6fe2330c1746cefff792677d5aa93bfb90a789d632c972fb1575b3cd4b17；外置 native-combined.log SHA35ed6ed30573553423cbdefda8cb0db31f311466a0afea5f1378693ecfc548d6。
+- `candidate-source-bindings.json` SHA39f4387b63214bf133796f1670f405ead5693d0db4449db736d70920d082c397。主 Reviewer 直接从 Git objects 另算11 current/committed SHA和mode100644，scope/sole-parent/clean核通过。native实际输入10路径副本匹配；新test是固定target import，未谎称它在早期native复制中。
+- 主 Reviewer 自写并执行6个独立反例，107.858s、真实exit0，来源11路径前后相同。错误source parents零tag/API写；publish intent处撤销Human explicit allow或修改remote notes均只保留先前合法draft/upload两POST、无公开PATCH；mixed/other/nested policy拒绝/reset；两个status及缺checkpoint resume无字节/ref变化；实际CLI不回显caller marker。report `/Users/smterpro/Downloads/rel1c-lightweight-fixtures.review-t2tD7b/reviewer-probes.json`，SHA09d67576c6d758555bb3ad8688c18effe3c454a056308671886af05a8f95dad8。Reviewer首次只读binding核验命令有quoting SyntaxError，明确不是产品REJECT或通过证据；随后用独立多行只读命令重核通过，没有改产品。
+- 主 Reviewer 另用新函数真实过滤环境查询native Git main及gh repo/push permission，均exit0；未提取凭据。只证明当前认证环境可用，不替代完整流程证据。
+
+源码/必要局部结果/独立反例暂未发现阻塞缺陷，准入固定clean6cb的一次完整 ResourceWarning-strict regression。要求外置durable launcher落盘真实OS exit、全日志、source/environment前后identity并绑定committed源；完整测试尚未完成，当前不予最终ACCEPT或切实际交付。旧279绿、synthetic ZIP与本准入不能作为新App/Human PASS。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
