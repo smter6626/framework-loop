@@ -361,6 +361,10 @@ Reviewer 指令明确: 作用域 ContextVar 必须 finally reset，不让 legacy
 
 源码/必要局部结果/独立反例暂未发现阻塞缺陷，准入固定clean6cb的一次完整 ResourceWarning-strict regression。要求外置durable launcher落盘真实OS exit、全日志、source/environment前后identity并绑定committed源；完整测试尚未完成，当前不予最终ACCEPT或切实际交付。旧279绿、synthetic ZIP与本准入不能作为新App/Human PASS。
 
+唯一 full 已实际启动: `/Users/smterpro/Downloads/rel1c1-fixtures.lightweight-full.9Twvhh/`，launcher 为外置 `rel1c-lightweight-check.wNr3ld/full-launcher.py`。启动时 collector PID13681/PPID1/session13681，test PID/PGID13904；这些是历史 locator，任何后续进程操作必须重新验证实际身份，不按旧 PID 杀进程。`process.json` 保存 argv/时间/精确HEAD；`full-strict.log` 与 collector.log 本地0600，root0700。
+
+source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739e、environment-before SHA9608afdc89aca17b9549c0dc2b8b062a2b62a588be51cfcba2f214ea8b4ecc49。collector 对实际 test wait 落盘 `full-result.json`、source-after/environment-after，先读取已有结果与源绑定再决定恢复，不重跑或把收集器状态当测试exit。当前状态 `RUNNING / FULL RESULT NOT YET AVAILABLE`；真实交付与Human包验收尚未开始。主 Reviewer已直接读取launcher/实际process和原日志，独立核11 paths及native/delta/probe结果，暂未发现blocking finding。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
