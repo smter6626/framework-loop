@@ -6,7 +6,7 @@
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
 - 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / ACTUAL DELIVERY PREPARATION ACTIVE`。
-- Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`。主助手独立复核，非新machine run/config；历史machine COMPLETED/transition原样保留，详见第20节及独立summary。
+- Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
 - C2/C3 旧实现及新轻量实现均关闭，唯一 Active Step 是顶层 Step2 的实际集成准备；旧部署 gate 已被第21节替代。真实 push/merge/build 尚未执行，不 resume 旧 terminal 配置。详细新接受见第22节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
 - 最后更新: 2026-10-07，America/New_York。

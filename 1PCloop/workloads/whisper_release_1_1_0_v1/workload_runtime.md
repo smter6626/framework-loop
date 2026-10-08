@@ -5,16 +5,16 @@
 - Task ID: `whisper_release_1_1_0_v1`
 - 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 ACTUAL DELIVERY PREPARATION ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
-- 当前方向: Human 已选择并授权轻量模式，主 Reviewer 控制一个新桌面 Executor 简化批准/认证入口，再经独立接受推进真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第31节与子 Runtime 第21节；第20/30节接受及旧 machine COMPLETED 不改。
+- 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-07，America/New_York。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
-- 执行门禁: 轻量新实现须经独立接受后再真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终 tag/API 写入仍须精确包 Human PASS 和明确允许。旧 run/account binding 不变。
+- 执行门禁: 轻量实现独立接受已满足，精确本地approval/refs须经Reviewer核后才真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终tag/API写入仍须精确包Human PASS和明确允许。旧run/account binding不变。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
 - C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新local独立接受HEAD `0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新local独立接受HEAD `6cbba5d02074311467be56ac349e44dea097a804`，clean、无target push；旧0c及更早01cb904保留。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
 ## 2. 已完成的准备与直接事实
 
