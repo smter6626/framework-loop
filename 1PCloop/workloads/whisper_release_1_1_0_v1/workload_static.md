@@ -1,5 +1,21 @@
 # Whisper 1.1.0 发布自动化 -- Static 稳定合同
 
+## 当前生效的轻量执行合同 -- Human supersession
+
+Human 于 2026-10-03 明确选择 "按照轻量模式来，用prompt约束和要求既可，不需要完整权限隔离机制"，并定义 "agent做到人工核验的前一步-我人工测-测完允许agent自己发布release"；于 2026-10-07 授权开始下一步。以下条款优先于本文旧的生产主体、批准机制和认证部署描述。旧文保留来源与历史，不能用旧重型要求阻止当前轻量路线。
+
+- 主助手为 Reviewer，控制一个桌面 Executor 子智能体；不启动新的 1PCloop、不修改普通 runner、不伪造 machine verdict。角色权限由明确 prompt 和 Reviewer 分阶段审核约束，不承诺 OS 隔离或同 UID 恶意 Agent 无法伪造批准。
+- 顺序为: 轻量实现/测试 -> Reviewer 独立接受 -> 实际隔离集成/完整测试/普通 feature-main push -> 固定 main source 的 fresh 正式构建/ZIP/自动验包 -> Human 测试该精确包并明确允许 -> Agent 发布同一 ZIP 并下载核验。实现阶段 Executor 只改批准路径、测试、本地普通提交；Reviewer 接受后才能进入实际交付阶段。
+- 不部署 root-owned entry、专用可信 Python 目录、签署私钥、密码学 receipt、专属系统组或自建认证桥。可以使用当前固定开发工具以及正式 bootstrap 获取的 pinned 环境，记录来源和字节；不能把来源不明旧 dist 当正式包。
+- 普通 Git/gh 原生使用现有登录。只核验非秘密身份、工具、固定 repo/ref 和必要权限；不提取/打印 token、不读取个人私钥、不复制凭据、不改全局 Git/Codex Mix 配置，不无故改变 SSH/HTTPS。
+- 实施接受、final-main 复核和 Human 精确 artifact 决定采用有明确对话/审核 reference 的普通本地审计记录。哈希用于绑定事实，不授予权限，也不声称密码学不可伪造。Executor 不得制造 Human PASS；Reviewer 只能引用真实 Human 决定。
+- 最终 Human 测试并明确允许之前，禁止真实 tag/draft/upload/publication。记录具体 source、ZIP path/size/SHA-256、保留解压 App 与决定 reference；改码、重建、换包必须重新测试。现在没有该份包的 Human PASS。
+- 固定产品/repo/ref/asset、pins、原构建和 Runtime/ZIP 实验、源码完整集成、保守恢复、隐私、不 force/clobber/历史删除等工程约束继续生效。未知副作用先真实对账，不能用同名对象或重算 state 宣称归属；无法确定则停机。
+- 下文 REL-AC-01 的权限分工按 prompt-based 角色及实际阶段解释；REL-AC-05 的批准真实性按真实 Human reference 与精确包绑定解释，不再要求独立生产签署路径。其余验收的源码、产物和远端事实必须实际证明。
+- 已封存 REL1A/B/C1/C2/C3 evidence 和 machine records 保持不变；旧签署实现可以保留为历史兼容，但不能被用作新轻量执行的隐含门禁或测试绕过入口。
+
+当前技术实现与状态由 REL1C 的新轻量阶段管理；旧 [production_deployment_proposal.md](production_deployment_proposal.md) 已被本决定替代，不部署。
+
 ## 1. 合同身份与授权
 
 - Task ID: `whisper_release_1_1_0_v1`

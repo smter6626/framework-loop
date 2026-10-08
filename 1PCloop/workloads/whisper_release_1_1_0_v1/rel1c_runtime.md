@@ -2,14 +2,14 @@
 
 ## 1. 现在做到哪里，用人类语言说明
 
-发布工具的"版本与验包基础层"、"合并管理员"和C1构建/人工批准控制层已独立审核通过。Human已批准将C2/C3和人工验收前自动化合并交付，继续由主助手Reviewer + 一个新桌面子Executor执行，不启动1PCloop。先完成并审核实现，再处理生产部署/认证门禁；真正集成/构建后才交给你验收最终ZIP解压App。
+发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `C1/C2/C3 LOCAL IMPLEMENTATION ACCEPTED / AWAITING OWNER PRODUCTION DEPLOYMENT AND TRANSPORT DECISION`。
+- 状态: `REL1C-LIGHTWEIGHT IMPLEMENTATION ACTIVE / NOT YET INDEPENDENTLY REVIEWED`。
 - Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`。主助手独立复核，非新machine run/config；历史machine COMPLETED/transition原样保留，详见第20节及独立summary。
-- C2/C3联合local实现关闭，无运行Agent/test；当前门禁为Owner生产部署/认证决定，不是产物人工验收。整体父Step1的生产交付及Step2-5未完成；不得对旧terminal配置resume。
-- Static: [rel1c_static.md](rel1c_static.md)，当前SHA-256 `c5992a640555c421e782f840591c0bb15842b05702baacda1f2e8ca970bfa810`；原编排版本hash ba7a0213...只用于历史。父Static SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
-- 最后更新: 2026-10-03，America/Phoenix。
+- C2/C3 旧实现关闭，唯一 Active Step 是 REL1C-LIGHTWEIGHT；旧部署 gate 已被第21节替代。实际 Step2-5 仍未执行，不 resume 旧 terminal 配置。
+- Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
+- 最后更新: 2026-10-07，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -306,6 +306,25 @@ Human报告usage limitation后明确要求继续。直接核target clean候选 `
 该接受仅local实现，不构造新的1PCloop machine ACCEPT/transition。PT-REL-01仍RESOLVED，k=1不变；父Static/封存B及历史拒绝不改。产品README的candidate审核语义是实现提交当时快照，未来生产/发布文档更新仍须按真实阶段，不用它证明已部署。
 
 当前停在 [生产部署方案](production_deployment_proposal.md) 的Owner gate。固定trust/root入口/可信Python/签署receipt未部署；Git ordinary push认证桥尚未实现且须先具体Owner授权再有界实现/复核，现gh协议也未部署。不得直接关闭整体Step1生产交付、执行main集成或把synthetic ZIP交人工；无正式App/ZIP/Human产物PASS/真实tag/draft/upload/publication。下一步是Owner决定部署/transport方案，之后受控程序才可继续至父Step4。
+
+## 21. REL1C-LIGHTWEIGHT -- Human 授权的唯一当前步骤，2026-10-07
+
+完整读取轻量 handoff 后，核 framework main0092329 与 target clean0c3449b，重读实际父/子合同、Runtime、旧 C2/C3 独立 summary 及入口/批准/Integration/artifact/Human/publisher 依赖。Human "授权开始下一步" 生效；旧第6/8/20节部署与认证桥 gate 被明确替代，不部署旧 proposal。
+
+目标: 用 prompt-based Reviewer/Executor 分工、普通本地决策 reference 和既有 Git/gh 登录实现实际可执行发布路径；保留真实源码、构建、ZIP、远端对象、恢复和隐私校验。不承诺 OS 隔离或密码学 Human 决定不可伪造。继承 k=1，PT-REL-01 已 RESOLVED，旧 machine block 与记录不动。
+
+阶段顺序:
+
+1. 读取依赖/影响 -> 最小轻量方案 -> Reviewer 固定文件和测试范围 -> 子 Executor 实现/测试/本地 commit。
+2. 主 Reviewer 独立审核及必要窄 REJECT/repair；源未定稿不反复运行昂贵全量。旧 279/279 不自动适用于新字节。
+3. 接受后用审核过的轻量入口和正常 native Git/gh 认证，实际隔离集成/完整测试/普通 push，固定 main source，fresh build/ZIP/自动验包。该实际阶段是已授权目标，不再要求系统 root/key/transport 部署。
+4. 停在 Human 验收: 提供精确 ZIP/source/size/hash/保留 App 与启动测试流程。Human 测试并明确允许之后才发布同一包及下载比对。
+
+子 Executor 本轮禁止治理修改、自 ACCEPT、真实 target push/merge/build/tag/API、读取/复制凭据、任意更改 pins/产品功能/用户 worktree；测试为新 Downloads fixture/local bare/fake gh。后续实际交付由 Reviewer 显式切阶段，不能让实现 turn 的禁止项永久阻断已经批准的交付。
+
+初始具体产品路径批准范围: 新 `scripts/release_lightweight.py` 与 `testCodes/test_release_lightweight.py`；`README.md`、`README.zh-CN.md`、`PACKAGING.md`、`docs/repo_map.md`。先提出方案，不要求一定采用新文件；如复用现 helper 需要耦合修改，先说明精确路径/影响/回归，由 Reviewer 追加，不静默扩大。已有 root/signature 路径可保留历史兼容，新入口不能用 fixture key 或 monkeypatch 当生产绕过。原 shell/Runtime/ZIP/provenance/pins 保持真实调用及默认行为。
+
+当前 verdict: `NOT EVALUATED -- LIGHTWEIGHT IMPLEMENTATION`，尚无正式包或 Human PASS。实际派发、必要 allowlist 补充、测试与复核结果追加到本节；不把桌面子任务伪造为新 1PCloop run。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

@@ -1,11 +1,26 @@
 # Whisper 1.1.0 REL1C -- Static 稳定合同
 
+## 当前生效的轻量阶段 -- 优先于下文旧重型机制
+
+Human 于 2026-10-03 选择 prompt-based 轻量发布，并于 2026-10-07 授权继续。执行主体为主 Reviewer + 一个桌面 Executor；父合同的 "当前生效的轻量执行合同" 为权威。本文后面的 root/trust/签署/认证桥要求及第8节生产 Owner gate 已被替代，保留仅为旧实现的历史背景，不是待批准事项。
+
+交付目标: 在已接受 C2/C3 基线上简化实际可执行入口与批准/认证，再完成真实集成、正式 fresh build 和验包，停在精确 ZIP 的 Human 黑盒测试前。人工通过并明确允许之后，Agent 可自行发布同一包。新轻量实现必须独立审核，旧 279/279 不自动覆盖新代码。
+
+- 不安装 root entry、不新增签署 key、专属 group 或认证桥。现有 Git/gh 原生登录可使用，不读取/输出凭据内容或更改个人登录。
+- 最小复用已有 Git 事实、build/Runtime/ZIP、固定 GitHub 对象与恢复能力；可以新增明确轻量入口和普通本地审计记录，不能用 fixture Policy/key 假冒生产路径，也不为保留旧 schema 而继续要求重型部署。
+- C-AC-01 改为实际轻量入口、Reviewer/Executor prompt 权限与阶段 gate；C-AC-04 改为真实 Human reference 与精确 source/artifact 决定绑定。缺决定、旧包/换包、FAIL、重建不能启用发布，不再要求密码学抵抗同 UID 恶意写入。C-AC-02/03/05/06/07/08 的真实源码、包、远端及恢复事实继续保留。
+- Reviewer 先固定路径与依赖影响；Executor 读取依赖、提出最小计划、实施测试和本地普通提交，不写治理、不自 ACCEPT、不提前真实 push/merge/build/tag/API。经独立接受后，Reviewer 切到实际交付阶段，使用已审核工具推进普通 push/隔离集成/正式构建，不再被实现 turn 的禁止项永久阻断。
+- 不改产品 UI/ASR/模型、pins、manifest/schema 身份，不重写封存 REL1B、旧 run/account/config/evidence，不动用户 worktree。未完成的 build 使用新 attempt，保留旧 evidence，不覆盖已固定产物。
+- 输出人类可读进度，完整元数据留本地；测试 fixture 与正式产物明确区分。测试先小范围与 Reviewer 反例，再固定最终源做必要回归，避免未定稿反复运行昂贵 full。
+
+本阶段具体 Static hash、执行 prompt、allowlist 与证据在 Runtime 记录。只允许先推进至最终 ZIP 人工 gate；发布必须另有该份包的 Human 测试通过及明确允许。
+
 ## 1. 身份与审批边界
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段: `REL1C`，属于顶层Step 1的实现工作。
 - 状态: `AUTHORIZED`。
 - Human Owner: 本对话项目Owner。
-- 父合同: [workload_static.md](workload_static.md)，SHA-256 `47a90b305e5fa80eeec44dba75244e6a8482c1a121154c53a76f14d20dcc79a7`。
+- 父合同: [workload_static.md](workload_static.md)，当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`；旧 47a90b30... 为 supersession 前历史。
 - 配套状态: [rel1c_runtime.md](rel1c_runtime.md)。模板参考framework现有中文Static/Runtime模板。
 
 Owner于2026-10-01审阅草案后明确说"批准启动，给出启动指令；然后写一个交接文档-给你自己看"，据此批准REL1C合同及三个有界子循环，启动由Human手动执行，首先只激活REL1C1。该决定不授权生产信任部署或真实发布；普通Agent权限仍不含真实push/merge/tag/API写入、正式App构建或治理修改。父合同有冲突时暂停，不能用本子合同扩大权限。

@@ -1,7 +1,9 @@
 # Whisper 1.1.0 -- 正式构建前的生产部署决定
 
 日期: 2026-10-03 America/Phoenix。
-状态: `PROPOSAL / NOT AUTHORIZED OR DEPLOYED`。本文是主Reviewer整理的待Human决定方案，不是批准记录、生产key、Human产物PASS或已完成发布的证据。
+状态: `SUPERSEDED BY HUMAN LIGHTWEIGHT DECISION / NOT DEPLOYED`。
+
+Human 于 2026-10-03 明确拒绝完整权限隔离机制，选择 prompt 约束与 "Agent做到人工核验前 -> Human测试并允许 -> Agent发布同一包"，2026-10-07 授权继续。本文下面的 root entry、签署、专属组和认证桥只保留为过时 proposal，不执行、不再请求相同授权，也不作为当前集成/build 门禁。当前合同见 [workload_static.md](workload_static.md) 与 [rel1c_static.md](rel1c_static.md) 首节。未创建正式包、未取得精确 Human PASS 或执行发布。
 
 ## 1. 目前为什么不能直接交你验包
 
