@@ -3,8 +3,8 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `LIGHTWEIGHT RELEASE IMPLEMENTATION ACTIVE`。
-- Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`；整个Step1生产交付和发布未完成。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 ACTUAL DELIVERY PREPARATION ACTIVE`。
+- Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
 - 当前方向: Human 已选择并授权轻量模式，主 Reviewer 控制一个新桌面 Executor 简化批准/认证入口，再经独立接受推进真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第31节与子 Runtime 第21节；第20/30节接受及旧 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
@@ -12,7 +12,7 @@
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: 轻量新实现须经独立接受后再真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终 tag/API 写入仍须精确包 Human PASS 和明确允许。旧 run/account binding 不变。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
-- C2/C3 旧 local 实现关闭；当前唯一 Active Step 为 REL1C-LIGHTWEIGHT 实现/复核，不 run/resume 旧 terminal 配置。不把当前新阶段授权当作最终 ZIP 人工通过。
+- C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
 - 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新local独立接受HEAD `0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`，clean、无target push；原延续启动HEAD01cb904。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
@@ -68,7 +68,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 4. Step 1 -- 发布工具、版本一致性与自动化边界
 
-状态: REL1A/B/C1/C2/C3 旧 local 实现已独立接受；REL1C-LIGHTWEIGHT 是当前唯一 Active Step，完成并审核新轻量入口后才能进入实际交付。旧部署/transport gate 已被第31节 Human supersession 替代，原证据与失败历史保留。
+状态: `ACCEPTED -- LIGHTWEIGHT IMPLEMENTATION AT6cb / IMPLEMENTATION PHASE CLOSED`。完整292/292及独立复核见第32节；旧部署/transport gate 已被第31节替代，原证据与失败历史保留。真实集成/build/Human/package/release不在本实现接受范围。
 
 - Objective: 在固定功能基线上实现发布 workflow 及版本/打包支持，通过独立审核后才能进入真实集成/build/publication。
 - 初始功能基线为0388fa9，REL1A/REL1B后已前进到accepted91e5479；当前实现分支及建议target见第1节和REL1C Runtime，不再从初始feature重建。实际启动以新config绑定的当前branch/HEAD/clean为准，不使用旧终态配置或改为main。
@@ -83,7 +83,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 5. Step 2 -- 受控集成与固定源码
 
-状态: `QUEUED`，仅 Step 1 machine + 独立审核通过后可激活。
+状态: `ACTIVE -- ACTUAL DELIVERY PREPARATION`，依据Step1既有machine历史、桌面轻量实现独立接受和Human已授权的工作流激活，详见第32节。先只读准备精确refs/普通approval draft，Reviewer核后再真实执行；不伪造新的machine ACCEPT。
 
 1. 核对已接受 implementation commit、工具 hash、当前批准 Static、feature/main 预期 refs 和 GitHub repo identity；必要时先普通 push 已接受实现分支。
 2. 在 Downloads 独立 clone 中集成，保持原用户 worktree 无变化；处理当前非 fast-forward 关系，确保 remote main 和已接受 feature 均为最终 commit 祖先。冲突/意外 drift 停止，不自动丢弃一边。
@@ -144,7 +144,7 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: REL1C-LIGHTWEIGHT，见子 Runtime 第21节；第4/11节 C1 config 仅历史，不 resume 旧终态。
+- Current Executor Handoff: Step2实际交付准备，见子 Runtime 第22节；第4/11节 C1 config 仅历史，不 resume 旧终态。
 - Next Direction: 轻量实现独立接受 -> 实际隔离集成与 fresh 正式构建 -> Human 最终 ZIP 测试并允许 -> Agent 发布同一 ZIP。旧 deployment proposal 已 superseded。
 
 ## 11. 直接输入导航
@@ -341,6 +341,14 @@ Human 于 2026-10-03 选择 "按照轻量模式来，用prompt约束和要求既
 - Human 精确 ZIP 测试与明确允许之前零 tag/draft/upload/publication。当前无正式包、无该份包的 Human PASS。不要再请求旧重型部署许可；真实 auth 不可用时仅报告具体必要操作。
 
 详细执行路径、prompt 和证据在子 Runtime 第21节管理；本节 supersedes 第30节的 Owner production gate，但不改变第30节历史接受范围。
+
+## 32. 轻量实现接受与 Step2 激活 -- 2026-10-07
+
+唯一完整strict292/292、4963.629s，真实test0/collector0；106source tested/current/committed一致，19157环境前后完全一致，进程及ownedgroups结束。主Reviewer重读源码、直接Git blob/完整292OK blocks/日志及六独立反例，正式接受local clean6cbba5d(parent0c)轻量实现。证据见 [轻量独立summary](../../evidence-summaries/whisper-lightweight-release-independent-review-20261007.md) 与子 Runtime 第22节。不继承旧279、不冒充第二份full或新的1PCloop machine run。
+
+Step1实现关闭，唯一 Active Step `Step2 -- 实际交付准备`，顶层 k 从1推进2，PT-REL-01仍RESOLVED，无未处理deadline pending。旧machine块/transition/封存B与所有失败历史保持不变。Step3-5queued，当前无正式App/ZIP或精确Human PASS。
+
+同一桌面Executor先准备新Downloads管理根、fresh origin/main/feature/tag/Release及baseline、普通0600审计approval draft(真实Reviewer reference与Human原授权reference)，不复制凭据、不用fixture开关。主Reviewer核具体schema/源/refs/36 tools及当前Static hashes后切EXECUTE；之后已审核controller实际普通feature/main push、隔离集成和完整merged-source gate，再独立接受final-main source。最终包仍须fresh构建和Human测试并明确允许后才能真实tag/draft/upload/publication。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

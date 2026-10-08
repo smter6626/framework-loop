@@ -5,9 +5,9 @@
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `REL1C-LIGHTWEIGHT IMPLEMENTATION ACTIVE / NOT YET INDEPENDENTLY REVIEWED`。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / ACTUAL DELIVERY PREPARATION ACTIVE`。
 - Verdict: `ACCEPT -- C2/C3 LOCAL IMPLEMENTATION AT 0c3449b5b946cfc4ee6d138dd2ddaf0f5d02b838`。主助手独立复核，非新machine run/config；历史machine COMPLETED/transition原样保留，详见第20节及独立summary。
-- C2/C3 旧实现关闭，唯一 Active Step 是 REL1C-LIGHTWEIGHT；旧部署 gate 已被第21节替代。实际 Step2-5 仍未执行，不 resume 旧 terminal 配置。
+- C2/C3 旧实现及新轻量实现均关闭，唯一 Active Step 是顶层 Step2 的实际集成准备；旧部署 gate 已被第21节替代。真实 push/merge/build 尚未执行，不 resume 旧 terminal 配置。详细新接受见第22节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
 - 最后更新: 2026-10-07，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -364,6 +364,16 @@ Reviewer 指令明确: 作用域 ContextVar 必须 finally reset，不让 legacy
 唯一 full 已实际启动: `/Users/smterpro/Downloads/rel1c1-fixtures.lightweight-full.9Twvhh/`，launcher 为外置 `rel1c-lightweight-check.wNr3ld/full-launcher.py`。启动时 collector PID13681/PPID1/session13681，test PID/PGID13904；这些是历史 locator，任何后续进程操作必须重新验证实际身份，不按旧 PID 杀进程。`process.json` 保存 argv/时间/精确HEAD；`full-strict.log` 与 collector.log 本地0600，root0700。
 
 source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739e、environment-before SHA9608afdc89aca17b9549c0dc2b8b062a2b62a588be51cfcba2f214ea8b4ecc49。collector 对实际 test wait 落盘 `full-result.json`、source-after/environment-after，先读取已有结果与源绑定再决定恢复，不重跑或把收集器状态当测试exit。当前状态 `RUNNING / FULL RESULT NOT YET AVAILABLE`；真实交付与Human包验收尚未开始。主 Reviewer已直接读取launcher/实际process和原日志，独立核11 paths及native/delta/probe结果，暂未发现blocking finding。
+
+## 22. 轻量实现独立 ACCEPT 与实际交付准备 -- 2026-10-07
+
+主 Reviewer 正式接受 clean6cbba5d02074311467be56ac349e44dea097a804 的11路径实现，普通后继0c，不是正式包或release接受。唯一fresh full292/292、4963.629s、真实test0/collector0；106 tested/current/committed source及mode一致，19157环境before/after身份与bytes完全一致，ownedgroups/进程已退出，防休眠已自动释放。主Reviewer另读完整log并解析292完整OK blocks、原Git blobs/source/env快照与六独立probe，未复跑第二full、未发现阻塞缺陷。
+
+完整scope、source/工具/局部与full日志/hash、独立路线及剩余限制见 [轻量独立summary](../../evidence-summaries/whisper-lightweight-release-independent-review-20261007.md)，Reviewer reference `lightweight-independent-review-20261007`。所有旧REJECT、machine state/transition和封存B保留。
+
+现在唯一 Active Step 为 `STEP2 -- ACTUAL DELIVERY PREPARATION`。已给同一 Executor 后续阶段指令: 先fresh只读核origin/refs/tag/Release与实际Git baseline，准备新Downloads根的普通local approval draft/schema/path/真实references及预算/恢复计划，交主Reviewer核后才能执行已授权的普通feature/main push、真正分叉集成与merged-source严格gate。不得在draft尚未核对时直接push或把独立full当merged-source测试。
+
+父Step1轻量实现已接受，Step2实际集成准备active，Step3build/Step4精确ZIP人工测试/Step5publication仍queued。此刻尚无正式main接受、App/ZIP或Human artifact PASS；零tag/draft/upload/publication。原Owner root/key/group/桥gate不再作为阻塞，Git/gh正常认证实际可用；需要真正新敏感权限或远端冲突才向Human报告具体事项。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
