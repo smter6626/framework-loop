@@ -385,6 +385,20 @@ source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739
 
 当前唯一 Active Step 为 `STEP2 -- ACTUAL INTEGRATION EXECUTING`。本授权不含正式App构建、编造final-main ACCEPT、Human包PASS或真实tag/draft/upload/publication；真实集成成功后仍由主Reviewer独立核source/refs/tests再给plain integration receipt。
 
+### 实际 attempt 失败 -- 外置观测器 REPAIR，不是产品源码 REJECT
+
+原actor正常启动真实CLI，collector79513/controller79743/caffeinate79744。原Integration已普通featurepush到6cb、真正两父级merge到aaf/treeb939、fresh Python bootstrap及原5/5smoke(0.928s)成功。main尚未更新，journal `MERGED / intent STRICT`，没有strict日志/main receipt。未正式build或创建tag/Release。
+
+外置collector在STRICT观察时 `assert path.lstat() == before` 触发AssertionError，把读取fresh文件本身造成的st_atime变化误判为漂移；其finally因此杀掉自己的controller(group)，真实exit -9、collector1、总125.371s，记录 `COLLECTOR_OR_OPERATION_FAILED`。这是Executor写的辅助监控错误，不是strict测试timeout、源码controller失败或通过。新collector不能把自己的结果替代原controller gate。
+
+子Executor只读定位7192处差异均仅access time；原controller身份/proof合理排除了atime。主Reviewer另从Git objects核当前actualclone HEAD=aaf/treeb939/orderedparents及110个source bytes/mode/clean，未见冲突，直接读原bootstrap完整5/5。旧fixture/full全绿仍不足以证明辅助脚本首次fresh-real观察正确；此前实现ACCEPT不改写成整体真实交付完成。
+
+失败raw保持 `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-delivery.LRqhAz/`，`integration-operation/operation-result.json`、原launcher/log/journal/env不覆盖。当前不resume旧root、不删除环境、不重复push或假写strict通过。main fresh仍d0f，feature已6cb、tag未创建；未来新attempt须重核，不使用旧snapshot永久假设。
+
+主Reviewer批准有界外置collector v2及new independent Downloads retry准备，产品源码/工具6cb不改、不重复implementation full。v2仅排除read-only atime，仍绑定dev/inode/mode/uid/nlink/size/mtime/ctime、symlink/bytes；启动前以synthetic观测fixture验证正常first-read及真实替换/改动拒绝。纯观测不可用标UNAVAILABLE，不把它伪装为proof或误杀原controller；真正identity冲突仍停止。新approval保留same6cb/main/base/tools/contracts/真实references，显式feature_prior=6cb、newid/newmanaged/workflow、operation metadata retry_of指向原失败。不修改approval schema或旧记录。
+
+先交Reviewer v2/局部验证/draft，再登记核准并EXECUTE；未重新启动。预计原Integration会向已经exact存在的feature调用一次无变更push，必须诚实区分调用和实际ref变化。Step2仍active(监控repair/retry准备)，Step3-5 queued，无正式包/Human PASS或publication。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
