@@ -522,6 +522,12 @@ canonical最终launcher SHA `dc91be3989f74c8b724aca2ff5ad95e52a29e8d5661cdea6831
 
 顶层保持Step3/k3，内部source更新前置已完成，下一仅新root/fresh正式buildattempt；旧79be actual292/正式失败42b24/native诊断都原样保留。新formal启动只原BuildController/原sixcheckpoint/真实Runtime/App/verifier/ZIP，不用diag包或旧dist。完成主独立审核再给精确ZIP人工测试，未得到该包HumanPASS+允许前零tag/draft/upload/publication。
 
+### Retry4 新正式 build 实际启动 -- 非产物 PASS
+
+主read最终外置脚本相对先前受审版的diff，只更新root/accepted/main/tree/auth/真实receiptSHA。最终launcher SHA `b97b962270c76be78aff0e4aa9d3cb908e52daa7af7dd9698e68533b9672dae8`，ownedwrapper SHA `e1afa3e128d644ef0ffa14344c9d893fb148d58f0920f988696c54b03c6097d5`；原preflight/guard通过，主明确EXECUTE，不由Executor自授权。
+
+真实collector4438(PPID1/PGID/SID4438)、controller4907(PGID4907)、caffeinate4908已ownedsessionack，`build-operation/process.json`和controller.log均0600，prepare唯一启动。PID仅历史locator，后续须fresh核身份。当前新formalworkflow准备阶段，无artifact/result/HumanPASS，不重启full或旧failedattempt。原BuildController/6checkpoints/Runtime/ZIP与原timers保持，完成主独立审包再交Human。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
