@@ -510,6 +510,18 @@ canonical最终launcher SHA `dc91be3989f74c8b724aca2ff5ad95e52a29e8d5661cdea6831
 
 原Integration已普通featurepush2c3，真实merge014a/treebac9匹配，freshPython bootstrap5/5，0.959s。唯一actualmerged-source297完整strict已启动，日志 `integration/evidence/strict-d64331a00cd3406faf3e348a7ab937c1.log`，MERGED/STRICTseq11。main仍79be，不能把启动、局部绿或诊断native包当最终source/artifact PASS；没有新integrationreceipt/正式workflow/Human或tag/API。顶层仍Step3内部source修复前置，完整真实结果后主独立审核才推进新正式包。
 
+## 25. Retry4 新 source gate 与独立 ACCEPT -- 2026-10-09
+
+额度中断未停止detached流程。唯一实际297/297 ResourceWarning-strict通过，4345.282s，真实controller0/collector0，总4486.455s，original COMPLETE/FINAL_MAIN_REVIEW_REQUIRED；implementation/merged源码及环境四项unchanged、observation AVAILABLE。main现 `014a609fcc7ab26be8820f4399cdaa19225498e1`，tree `bac9cd36aa9d2adf646f8b62be43a95599b1c87d`，parents[79be,2c3]、baselinec66、feature2c3、tag不存在。旧PID已退出，不重启full或将中断误报成失败。
+
+- actualroot `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry4.KbFkF4`；`integration-operation/operation-result.json` SHA `832ab3bdb77fde0b06611d49daab2f02b63dba096eb8763fac47c79aaa061bcd`。
+- 原strict `integration/evidence/strict-d64331a00cd3406faf3e348a7ab937c1.log` SHA `ceabe327d1666135474df93a972bfb21331a4b2cd3df8a40296ddba3703ecc01`，完整297/4345.282/OK，无ResourceWarning或未处理traceback。原freshPython5/5 bootstrap log SHA `24d44a815cbdeecf7225b0fc5faa33153a6cc936fabb30925ab30c1998100266`。
+- 主Reviewer直接核actual110tracked bytes/mode/34tools、原日志/journal logs、merge objects/parents/base/真实refs及七main文档保留/四source-env观测，Verdict ACCEPT ACTUAL FINAL MAIN014a。独立外置audit首版因机械替换误改expected parentSHA拒绝，未产生ACCEPT；新v2只纠正预期SHA与此前独立derive相同，真实source无变更。首脚本保留为Reviewer辅助诊断失误，不当产品REJECT或测试失败。
+- 独立report `/Users/smterpro/Downloads/rel1c-lightweight-review-environment.BQuaEt/retry4-actual-final-main-review.json` SHA `db3d68db27af1bdb435da860a7216b6637ab872502a5c3c81d5befb699ece8e8`。主建立compact `decisions/integration-evidence.json` SHA `c1deddb6bd0b280fb85d835cc8a8f1539a658057627017ddc6eb4985036ebb89`，绑定完整独立报告、source/log/实际exit/hash，不复制raw环境或凭据。
+- 真正plain0600 `decisions/integration.json`由主apply_patch创建，SHA `d78c665b616e53a77de8f1fdd9a06d85bff7aab512bb2ea283170531929c05a6`，reference `reviewer-20261009-final-main-014a609-ACCEPT`/purpose independent-final-main-source。原accepted_source(remote=True)确证有效。不是Human产物PASS，也不是签署或journal自授权限。
+
+顶层保持Step3/k3，内部source更新前置已完成，下一仅新root/fresh正式buildattempt；旧79be actual292/正式失败42b24/native诊断都原样保留。新formal启动只原BuildController/原sixcheckpoint/真实Runtime/App/verifier/ZIP，不用diag包或旧dist。完成主独立审核再给精确ZIP人工测试，未得到该包HumanPASS+允许前零tag/draft/upload/publication。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {

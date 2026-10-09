@@ -3,7 +3,7 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `ACTUAL FINAL MAIN ACCEPTED / STEP3 FORMAL BUILD ACTIVE`。
+- 状态: `REPAIRED FINAL MAIN014a ACCEPTED / STEP3 FRESH FORMAL BUILD ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
 - 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
@@ -14,7 +14,7 @@
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
 - C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，轻量6cb后仅两份test-hygiene修复独立接受为 `c66ed63ed4084e1b02e8a1f7047ae5f6291e9b3f`，clean，feature已普通push；main仍为 `d0f581bb70379239c3147e5c8469d2285ad6620b`。实际retry3正在隔离集成完整gate，旧dirty草稿和失败证据保留，用户worktrees不动。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch codex/release-1-1-0-automation，clean accepted/pushed `2c3e284d2b1b2d748aca8c0c05b8e795452a16bb`。修复后actualmain `014a609fcc7ab26be8820f4399cdaa19225498e1` 经297完整strict及独立source审核接受。当前正式buildroot `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry4.KbFkF4`，旧失败/原79be接受/诊断包保留，用户worktrees不动。
 
 ## 2. 已完成的准备与直接事实
 
@@ -363,6 +363,12 @@ Human要求读取最新handoff后继续到人工校验前。主Reviewer已直接
 实际retry3完成292/292，4677.644s，总5022.553s，controller/collector真实0。main79be/tree748/parents[d0f,c66]、featurec66、tag空、四source/envunchanged true。主Reviewer独立110源码/34tools/文档/object/refs/原日志proof接受；普通0600integration receipt由主生成并由原accepted_source(remote=True)验证通过，locator/hash见子Runtime第24节。实现、actualsource、Human精确包PASS保持分层，无新machine verdict。
 
 Step2关闭，唯一Active为Step3 fresh正式App/ZIP/自动验包，顶层k=3，PT-REL-01已resolved，无deadline阻塞。Step4Human与Step5发布仍queued；accepted工具/同approval/source开新freshbuildattempt，旧失败roots/用户worktree/Static/封存B/认证不动，不部署旧heavy机制，不提前tag/API发布。
+
+## 35. 正式 build 窄修复与 new final-main 接受 -- 2026-10-09
+
+初次真实formal42b24在已PASS的Runtime后误拒官方固定CMake两个内部attrs，保留controller1/203.340s/noApp记录。精确5路径修复只固定两path/hash和build-only opt-in，默认source/Integration仍拒，所有proof/计时/ZIPchecks不变。局部5/61.970s、主独立3/1.118s/实际readonly30403不变、真实native6checkpoints/App/ZIP诊断287.884s均通过并独立接受2c3；诊断包是fixture source，不交Human验收。
+
+新actualretry4真正merged-source297/4345.282s全过，controller/collector0，source/env全不变并普通mainpush014a。主独立actual110source/34tools/objects/refs/原日志审核接受，plain真实receipt已由原accepted_source验证通过，详细hash/REJECT历史/诊断与result见子Runtime第24-25节。旧Step2/79be接受不改写，顶层仍k3/Step3正式freshbuild；未来Step4精确ZIPHuman、Step5同包发布仍queued，无HumanPASS/tag/Release。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
