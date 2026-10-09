@@ -4,10 +4,10 @@
 
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
-- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=2`。
+- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=3`。
 - 状态: `ACTUAL FINAL MAIN INDEPENDENTLY ACCEPTED / STEP3 FORMAL BUILD ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
-- C2/C3旧实现及轻量实现均关闭，唯一Active为Step2新retry3实际集成。旧strict失败保留，c66窄test-hygiene修复已接受；feature更新和新隔离merge完成，正在fresh环境/完整gate，main未更新，正式App/ZIP未构建。旧部署gate被第21节替代，最新状态见第23节。
+- Step2 retry3实际集成已独立接受79be最终main，旧strict失败保留；唯一Active为Step3 fresh正式build，尚无精确包HumanPASS。旧部署gate不复活，不resume旧terminal配置；最新事实见第24节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
 - 最后更新: 2026-10-09，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -463,6 +463,12 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 - Verdict ACCEPT ACTUAL FINAL MAIN79be，reference `reviewer-20261008-final-main-79be529-ACCEPT`(沿用准入日期ID，实际接受2026-10-09)。主apply_patch建立0600普通 `decisions/integration.json` SHA `fd472f9b7734ea9066850cf37c7b1e1e2bf9702329840f937c2aeaf7da528165`，purpose independent-final-main-source，绑定当前auth/source/tree/parents/refs/evidence。原accepted_source(remote=True)真实验证通过，不伪造密码学签署或HumanPASS。
 
 Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh正式build。新原CLI prepare调用既有BuildController/原bootstrap_and_build/六checkpoint/Runtime/ZIP；collector私有077记录0600、child022。不将许可build/runtime/dist/cache生成粗暴冻结，原checkpoint仍审受保护输入和许可输出。外置draft双guard独立2/2通过，收到真实sourceACCEPT后才填receiptSHA/newattempt。完成后自动验包与主独立复核，停精确ZIPHuman gate；无Humanreceipt/tag/draft/upload/publication。
+
+### 正式 build 实际启动快照
+
+最终外置 `build-operation/launcher.py` SHA `391c185ac540374991e241cd3572632f971c2bac058d22e07309bba59ea5f801`，相对draft只有真实receiptSHA替换；owned启动wrapper SHA `ea44ad898448b5f555e6c71c323d1b24a4b25be6d5b5f4224d9f3c9f63cf16ae`。主Reviewer全文read及diff/schema/原source接受验证，授权唯一真实prepare，仍禁止Humanreceipt/tag/API。
+
+实际collector63135(PPID1/PGID/SID63135)、controller63608(PGID63608)、caffeinate63609已真实ack，`build-operation/process.json`固定argv/时间，启动器exit0。这些PID为历史locator，后续操作须fresh查身份；首次正式workflow尚在原preflight/创建阶段，无最终artifact/result，不以启动0当构建PASS。不重复完整测试或集成，正常持续到原构建/验包结束再独立审包。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
