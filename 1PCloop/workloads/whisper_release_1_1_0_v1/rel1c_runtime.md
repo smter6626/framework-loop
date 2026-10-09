@@ -448,6 +448,10 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 
 唯一新collector93319(PPID1/PGID93319)、controller93541(PGID93541)、caffeinate93542已真实owned-session ack；`integration-operation/process.json`固定argv/启动时间。主Reviewer直接核活进程和receipt，不依赖nohup shellpid；PID仅历史locator，后续须fresh核身份。新普通featurepush已记录c66，actualmerge79be/tree748匹配，journal MERGED/BOOTSTRAP，正在fresh原Python获取。尚无完整strict/mainreceipt/正式build。最终退出码/日志/source/env/ref核验后才能独立推进，不把此快照长期当running证明。
 
+### Retry3 full strict 启动 -- 历史快照，须以实际结果收尾
+
+原fresh bootstrap5/5，0.966s；实际managed Python0755。原CLI进入MERGED/STRICT seq11，真正79be合并源码的292项完整回归已开始，日志 `integration/evidence/strict-2af7d45861294363a8030109ab7b9d61.log`。主Reviewer直接读实际测试日志，非syntheticcallback或复用旧full；当前没有mainpush、finalsource receipt、正式包或HumanPASS。完成后必须用真实OS退出、源/环境/refs和日志结果supersede本快照。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
