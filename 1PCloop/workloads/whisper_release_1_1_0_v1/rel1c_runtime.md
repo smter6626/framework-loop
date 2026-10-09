@@ -504,6 +504,12 @@ Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh�
 
 主read原testedlauncher相对差异(仅新root/refs/hashes/retrymetadata)，保持原observer排atime、controller022/collector077/0600/no-clobber/14400有界预算。批准唯一原CLI prepare actualIntegration的297项完整merged-source gate，成功才ordinarymainpush014a，然后主独立finalsource receipt和新正式attempt；不能复用诊断包或旧approval/receipt/失败build。此次是Step3修复所需的内部source重新固定，不倒退顶层k3或删除旧Step2接受。无Human/tag/Release授权。
 
+### Retry4 唯一 actual full 启动 -- 非最终结果
+
+canonical最终launcher SHA `dc91be3989f74c8b724aca2ff5ad95e52a29e8d5661cdea68313d76b5b55b86b`，startupwrapper SHA `e3fcb4fbe40698c047cf4eac31bd7d1df7e13fd0193988cf42a872e04fb482e0`；只metadata/规范输入hash变化。真实collector91894(PPID1/PGID/SID91894)、controller92117(PGID92117)、caffeinate92118已ack，process.json固定argv/时间；PID仅历史locator，后续fresh核，不依赖旧PID操作。
+
+原Integration已普通featurepush2c3，真实merge014a/treebac9匹配，freshPython bootstrap5/5，0.959s。唯一actualmerged-source297完整strict已启动，日志 `integration/evidence/strict-d64331a00cd3406faf3e348a7ab937c1.log`，MERGED/STRICTseq11。main仍79be，不能把启动、局部绿或诊断native包当最终source/artifact PASS；没有新integrationreceipt/正式workflow/Human或tag/API。顶层仍Step3内部source修复前置，完整真实结果后主独立审核才推进新正式包。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
