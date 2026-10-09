@@ -424,6 +424,18 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 
 修复须精确allowlist和独立局部验证，再新attempt/真实approval/explicit retry_of；不重复无变更implementation full，但actualmerged-source full仍必须成功。成功后主Reviewer复核source/tree/parents/ref/proof，才写真正integration receipt并fresh正式build/验包；最终Human精确包测试与明确允许前零真实tag/draft/upload/publication。未重新激活Step1或更改Static/封存REL1B/machine records/认证。
 
+### 已确认根因与窄修复接受
+
+新Downloads实测相同官方Python bytes SHA `bc56ea9cdc0fface1eb75712f871a454324f6cbfec4e30311b197f208a7f3d07` 在077获取时mode0711、022时0755；原ZIP权限反例在077失败、022通过。两处原strict失败由外置启动器umask继承造成。新启动器须让collector仍077/记录0600，但真实controller Popen显式umask022；独立真实父/子/孙权限测试通过，未放宽产品PATH_MODE或ZIP权限核查。
+
+另直接比较旧环境54差异: 43新增(36pyc和7目录)、11变化(3encodings pyc及8父目录)，无删除或其它文件变化。cold原fake-gh test虽成功却新增25pyc/重写3pyc；正确ValidationCacheTests原隔离验证test另新增10pyc。错误class首次诊断lookup与Reviewer首次probe嵌套quote失败均保留为诊断历史，不当产品失败或PASS。根因是fake-gh shebang和显式-I隔离test子进程没有-B，不是凭据、额度或产品功能故障。
+
+窄修复普通后继commit `c66ed63ed4084e1b02e8a1f7047ae5f6291e9b3f`，parent6cb，仅 `testCodes/test_release_publication.py` 和 `testCodes/test_release_workflow.py`。fake-gh及隔离父/子显式-B，原安全assertions不变且增加dont_write_bytecode检查。生产34项实际approval tools(历史36计数更正为本次机械34)逐项bytes不变，native_environment/所有生产helper不改；Static与sealedB不改。当前只本地commit，后续ordinarypush由已审核Integration执行。
+
+独立冷源 `/Users/smterpro/Downloads/rel1c1-fixtures.verifier-cold.I79dI8/source` 原bootstrap5/5；原native UV、原ZIP权限攻击、隔离验证清理、轻量和legacy模拟发布五项184.165s/5PASS、collector186.852s/exit0，18893环境entry前后完全一致。log SHA `e3c9a260357ca397ee04e4f6d9f941231b7db8fe0d4a24c9e4552a8627469b92`；before/after SHA均 `db3b03209decc707cbdd3f447dffbedf0b71242346d4434d005251490898d450`。结果及snapshot在同根 `focused-repair-result.json`、`focused-env-before.json`、`focused-env-after.json`。
+
+主Reviewer直接读完整2-path diff、cold证据/current/committed bytes并另做三项process probes3/3，0.144s；`/Users/smterpro/Downloads/rel1c-lightweight-review-environment.BQuaEt/corrected-reviewer-probes/reviewer-result.json`。据此接受窄test-hygiene修复，reference `reviewer-20261008-environment-c66ed63-ACCEPT`；只准入新actualmerged-source完整测试，不声称新292已经通过，也不复用旧implementation292替代actualgate。唯一Active仍Step2，之后正式包和Human gate仍未执行。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
