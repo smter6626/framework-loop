@@ -470,6 +470,12 @@ Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh�
 
 实际collector63135(PPID1/PGID/SID63135)、controller63608(PGID63608)、caffeinate63609已真实ack，`build-operation/process.json`固定argv/时间，启动器exit0。这些PID为历史locator，后续操作须fresh查身份；首次正式workflow尚在原preflight/创建阶段，无最终artifact/result，不以启动0当构建PASS。不重复完整测试或集成，正常持续到原构建/验包结束再独立审包。
 
+### 首次正式 build 失败 -- 保留 attempt，未生成正式 App/ZIP
+
+原正式attempt `attempt-42b24f1cfca547bd8e923a0c14aca593` 203.340s后controller1/collector1，原CLI `STOP GIT_ATTRIBUTES`。Python5/5、before/after:python、before:runtime通过；固定CMake下载hash/原whisper编译arm64/依赖闭包/--help/Runtimeverify均PASS，但after:runtime前被外层Git审计拒绝。`build-operation/operation-result.json`及原build.log保留，workflow BUILDING/seq2/artifactnull；source/receipt/remote79be-c66不变，owned进程已退出，没有tag/API/HumanPASS。
+
+主与Executor直接定位实际新workspace只有两个官方固定CMake4.2.3内部 `.gitattributes`，路径 `.tools/cmake/4.2.3/CMake.app/Contents/share/cmake-4.2/Templates/.gitattributes`(SHA `6a227c6503009644f6e21a557078543f99795f4b41da66a5fbdd6fd50b5f285b`)和 `Modules/Internal/CPack/.gitattributes`(SHA `8653f74ed421f0a7dabf0f3eedfa2dea98c3540fc474710a8bf35625e37392a0`)。原BuildController.revalidate调用主源码audit_git递归全部ignored工具，也误拒绝已固定下载包的非源码属性文件；不是用户.gitattributes或源码漂移。当前只定位，尚未修复/重跑；下一窄proposal需仍拒绝其它attributes/submodules/info文件，并保留freshacquisition与全部输入快照。失败root/env/state不删除、不硬resume或猴patch绕gate。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
