@@ -476,6 +476,16 @@ Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh�
 
 主与Executor直接定位实际新workspace只有两个官方固定CMake4.2.3内部 `.gitattributes`，路径 `.tools/cmake/4.2.3/CMake.app/Contents/share/cmake-4.2/Templates/.gitattributes`(SHA `6a227c6503009644f6e21a557078543f99795f4b41da66a5fbdd6fd50b5f285b`)和 `Modules/Internal/CPack/.gitattributes`(SHA `8653f74ed421f0a7dabf0f3eedfa2dea98c3540fc474710a8bf35625e37392a0`)。原BuildController.revalidate调用主源码audit_git递归全部ignored工具，也误拒绝已固定下载包的非源码属性文件；不是用户.gitattributes或源码漂移。当前只定位，尚未修复/重跑；下一窄proposal需仍拒绝其它attributes/submodules/info文件，并保留freshacquisition与全部输入快照。失败root/env/state不删除、不硬resume或猴patch绕gate。
 
+### 构建属性规则窄修复 -- 待最终独立接受，非全局放宽
+
+首次正式build result SHA `5abfe8c88bf77601094f522325d8db51ebe4ea9922b3d836fe12fa5f758db9c3`、原build.log SHA `33e765de175ec4d37ffc06a9ae7e09c41bb25954c5988d989bf4d1a644f9109e` 保留。主Reviewer批准先读取完整影响，再精确修改5路径: `scripts/release_integration.py`、`release_workflow.py`、必要下游`release_artifact.py`以及直接`testCodes/test_release_controller.py`和`test_release_workflow.py`。不改产品UI/pins/原构建脚本/Static/封存B/认证，不在旧失败workspace恢复或删环境。
+
+候选audit_git增加默认False且必须literalbool的build opt-in，固定两CMake路径与hash，owner/type/nlink1/0644/真实安全ancestry仍核验，其它.gitattributes/.gitmodules/.gitinfo仍拒；原Integration/source接受/初始fresh目录不opt-in。只有原BuildController.revalidate及严格绑定的fix_metadata构建workspace opt-in，其余source/tools/provenance/ZIP/原输入冻结不改。
+
+首次focused三个audit矩阵通过但原六checkpoint/ZIP结束时下游fix_metadata仍default拒绝导致1error，真实失败61.642s保留；主直接读整个function/allcalls后授权该helper唯一call耦合，再新focused5/5，61.970s。包含17负向subcases、源码默认拒、字面bool、readonly/tracked属性无影响和完整原synthetic六checkpoint/metadata/proof保持及相同bytes换inode拒绝，未声称native正式build通过。
+
+主Reviewer另独立3audit tests/1.118s通过，并对旧真实workspace只读default拒/opt-in通过及30403 snapshot前后一致。为检出真实下游问题，新Downloads诊断 `/Users/smterpro/Downloads/rel1c1-fixtures.cmake-native-diagnostic.xILQK8/diagnostic.py` 采用原真实Python/CMake/whisper/App/verifier/ZIP/六checkpoint，明示DIAGNOSTIC_NOT_HUMAN；唯一fixture seam是新case只读Git exact-root includeIf canonical reader，主全文read核tiny root/nestedview，真实controller Git仍localbare/defaultconfig、whisper仍officialorigin，未改Runtime/verifier/timers或读取凭据。诊断包不能作为Human产物或source批准。源码稳定后只跑一次新actualmerged-source完整gate，再新正式attempt，不用诊断/旧full替代正式source和artifact。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
