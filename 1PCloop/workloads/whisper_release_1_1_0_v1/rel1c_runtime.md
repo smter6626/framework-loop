@@ -5,9 +5,9 @@
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=2`。
-- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / ACTUAL STRICT FAILED / DIAGNOSIS ACTIVE`。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / RETRY3 ACTUAL INTEGRATION ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
-- C2/C3旧实现及新轻量实现均关闭，唯一Active为Step2实际strict失败诊断。feature已push，隔离merge完成，但merged-source完整测试失败，main未更新；正式App/ZIP未构建。旧部署gate被第21节替代，不resume旧terminal配置，最新状态见第23节。
+- C2/C3旧实现及轻量实现均关闭，唯一Active为Step2新retry3实际集成。旧strict失败保留，c66窄test-hygiene修复已接受；feature更新和新隔离merge完成，正在fresh环境/完整gate，main未更新，正式App/ZIP未构建。旧部署gate被第21节替代，最新状态见第23节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
 - 最后更新: 2026-10-08，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -443,6 +443,10 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 主Reviewer重新核真实refs/clean/c66/34tools/Static、严谨schema与原生身份，不读取凭据；apply_patch建立与草稿逐字节相同的0600 `decisions/approval.json`，SHA `e5f052ca05ce702206323e6fafaa6f54a884754c3f910b3f3ecceb2d997a4b62`。普通reference对应本次Human继续授权和独立窄修复接受，feature_prior6cb/main d0f，未自授final-main或Human包PASS。
 
 真实object机械推导并独立核对expected merge `79be5292e217cc600f6191882641320ca2437ce4`、tree `748288939f7ed6607cb1e0134a42dee8b2a3820f`、orderedparents[d0f,c66]。批准新原CLI prepare，允许普通feature快进c66和通过真实merged-source292 strict后普通mainpush；仍须独立final-main审核才建立integration receipt并开始正式build。外置总预算14400s不缩减完整suite，Step3-5尚未执行，零tag/Release写入。
+
+### Retry3 实际启动快照 -- 非最终结果
+
+唯一新collector93319(PPID1/PGID93319)、controller93541(PGID93541)、caffeinate93542已真实owned-session ack；`integration-operation/process.json`固定argv/启动时间。主Reviewer直接核活进程和receipt，不依赖nohup shellpid；PID仅历史locator，后续须fresh核身份。新普通featurepush已记录c66，actualmerge79be/tree748匹配，journal MERGED/BOOTSTRAP，正在fresh原Python获取。尚无完整strict/mainreceipt/正式build。最终退出码/日志/source/env/ref核验后才能独立推进，不把此快照长期当running证明。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

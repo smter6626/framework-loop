@@ -3,7 +3,7 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 ACTUAL STRICT FAILED / DIAGNOSIS ACTIVE`。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 RETRY3 ACTUAL INTEGRATION ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
 - 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
@@ -14,7 +14,7 @@
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
 - C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，独立接受HEAD `6cbba5d02074311467be56ac349e44dea097a804`，clean，feature已普通push；main仍为 `d0f581bb70379239c3147e5c8469d2285ad6620b`。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，轻量6cb后仅两份test-hygiene修复独立接受为 `c66ed63ed4084e1b02e8a1f7047ae5f6291e9b3f`，clean，feature已普通push；main仍为 `d0f581bb70379239c3147e5c8469d2285ad6620b`。实际retry3正在隔离集成完整gate，旧dirty草稿和失败证据保留，用户worktrees不动。
 
 ## 2. 已完成的准备与直接事实
 
@@ -83,7 +83,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 5. Step 2 -- 受控集成与固定源码
 
-状态: `ACTIVE -- ACTUAL STRICT FAILURE DIAGNOSIS`，实际retry已结束且292项有1个failure、1个error；不把旧“运行中”当现状。保留失败根并做局部诊断，独立接受修复后用新attempt继续；见第33节及子Runtime第23节，不伪造新的machine ACCEPT。
+状态: `ACTIVE -- RETRY3 ACTUAL INTEGRATION`，旧292失败永久保留；两个tests及外置启动环境窄修复已局部独立接受，准入唯一新attempt，不硬resume失败根。新root执行实际merged-source完整gate，尚未最终source ACCEPT；见第33节及子Runtime第23节，不伪造新的machine ACCEPT。
 
 1. 核对已接受 implementation commit、工具 hash、当前批准 Static、feature/main 预期 refs 和 GitHub repo identity；必要时先普通 push 已接受实现分支。
 2. 在 Downloads 独立 clone 中集成，保持原用户 worktree 无变化；处理当前非 fast-forward 关系，确保 remote main 和已接受 feature 均为最终 commit 祖先。冲突/意外 drift 停止，不自动丢弃一边。
@@ -355,6 +355,8 @@ Step1实现关闭，唯一 Active Step `Step2 -- 实际交付准备`，顶层 k 
 Human要求读取最新handoff后继续到人工校验前。主Reviewer已直接读实际result与完整日志失败段，fresh核远端feature6cb/main d0f、tag1.1.0不存在，实施工作树clean。实际retry `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry.EXfYF9` 已结束: 292项/4263.423s，1failure、1error；controller真实exit1/STRICT_FAILED，collector另报告environment drift/exit1，总4389.666s。两层问题分别诊断，不能把collector结果替代测试结果。
 
 唯一Active仍为Step2，不重新实现Step1、不硬resume失败根、不删除环境或旧证据。先局部核外置launcher的umask与两个权限测试，并单独核实际environment差异；目前根因尚未确认。轻量授权继续有效，不部署旧重型机制。Step3-5仍queued，无正式App/ZIP、Human精确包PASS或tag/draft/upload/publication。详细locator/hash、复现与后续审核写子Runtime第23节。
+
+随后证实权限mask和synthetic Python字节码写入根因；只改2tests的c66窄修复及外置controller mask022，经cold5/5、18893全环境identity/bytes不变和主Reviewer三process probes接受。生产34tools/Static不变。新root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry3.nSskcd` 的approval/refs/schema/expectedmerge独立核准后唯一真实启动，feature已快进c66，actualmerge79be/tree748吻合；当前fresh原Python acquisition，不把局部PASS代替292full或final-main ACCEPT。最新详细进度写子Runtime第23节，Step2仍active，k2，Step3-5queued。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
