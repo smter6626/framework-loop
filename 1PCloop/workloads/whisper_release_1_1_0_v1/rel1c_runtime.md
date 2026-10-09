@@ -486,6 +486,16 @@ Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh�
 
 主Reviewer另独立3audit tests/1.118s通过，并对旧真实workspace只读default拒/opt-in通过及30403 snapshot前后一致。为检出真实下游问题，新Downloads诊断 `/Users/smterpro/Downloads/rel1c1-fixtures.cmake-native-diagnostic.xILQK8/diagnostic.py` 采用原真实Python/CMake/whisper/App/verifier/ZIP/六checkpoint，明示DIAGNOSTIC_NOT_HUMAN；唯一fixture seam是新case只读Git exact-root includeIf canonical reader，主全文read核tiny root/nestedview，真实controller Git仍localbare/defaultconfig、whisper仍officialorigin，未改Runtime/verifier/timers或读取凭据。诊断包不能作为Human产物或source批准。源码稳定后只跑一次新actualmerged-source完整gate，再新正式attempt，不用诊断/旧full替代正式source和artifact。
 
+### 窄构建修复独立接受并准入新 actual gate
+
+普通local后继 `2c3e284d2b1b2d748aca8c0c05b8e795452a16bb`，parentc66，精确5-path范围，184新增/5删除。主Reviewer累计diff/调用闭包、实际readonly30403输入冻结、独立3audit tests1.118s、局部5/61.970s及default-source拒绝均通过，未取消原34tool身份、原计时/6checkpoint/source/provenance/ZIP gate。reference `reviewer-20261009-pinned-cmake-build-audit-ACCEPT`，接受该窄修复进入新actual完整回归，不声称新297已通过。
+
+真实新诊断根 `/Users/smterpro/Downloads/rel1c1-fixtures.cmake-native-diagnostic.xILQK8` 完整完成，actual child0/collector实际0，287.884s(collector288.001s)，`PASS_DIAGNOSTIC_NOT_HUMAN`。原官方freshPython/CMake/whisper、实际App/PyInstaller/Runtimenormalize/ad-hoccodesign/CLI/version/icon/provenance、六checkpoints及原ZIP/解压 verifier都通过，31458最终proof仍等于invocation live snapshot。result SHA `f2f8f268dd5a5694bf33d2333c5a60e1e36a5afeb4d83d1b51e6568a04ae2748`，actualoperation SHA `9730f416700c1acc62e62543f9723a04be35923ec42948dc15caf366a18d32ed`。
+
+原build evidence SHA `8ec0c83d113d66378552b2b7be7fd25b5a1de25bb0840738b29b6d8e0b0f7477`，package SHA `a67f25c1c229b3a2a67ecdc703b01ae0a9f81eb9b5e6f1839e7082d1534c7e32`；主直接核两日志/hash、actualresult/6events及48307899-byte诊断ZIP实际hash `af8bcb459aafb1b29dd418d55465ba89cc8faad3d9d3e2fd0608138b5c4bd15c`。这是fixture source/localbare/signedfixture与exact-root只读Gitview，不是finalmain79be或新的生产artifact，绝不交Human代替正式包/自造HumanPASS；没有生产trust/key/认证部署。
+
+下一新managed/root基于actualmain79be、featurepriorc66/newaccepted2c3/commonbaselinec66，机械derive真分叉；主核新draft/34tools(3helperhash更新)/原合同/refs后，原Integration唯一actualmerged-source完整297(新增5outer) gate，再独立finalmain接受及新fresh正式build。旧79be实际292与失败build/diagnostic都保留，不换旧approval/receipt、不猴patch恢复或跳gate；正式包仍须Human测试与明确允许才publish。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
