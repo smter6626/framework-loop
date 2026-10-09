@@ -496,6 +496,14 @@ Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh�
 
 下一新managed/root基于actualmain79be、featurepriorc66/newaccepted2c3/commonbaselinec66，机械derive真分叉；主核新draft/34tools(3helperhash更新)/原合同/refs后，原Integration唯一actualmerged-source完整297(新增5outer) gate，再独立finalmain接受及新fresh正式build。旧79be实际292与失败build/diagnostic都保留，不换旧approval/receipt、不猴patch恢复或跳gate；正式包仍须Human测试与明确允许才publish。
 
+### Retry4 真实 source 更新 gate 准入 -- 保持顶层 Step3/k3
+
+新root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry4.KbFkF4`，accepted2c3/featurepriorc66/main79be/commonbaselinec66。主Reviewer从真实localobjects独立derive expected merge `014a609fcc7ab26be8820f4399cdaa19225498e1`，tree `bac9cd36aa9d2adf646f8b62be43a95599b1c87d`，parents[79be,2c3]，仍保留main七文档路径。34tools只有3helperhash更新，原合同/pins未改；旧实际79be sourceACCEPT不撤销，新包必须采用新source gate。
+
+启动前Reviewer发现pretty approval草稿raw不等于canonical，明确REJECT准备格式(不是产品窄修复拒绝)，真实只读复现SCHEMA_INVALID。原pretty/draftlauncher/startup草稿保留，未启动真实controller或产生副作用；Executor新增canonicaldraft而不是放宽schema。主apply_patch创建0600正式approval与新draft相同bytes，SHA `8b74e4e901770911224c6626ddd8e3b9e87c359944ff451e7da2eac711d77e16`，原authorize_workflow真实34tools通过。实际执行只使用该canonical输入，旧rawSHA5ee不再作启动identity。
+
+主read原testedlauncher相对差异(仅新root/refs/hashes/retrymetadata)，保持原observer排atime、controller022/collector077/0600/no-clobber/14400有界预算。批准唯一原CLI prepare actualIntegration的297项完整merged-source gate，成功才ordinarymainpush014a，然后主独立finalsource receipt和新正式attempt；不能复用诊断包或旧approval/receipt/失败build。此次是Step3修复所需的内部source重新固定，不倒退顶层k3或删除旧Step2接受。无Human/tag/Release授权。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
