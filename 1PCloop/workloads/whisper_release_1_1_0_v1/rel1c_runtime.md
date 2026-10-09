@@ -436,6 +436,14 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 
 主Reviewer直接读完整2-path diff、cold证据/current/committed bytes并另做三项process probes3/3，0.144s；`/Users/smterpro/Downloads/rel1c-lightweight-review-environment.BQuaEt/corrected-reviewer-probes/reviewer-result.json`。据此接受窄test-hygiene修复，reference `reviewer-20261008-environment-c66ed63-ACCEPT`；只准入新actualmerged-source完整测试，不声称新292已经通过，也不复用旧implementation292替代actualgate。唯一Active仍Step2，之后正式包和Human gate仍未执行。
 
+### Retry3 实际集成准入 -- 非最终 source ACCEPT
+
+新root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry3.nSskcd`，explicit retry_of指向EXfYF9失败result，不硬resume。主Reviewer直接读完整launcher及相对旧版diff，独立observer/mask7+1全部通过；collector077/0600、controller显式022，外置helper仍v2同bytes，不能授予controller proof。Launcher SHA `77330c2824952ffc45f076183307b6f1a00b6c4fdb14e9cc863be76cb0c03999`。
+
+主Reviewer重新核真实refs/clean/c66/34tools/Static、严谨schema与原生身份，不读取凭据；apply_patch建立与草稿逐字节相同的0600 `decisions/approval.json`，SHA `e5f052ca05ce702206323e6fafaa6f54a884754c3f910b3f3ecceb2d997a4b62`。普通reference对应本次Human继续授权和独立窄修复接受，feature_prior6cb/main d0f，未自授final-main或Human包PASS。
+
+真实object机械推导并独立核对expected merge `79be5292e217cc600f6191882641320ca2437ce4`、tree `748288939f7ed6607cb1e0134a42dee8b2a3820f`、orderedparents[d0f,c66]。批准新原CLI prepare，允许普通feature快进c66和通过真实merged-source292 strict后普通mainpush；仍须独立final-main审核才建立integration receipt并开始正式build。外置总预算14400s不缩减完整suite，Step3-5尚未执行，零tag/Release写入。
+
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
   "active_step": {
