@@ -3,16 +3,16 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `REPAIRED FINAL MAIN014a ACCEPTED / STEP3 FRESH FORMAL BUILD ACTIVE`。
-- Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
-- 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
+- 状态: `FINAL MAIN014a AND FORMAL ARTIFACT REVIEW PASS / STEP4 HUMAN GATE ACTIVE`。
+- Verdict: `AUTOMATED ARTIFACT REVIEW PASS -- HUMAN NOT EVALUATED`；finalmain及正式包已自动/独立审核，不是HumanPASS或发布完成。
+- 当前方向: 精确最终ZIP已生成并独立验包，等待Human测试此ZIP提取App及明确同包发布许可。最新见第36节/子Runtime第25节和包review summary；旧接受及machine COMPLETED不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
 - 更新日期: 2026-10-09，America/New_York。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: 轻量实现独立接受已满足，精确本地approval/refs须经Reviewer核后才真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终tag/API写入仍须精确包Human PASS和明确允许。旧run/account binding不变。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
-- C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
+- 实现、actualsource及fresh正式包自动验收均关闭；唯一Active Step4精确ZIPHuman gate。无HumanPASS，不resume旧loop或在等待期间重建/发布。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
 - 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch codex/release-1-1-0-automation，clean accepted/pushed `2c3e284d2b1b2d748aca8c0c05b8e795452a16bb`。修复后actualmain `014a609fcc7ab26be8820f4399cdaa19225498e1` 经297完整strict及独立source审核接受。当前正式buildroot `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry4.KbFkF4`，旧失败/原79be接受/诊断包保留，用户worktrees不动。
 
@@ -94,7 +94,7 @@ Evidence: before/after refs、merge parents/ancestry、diff、tests、clean/remo
 
 ## 6. Step 3 -- 正式构建、固定 ZIP 与自动验包
 
-状态: `ACTIVE -- FRESH FORMAL BUILD`，实际Step2 finalmain79be已独立接受，见第34节及子Runtime第24节；不复用旧dist或synthetic包。
+状态: `ACCEPTED / CLOSED -- FORMAL ARTIFACT AUTOMATED AND INDEPENDENT REVIEW PASS`。actualsource014a的fresh正式ZIP/App/verifier通过，见第36节和子Runtime第25节；不代表HumanPASS。
 
 - 从固定 source 在隔离 clone 使用现有正式 one-entry build；正式锁定 Python 3.12.14/uv/whisper runtime/manifest 不升级，不复用旧 App。
 - 核验真实 plist version、签名、runtime components/architecture/dependency closure、下载器与模型 manifest、CLI smoke；ZIP 全边界/CRC、bytes/mode/symlink round-trip、解压 App verifier 必须通过。
@@ -106,7 +106,7 @@ Evidence: source + build + artifact identity、自动验证原始输出的 locat
 
 ## 7. Step 4 -- 最终 ZIP 的 Human 黑盒验收
 
-状态: `QUEUED / FUTURE HUMAN GATE`。
+状态: `ACTIVE -- EXACT ZIP HUMAN GATE / NOT EVALUATED`，唯一当前步骤，顶层k=4，见 [正式包人工流程](../../evidence-summaries/whisper-1.1.0-prehuman-release-package-review-20261009.md)。
 
 Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版本或直接 `ui_app.py`。
 
@@ -144,7 +144,7 @@ Human 从指定 Downloads 目录启动 ZIP 解压 App，不使用旧已安装版
 - Step 迁移均引用固定 evidence 或显式 Human 决定；Static 变化必须由 Owner 授权。保留失败/retry/REJECT/Human gate，不能删历史制造 "从未出错"。
 - 本任务初始无 Pending Tasks；待批准和尚未执行步骤是启动/验收 gate，不假装成 non-blocking pending。将来若引入 pending，必须标 deadline_step 和 `max(n-k-1, 0)`；激活到期 Step 前解决或升级 blocking。
 - Residual: ad-hoc/未公证、minimum macOS 未定、未测硬件、single-writer/无并发保证等属于已披露范围限制，不在本任务无限扩展。
-- Current Executor Handoff: Step2实际交付准备，见子 Runtime 第22节；第4/11节 C1 config 仅历史，不 resume 旧终态。
+- Current Executor Handoff: 自动任务已结束，当前Step4 Human精确包验收；C1configs仅历史，不resume旧loop或在等待期间重建/发布。
 - Next Direction: 轻量实现独立接受 -> 实际隔离集成与 fresh 正式构建 -> Human 最终 ZIP 测试并允许 -> Agent 发布同一 ZIP。旧 deployment proposal 已 superseded。
 
 ## 11. 直接输入导航
@@ -369,6 +369,14 @@ Step2关闭，唯一Active为Step3 fresh正式App/ZIP/自动验包，顶层k=3�
 初次真实formal42b24在已PASS的Runtime后误拒官方固定CMake两个内部attrs，保留controller1/203.340s/noApp记录。精确5路径修复只固定两path/hash和build-only opt-in，默认source/Integration仍拒，所有proof/计时/ZIPchecks不变。局部5/61.970s、主独立3/1.118s/实际readonly30403不变、真实native6checkpoints/App/ZIP诊断287.884s均通过并独立接受2c3；诊断包是fixture source，不交Human验收。
 
 新actualretry4真正merged-source297/4345.282s全过，controller/collector0，source/env全不变并普通mainpush014a。主独立actual110source/34tools/objects/refs/原日志审核接受，plain真实receipt已由原accepted_source验证通过，详细hash/REJECT历史/诊断与result见子Runtime第24-25节。旧Step2/79be接受不改写，顶层仍k3/Step3正式freshbuild；未来Step4精确ZIPHuman、Step5同包发布仍queued，无HumanPASS/tag/Release。
+
+## 36. 正式包自动/独立验包通过，停 Human gate -- 2026-10-09
+
+fresh attempt286e源014a，原构建/六checkpoint/Runtime/App/ZIP验证成功，controller/collector0/328.533s。主另核实际artifact/source/provenance/ZIP bytes与保留App一致、codesign及保留AppRuntime另跑exit0、state/receipt前后不变，AUTOMATED ARTIFACT REVIEW PASS。没有Humanreceipt，真实tag/Release不存在，未上传或发布。
+
+最终ZIP48307378 bytes，SHA `fbe14de7d68c519ddb817ef1f45166f3e39a24f0a27d290cd82d9c2c20717bdb`；精确ZIP/App/artifactID/source/日志hash/独立report/人工步骤见 [正式包summary](../../evidence-summaries/whisper-1.1.0-prehuman-release-package-review-20261009.md) 和子Runtime第25节。旧失败42b24/native诊断/所有REJECT保持。
+
+Step3关闭，唯一Active Step4 Human gate，k=4，PT-REL-01resolved，无deadlinepending阻塞；Step5 queued。Human须测试这份保留App并明确同包发布许可，未回复不能当PASS。不重建/修改正式artifact，不部署heavy机制、不读凭据、不改用户worktree。测试仅新Downloads输出目录，正式包/evidence暂保留，后续精确授权清理。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

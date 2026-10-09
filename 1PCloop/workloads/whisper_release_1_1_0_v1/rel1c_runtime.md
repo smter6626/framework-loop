@@ -4,10 +4,10 @@
 
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
-- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=3`。
-- 状态: `ACTUAL FINAL MAIN INDEPENDENTLY ACCEPTED / STEP3 FORMAL BUILD ACTIVE`。
-- Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
-- Step2 retry3实际集成已独立接受79be最终main，旧strict失败保留；唯一Active为Step3 fresh正式build，尚无精确包HumanPASS。旧部署gate不复活，不resume旧terminal配置；最新事实见第24节。
+- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；当前顶层编号 `k=4`。
+- 状态: `FORMAL ARTIFACT AUTOMATED AND INDEPENDENT REVIEW PASS / STEP4 HUMAN GATE ACTIVE`。
+- Verdict: `AUTOMATED ARTIFACT REVIEW PASS -- HUMAN NOT EVALUATED`。实际finalsource014a和fresh正式包已自动/独立审核，不是HumanPASS或发布完成；历史machine状态/transition原样保留。
+- 唯一Active为Step4精确ZIP的Human黑盒验收。旧失败/79be接受保留，旧部署gate不复活，不resume旧terminal配置或重建换包；最新事实见第25节和包review summary。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
 - 最后更新: 2026-10-09，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
@@ -527,6 +527,19 @@ canonical最终launcher SHA `dc91be3989f74c8b724aca2ff5ad95e52a29e8d5661cdea6831
 主read最终外置脚本相对先前受审版的diff，只更新root/accepted/main/tree/auth/真实receiptSHA。最终launcher SHA `b97b962270c76be78aff0e4aa9d3cb908e52daa7af7dd9698e68533b9672dae8`，ownedwrapper SHA `e1afa3e128d644ef0ffa14344c9d893fb148d58f0920f988696c54b03c6097d5`；原preflight/guard通过，主明确EXECUTE，不由Executor自授权。
 
 真实collector4438(PPID1/PGID/SID4438)、controller4907(PGID4907)、caffeinate4908已ownedsessionack，`build-operation/process.json`和controller.log均0600，prepare唯一启动。PID仅历史locator，后续须fresh核身份。当前新formalworkflow准备阶段，无artifact/result/HumanPASS，不重启full或旧failedattempt。原BuildController/6checkpoints/Runtime/ZIP与原timers保持，完成主独立审包再交Human。
+
+### 正式 artifact 完成并独立复核 -- Step4 Human gate
+
+新attempt `attempt-286e5589e09943b39aa38553f24fa31c` 完整fresh正式build/6 checkpoints/原Runtime/App/provenance/ZIP与解压 verifier通过。实际controller0/collector0，328.533s，原CLI EXACT_ARTIFACT_HUMAN_REVIEW_REQUIRED，workflow ARTIFACT/sequence5/human_receipt=null；owned进程均已退出，不在后台等待Human或自行发布。
+
+- 本根build result `build-operation/operation-result.json` SHA `8af287c4310156b6311e62bb5ee7451b50342059d557732dcfacb22b8243d966`；原build/package日志SHA `0cfed7ffae060fe3cb70f0642a99c5d536a016f799a1e85b3bc4177355cff90d` / `487c1e6aa20b97f9d2bcbe40dcb6081a811a7ffa16b04e42abdfd407296e196a`。
+- ZIP `workflow/artifacts/attempt-286e5589e09943b39aa38553f24fa31c/ClassroomTranscriber-1.1.0-macOS-AppleSilicon.zip`，48307378 bytes，SHA `fbe14de7d68c519ddb817ef1f45166f3e39a24f0a27d290cd82d9c2c20717bdb`。Artifact ID `616c47bd2585ba69b18001d3935e3308293b73d827c8d429092e5fb6c3d5ff80`，App treeSHA `5be21a2a4860e5918cdd6e4bcdda2ddbd526b35a7a392e77abd129508605a379`。
+- Human App `workflow/human/attempt-286e5589e09943b39aa38553f24fa31c/ClassroomTranscriber.app`。只测试这份ZIP提取App，不用旧安装/源码/diagnostic。source014a/treebac9/receipt d78c/实际remote014a-2c3/34tools/合同固定，App版本1.1.0。
+- 主直接核真实operation/state/artifact/6events/provenance/logSHA，构建App与保留App相同，ZIP实际bytes/hash/权限/symlink对应；另跑保留App原Runtime verifier exit0及codesign --verify --deep --strict exit0。前后state/receipt bytes不变，无Human或publication receipt。独立report `/Users/smterpro/Downloads/rel1c-lightweight-review-environment.BQuaEt/retry4-independent-artifact-review.json` SHA `4554ad92a24a50933a623387b2b6a8d68cf7bccf13996b267db113e366b27936`，retained verifier log SHA `4097890935c36d19430e2f95731ef22218dac728853def125177846462acb816`。
+
+Verdict AUTOMATED ARTIFACT REVIEW PASS/HUMAN NOT EVALUATED，非发布或Human通过。Step3关闭、k推进4，唯一Active Step4，PT-REL-01仍resolved，Step5 queued。Fresh只读核tag1.1.0不存在、Release列表无1.1.0；旧失败、诊断包、machine历史保留，零tag/draft/upload/publication。
+
+精确路径、从启动开始的测试流程见 [正式包review与人工流程](../../evidence-summaries/whisper-1.1.0-prehuman-release-package-review-20261009.md)。Human须明确此包PASS/FAIL及同包发布许可才能启用Step5，改码/重建/换包要重新自动和人工验收。无需bootstrap开发环境，测试输出仅新Downloads目录，提醒后续有界清理，不删除当前正式包/evidence。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
