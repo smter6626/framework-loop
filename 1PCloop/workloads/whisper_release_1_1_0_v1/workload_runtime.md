@@ -3,12 +3,12 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 RETRY3 ACTUAL INTEGRATION ACTIVE`。
+- 状态: `ACTUAL FINAL MAIN ACCEPTED / STEP3 FORMAL BUILD ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
 - 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
-- 更新日期: 2026-10-08，America/New_York。
+- 更新日期: 2026-10-09，America/New_York。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: 轻量实现独立接受已满足，精确本地approval/refs须经Reviewer核后才真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终tag/API写入仍须精确包Human PASS和明确允许。旧run/account binding不变。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
@@ -83,7 +83,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 5. Step 2 -- 受控集成与固定源码
 
-状态: `ACTIVE -- RETRY3 ACTUAL INTEGRATION`，旧292失败永久保留；两个tests及外置启动环境窄修复已局部独立接受，准入唯一新attempt，不硬resume失败根。新root执行实际merged-source完整gate，尚未最终source ACCEPT；见第33节及子Runtime第23节，不伪造新的machine ACCEPT。
+状态: `ACCEPTED / CLOSED -- ACTUAL FINAL MAIN79be`。唯一retry3 actualmerged-source292/292、4677.644s、真实controller0/collector0/环境源码不变、普通mainpush及独立源码/34tools/110tracked/object/log/ref核验通过；见子Runtime第24节。旧292失败保留，不伪造machine ACCEPT。
 
 1. 核对已接受 implementation commit、工具 hash、当前批准 Static、feature/main 预期 refs 和 GitHub repo identity；必要时先普通 push 已接受实现分支。
 2. 在 Downloads 独立 clone 中集成，保持原用户 worktree 无变化；处理当前非 fast-forward 关系，确保 remote main 和已接受 feature 均为最终 commit 祖先。冲突/意外 drift 停止，不自动丢弃一边。
@@ -94,7 +94,7 @@ Evidence: before/after refs、merge parents/ancestry、diff、tests、clean/remo
 
 ## 6. Step 3 -- 正式构建、固定 ZIP 与自动验包
 
-状态: `QUEUED`，依赖已接受 Step 2 source identity。
+状态: `ACTIVE -- FRESH FORMAL BUILD`，实际Step2 finalmain79be已独立接受，见第34节及子Runtime第24节；不复用旧dist或synthetic包。
 
 - 从固定 source 在隔离 clone 使用现有正式 one-entry build；正式锁定 Python 3.12.14/uv/whisper runtime/manifest 不升级，不复用旧 App。
 - 核验真实 plist version、签名、runtime components/architecture/dependency closure、下载器与模型 manifest、CLI smoke；ZIP 全边界/CRC、bytes/mode/symlink round-trip、解压 App verifier 必须通过。
@@ -357,6 +357,12 @@ Human要求读取最新handoff后继续到人工校验前。主Reviewer已直接
 唯一Active仍为Step2，不重新实现Step1、不硬resume失败根、不删除环境或旧证据。先局部核外置launcher的umask与两个权限测试，并单独核实际environment差异；目前根因尚未确认。轻量授权继续有效，不部署旧重型机制。Step3-5仍queued，无正式App/ZIP、Human精确包PASS或tag/draft/upload/publication。详细locator/hash、复现与后续审核写子Runtime第23节。
 
 随后证实权限mask和synthetic Python字节码写入根因；只改2tests的c66窄修复及外置controller mask022，经cold5/5、18893全环境identity/bytes不变和主Reviewer三process probes接受。生产34tools/Static不变。新root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry3.nSskcd` 的approval/refs/schema/expectedmerge独立核准后唯一真实启动，feature已快进c66，actualmerge79be/tree748吻合；当前fresh原Python acquisition，不把局部PASS代替292full或final-main ACCEPT。最新详细进度写子Runtime第23节，Step2仍active，k2，Step3-5queued。
+
+## 34. Step2 final-main 接受并激活正式 build -- 2026-10-09
+
+实际retry3完成292/292，4677.644s，总5022.553s，controller/collector真实0。main79be/tree748/parents[d0f,c66]、featurec66、tag空、四source/envunchanged true。主Reviewer独立110源码/34tools/文档/object/refs/原日志proof接受；普通0600integration receipt由主生成并由原accepted_source(remote=True)验证通过，locator/hash见子Runtime第24节。实现、actualsource、Human精确包PASS保持分层，无新machine verdict。
+
+Step2关闭，唯一Active为Step3 fresh正式App/ZIP/自动验包，顶层k=3，PT-REL-01已resolved，无deadline阻塞。Step4Human与Step5发布仍queued；accepted工具/同approval/source开新freshbuildattempt，旧失败roots/用户worktree/Static/封存B/认证不动，不部署旧heavy机制，不提前tag/API发布。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

@@ -5,11 +5,11 @@
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
 - 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=2`。
-- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / RETRY3 ACTUAL INTEGRATION ACTIVE`。
+- 状态: `ACTUAL FINAL MAIN INDEPENDENTLY ACCEPTED / STEP3 FORMAL BUILD ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
 - C2/C3旧实现及轻量实现均关闭，唯一Active为Step2新retry3实际集成。旧strict失败保留，c66窄test-hygiene修复已接受；feature更新和新隔离merge完成，正在fresh环境/完整gate，main未更新，正式App/ZIP未构建。旧部署gate被第21节替代，最新状态见第23节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
-- 最后更新: 2026-10-08，America/New_York。
+- 最后更新: 2026-10-09，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -451,6 +451,18 @@ v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不�
 ### Retry3 full strict 启动 -- 历史快照，须以实际结果收尾
 
 原fresh bootstrap5/5，0.966s；实际managed Python0755。原CLI进入MERGED/STRICT seq11，真正79be合并源码的292项完整回归已开始，日志 `integration/evidence/strict-2af7d45861294363a8030109ab7b9d61.log`。主Reviewer直接读实际测试日志，非syntheticcallback或复用旧full；当前没有mainpush、finalsource receipt、正式包或HumanPASS。完成后必须用真实OS退出、源/环境/refs和日志结果supersede本快照。
+
+## 24. Retry3 真实集成及独立 final-main ACCEPT -- 2026-10-09
+
+本节supersedes第23节运行快照。唯一真实merged-source strict292/292，4677.644s，ResourceWarning严格，无failure/error/未处理traceback。实际controller0、collector0，5022.553s；原CLI输出FINAL_MAIN_REVIEW_REQUIRED。源码/环境四项前后均unchanged、observation AVAILABLE。main `79be5292e217cc600f6191882641320ca2437ce4`，featurec66、tag1.1.0不存在；原ownedcollector/controller/caffeinate/strict均已退出。不重复启动、不复用旧full或仅凭receipt自述。
+
+- 实际root `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry3.nSskcd`；`integration-operation/operation-result.json` SHA `c7c777759692eeca937fe6debf3db314d76698654c3e03614889beb34c6589e6`。
+- 原strict log `integration/evidence/strict-2af7d45861294363a8030109ab7b9d61.log` SHA `119210ae9482a9b7db61e78704b922275998685aa2dc4a817c44690283248c89`；bootstrap5/5 log SHA `8fbc7e58b3c7f369552ebc3a17923f4c457a5b15eb7b842a5a9a0e0434504498`。原journal COMPLETE/mainreceipt79be/featurec66，validate_logs通过。
+- 主Reviewer独立read实际diff/三文档导航修改/完整summary、110源码current/committed bytes/mode、34tools/Static、tree748/parents[d0f,c66]/baselineb518、freshrefs及四source/env一致，机械核原journal/logs。未伪称额外第二份292full。
+- 独立report `/Users/smterpro/Downloads/rel1c-lightweight-review-environment.BQuaEt/actual-final-main-review.json` SHA `214874dc45a3d244908275c52b3e1cff17111b6d67ffa7c5699bfef264dfd64b`，精确copy到 `decisions/integration-evidence.json`，不是签名或Human批准。
+- Verdict ACCEPT ACTUAL FINAL MAIN79be，reference `reviewer-20261008-final-main-79be529-ACCEPT`(沿用准入日期ID，实际接受2026-10-09)。主apply_patch建立0600普通 `decisions/integration.json` SHA `fd472f9b7734ea9066850cf37c7b1e1e2bf9702329840f937c2aeaf7da528165`，purpose independent-final-main-source，绑定当前auth/source/tree/parents/refs/evidence。原accepted_source(remote=True)真实验证通过，不伪造密码学签署或HumanPASS。
+
+Step2关闭，顶层k推进3，PT-REL-01仍resolved，唯一Active Step3 fresh正式build。新原CLI prepare调用既有BuildController/原bootstrap_and_build/六checkpoint/Runtime/ZIP；collector私有077记录0600、child022。不将许可build/runtime/dist/cache生成粗暴冻结，原checkpoint仍审受保护输入和许可输出。外置draft双guard独立2/2通过，收到真实sourceACCEPT后才填receiptSHA/newattempt。完成后自动验包与主独立复核，停精确ZIPHuman gate；无Humanreceipt/tag/draft/upload/publication。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {
