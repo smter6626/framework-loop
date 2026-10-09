@@ -4,12 +4,12 @@
 
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
-- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承顶层编号 `k=1`。
-- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / ACTUAL DELIVERY PREPARATION ACTIVE`。
+- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；继承当前顶层编号 `k=2`。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED / ACTUAL STRICT FAILED / DIAGNOSIS ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`。主助手独立复核，非新machine run/config；历史C2/C3接受、machine COMPLETED/transition原样保留，详见第22节及新独立summary。
-- C2/C3 旧实现及新轻量实现均关闭，唯一 Active Step 是顶层 Step2 的实际集成准备；旧部署 gate 已被第21节替代。真实 push/merge/build 尚未执行，不 resume 旧 terminal 配置。详细新接受见第22节。
+- C2/C3旧实现及新轻量实现均关闭，唯一Active为Step2实际strict失败诊断。feature已push，隔离merge完成，但merged-source完整测试失败，main未更新；正式App/ZIP未构建。旧部署gate被第21节替代，不resume旧terminal配置，最新状态见第23节。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
-- 最后更新: 2026-10-07，America/New_York。
+- 最后更新: 2026-10-08，America/New_York。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -410,6 +410,19 @@ source-before SHA4e72ce8abfdf6d338aa4c783241e171a1dd0302630275619b956cc491a9e739
 启动尝试02已获实证: collector83499(PPID1/PGID/SID83499)、controller83721(PGID83721)、caffeinate83722(-w83721)，`integration-operation/process.json`和startup-receipt.json已落盘，log为collector-launch02.log/controller.log。原CLI唯一实际retry已执行exact已有feature的no-op push调用(无ref改变)、同aaf/b939真正merge/fresh原Python5/5，进入 `MERGED / intent STRICT`。实际strict child86227/PPID83721/PGID83721，日志 `integration/evidence/strict-ad5f8a6d84f64497b6a8f6a9f6f015f4.log`。这些PID是启动locator，后续操作必须重新验证身份，不按旧PID批量kill。
 
 v2 source/env STRICT观察均AVAILABLE，明确捕获在STRICT intent后，不谎称child启动前baseline或persisted live proof；真正gate是原controller内fresh invocation proof/full。当前 `STEP2 ACTUAL MERGED-SOURCE STRICT RUNNING`，尚无最终operation-result或main receipt，不重跑、不改源/合同。main仍d0f，Step3正式App/ZIP及Human/pass/tag/Release均未开始。完成后先核真实退出码、完整merged-source测试、source/tree/parents/refs，再独立final-main接受，不能用旧implementation full替代。
+
+## 23. 实际 retry strict 失败 -- 2026-10-08，当前权威进度
+
+本节supersedes第22节的“STRICT RUNNING”快照，原启动记录/失败证据不改写。Human已授权主Reviewer继续控制有界Executor直到精确ZIP人工校验前；本次先诊断，不以旧通过结果跳gate。
+
+- 已完整读恢复交接 `/Users/smterpro/Workspace/framework-loop/1PCloop/.local/handoffs/whisper-lightweight-actual-strict-failed-handoff-20261008-01.md`，并重读两个当前Static、Runtime及实际launcher/入口/失败用例。
+- 实际retry root: `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry.EXfYF9`。原merged-source日志 `integration/evidence/strict-ad5f8a6d84f64497b6a8f6a9f6f015f4.log` SHA `ff7b4abf78e8afc8d6f79c313b271a7d7ba22abd754b2a238a4f9f91d34323bc`，292项/4263.423s，`FAILED (failures=1, errors=1)`。
+- 原controller真实exit1，`STOP STRICT_FAILED`；`integration-operation/controller.log` SHA `fce82fe4abb36483db777d0d7b4facd4e608a5875f8c00d3565ec6225cdebd06`。collector另exit1/`OBSERVED_SOURCE_OR_IDENTITY_DRIFT`，4389.666s；`operation-result.json` SHA `2c2abaee7e30b54a8e7cb06e67d7ab9cf24c65523f3f98edd39b64592026206b`。implementation source/env与merged source记录unchanged，merged environment比较抛错；不能擅自解释为atime或忽略实际测试失败。
+- ERROR: `CacheLockTests.test_native_identity_checked_uv_populates_wheel_cache_offline`，真实固定工具read_file要求0755时`PATH_MODE`。FAIL: `ArtifactTests.test_independent_mismatched_zip_counterexample_and_recomputed_signed_state_are_refused`，`directory-mode`反例未抛Stop。
+- 外置launcher新增`os.umask(0o077)`被子进程继承可能共同影响工具/目录模式，但当前只是待证假设。Executor先新Downloads fixture局部复现077/022、只读真实mode和environment前后差异，不能改产品安全检查或test期待值凑全绿；不得import有顶层副作用的旧launcher。
+- fresh远端main `d0f581bb70379239c3147e5c8469d2285ad6620b`，feature `6cbba5d02074311467be56ac349e44dea097a804`，tag1.1.0不存在；实施工作树clean。旧PID不作当前运行证据，未杀进程、未硬resume、未删除旧环境/证据。
+
+修复须精确allowlist和独立局部验证，再新attempt/真实approval/explicit retry_of；不重复无变更implementation full，但actualmerged-source full仍必须成功。成功后主Reviewer复核source/tree/parents/ref/proof，才写真正integration receipt并fresh正式build/验包；最终Human精确包测试与明确允许前零真实tag/draft/upload/publication。未重新激活Step1或更改Static/封存REL1B/machine records/认证。
 
 <!-- 1PCLOOP_RUNTIME_STATE_BEGIN -->
 {

@@ -3,18 +3,18 @@
 ## 1. 当前状态
 
 - Task ID: `whisper_release_1_1_0_v1`
-- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 ACTUAL DELIVERY PREPARATION ACTIVE`。
+- 状态: `LIGHTWEIGHT IMPLEMENTATION ACCEPTED / STEP2 ACTUAL STRICT FAILED / DIAGNOSIS ACTIVE`。
 - Verdict: `ACCEPT -- LIGHTWEIGHT IMPLEMENTATION AT 6cbba5d02074311467be56ac349e44dea097a804`；不代表实际集成、正式包或发布完成。
 - 当前方向: 轻量实现已独立接受，主 Reviewer 控制桌面 Executor 做 Step2 精确refs/普通approval准备，再运行真实集成/build；精确 artifact 的 Human gate 保留。最新安排见第32节与子 Runtime 第22节，旧接受及 machine COMPLETED 不改。
 - Static: `/Users/smterpro/Workspace/framework-loop/1PCloop/workloads/whisper_release_1_1_0_v1/workload_static.md`
 - Static identity: 见文末 "合同固定值"；经 Human 修改后须重新计算。
-- 更新日期: 2026-10-07，America/New_York。
+- 更新日期: 2026-10-08，America/New_York。
 - 已确认发布身份: `1.1.0` / `Classroom Transcriber 1.1.0` / macOS Apple Silicon ZIP / 正式版 / ad-hoc / 中英 notes。
 - 执行门禁: 轻量实现独立接受已满足，精确本地approval/refs须经Reviewer核后才真实交付；不再要求 root/trust/签署/认证桥。真实 Git/gh 使用现有登录；最终tag/API写入仍须精确包Human PASS和明确允许。旧run/account binding不变。
 - 最近已结束Config: [workload_rel1c1_continuation_01.json](workload_rel1c1_continuation_01.json)，run `20261002T023023Z-10810`，原Reviewer机器ACCEPT52237ae、COMMITTED/APPLIED/PUSHED，后来独立REJECT；最后桌面子Executor修复5d33416获主Reviewer独立ACCEPT，不伪造新machine verdict。更早usage-limit失败/dirty target仍保留。
 - C2/C3 旧 local 及新轻量实现均关闭；当前唯一 Active Step 为 Step2 实际交付准备，不 run/resume 旧 terminal 配置。不把实现接受当作最终 ZIP 人工通过。
 - 全局 Runtime 保留阶段指针，REL1B详细接受证据由子Runtime维护；旧task保持关闭/冻结。
-- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，最新local独立接受HEAD `6cbba5d02074311467be56ac349e44dea097a804`，clean、无target push；旧0c及更早01cb904保留。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
+- 当前隔离目录: `/Users/smterpro/Downloads/whisper-rel1c1-continuation.2Mrct0/implementation`，branch `codex/release-1-1-0-automation`，独立接受HEAD `6cbba5d02074311467be56ac349e44dea097a804`，clean，feature已普通push；main仍为 `d0f581bb70379239c3147e5c8469d2285ad6620b`。旧dirty草稿和patch保留，用户worktrees不动；不是正式release_source。
 
 ## 2. 已完成的准备与直接事实
 
@@ -83,7 +83,7 @@ Step 1 的一次 `ACCEPT -> Runtime transition` 只关闭实现阶段，不代�
 
 ## 5. Step 2 -- 受控集成与固定源码
 
-状态: `ACTIVE -- ACTUAL DELIVERY PREPARATION`，依据Step1既有machine历史、桌面轻量实现独立接受和Human已授权的工作流激活，详见第32节。先只读准备精确refs/普通approval draft，Reviewer核后再真实执行；不伪造新的machine ACCEPT。
+状态: `ACTIVE -- ACTUAL STRICT FAILURE DIAGNOSIS`，实际retry已结束且292项有1个failure、1个error；不把旧“运行中”当现状。保留失败根并做局部诊断，独立接受修复后用新attempt继续；见第33节及子Runtime第23节，不伪造新的machine ACCEPT。
 
 1. 核对已接受 implementation commit、工具 hash、当前批准 Static、feature/main 预期 refs 和 GitHub repo identity；必要时先普通 push 已接受实现分支。
 2. 在 Downloads 独立 clone 中集成，保持原用户 worktree 无变化；处理当前非 fast-forward 关系，确保 remote main 和已接受 feature 均为最终 commit 祖先。冲突/意外 drift 停止，不自动丢弃一边。
@@ -349,6 +349,12 @@ Human 于 2026-10-03 选择 "按照轻量模式来，用prompt约束和要求既
 Step1实现关闭，唯一 Active Step `Step2 -- 实际交付准备`，顶层 k 从1推进2，PT-REL-01仍RESOLVED，无未处理deadline pending。旧machine块/transition/封存B与所有失败历史保持不变。Step3-5queued，当前无正式App/ZIP或精确Human PASS。
 
 同一桌面Executor先准备新Downloads管理根、fresh origin/main/feature/tag/Release及baseline、普通0600审计approval draft(真实Reviewer reference与Human原授权reference)，不复制凭据、不用fixture开关。主Reviewer核具体schema/源/refs/36 tools及当前Static hashes后切EXECUTE；之后已审核controller实际普通feature/main push、隔离集成和完整merged-source gate，再独立接受final-main source。最终包仍须fresh构建和Human测试并明确允许后才能真实tag/draft/upload/publication。
+
+## 33. 实际 strict 失败与继续授权 -- 2026-10-08
+
+Human要求读取最新handoff后继续到人工校验前。主Reviewer已直接读实际result与完整日志失败段，fresh核远端feature6cb/main d0f、tag1.1.0不存在，实施工作树clean。实际retry `/Users/smterpro/Downloads/whisper-1.1.0-lightweight-retry.EXfYF9` 已结束: 292项/4263.423s，1failure、1error；controller真实exit1/STRICT_FAILED，collector另报告environment drift/exit1，总4389.666s。两层问题分别诊断，不能把collector结果替代测试结果。
+
+唯一Active仍为Step2，不重新实现Step1、不硬resume失败根、不删除环境或旧证据。先局部核外置launcher的umask与两个权限测试，并单独核实际environment差异；目前根因尚未确认。轻量授权继续有效，不部署旧重型机制。Step3-5仍queued，无正式App/ZIP、Human精确包PASS或tag/draft/upload/publication。详细locator/hash、复现与后续审核写子Runtime第23节。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json
