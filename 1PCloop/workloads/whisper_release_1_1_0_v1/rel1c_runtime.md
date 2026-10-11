@@ -4,12 +4,12 @@
 
 发布基础层及旧 C1/C2/C3 local 实现已独立接受。Human 已选择轻量模式并授权继续，当前由主 Reviewer + 一个新桌面 Executor 简化实际入口，不启动 1PCloop。独立接受后推进真实集成、正式构建与验包，停在你测试最终 ZIP 解压 App 前；不再请求旧生产部署/认证桥授权。
 
-- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；当前顶层编号 `k=4`。
-- 状态: `FORMAL ARTIFACT AUTOMATED AND INDEPENDENT REVIEW PASS / STEP4 HUMAN GATE ACTIVE`。
-- Verdict: `AUTOMATED ARTIFACT REVIEW PASS -- HUMAN NOT EVALUATED`。实际finalsource014a和fresh正式包已自动/独立审核，不是HumanPASS或发布完成；历史machine状态/transition原样保留。
-- 唯一Active为Step4精确ZIP的Human黑盒验收。旧失败/79be接受保留，旧部署gate不复活，不resume旧terminal配置或重建换包；最新事实见第25节和包review summary。
+- 父Task: `whisper_release_1_1_0_v1`；子阶段REL1C；当前顶层编号 `k=5`，已关闭。
+- 状态: `HUMAN ACCEPTED / SAME ZIP PUBLICATION VERIFIED / TASK CLOSED`。
+- Verdict: `PASS -- RELEASE 1.1.0 VERIFIED`。精确包获Human手测认可和发布许可，tag/正式latest/唯一资产和实际下载已独立核验；历史machine状态/transition原样保留。
+- 无Active Step。旧失败/79be接受保留，旧部署gate不复活，不resume旧terminal配置或重建换包；最新事实见第26节和发布review summary。
 - Static: [rel1c_static.md](rel1c_static.md)，当前 SHA-256 `0fb58bd5f263ab9ae312a5956e3010882f73c80d79fb4d1952054acefe3513b9`；旧 c5992a64... 和 ba7a0213... 仅为历史。父 Static 当前 SHA-256 `82487f10e54e35c5364f14eb29622f74a714da8c3b3bc674a00a382b0a04d917`，旧47a90b30...不用于轻量执行。
-- 最后更新: 2026-10-09，America/New_York。
+- 最后更新: 2026-10-11，America/Phoenix。
 - Human于2026-10-01批准并手动启动首轮；额度用尽后换号，明确要求继续。本次用新run延续C1，详见第12-13节；不改写旧失败终态或宣称实施完成。
 
 ## 2. Completed与不可丢失的背景
@@ -554,6 +554,18 @@ Verdict AUTOMATED ARTIFACT REVIEW PASS/HUMAN NOT EVALUATED，非发布或Human�
 }
 <!-- 1PCLOOP_RUNTIME_STATE_END -->
 
+
+## 26. 精确Human决定、同包公开发布与独立复核 -- 2026-10-11
+
+Human实际手测正式retry4保留App并回报未发现异常，主只读验证结果文件正常；随后明确要求发布，获知影响后批准临时Cellar权限变更。普通本地artifact-human/plan绑定真实对话reference、source014a、artifact616c47bd和ZIP fbe14de7...，原human-gate真实exit0/HUMAN_RECORDED，不伪造machine ACCEPT。
+
+最终release409876735/asset631624978，正式/latest 1.1.0，tag object32b21b1b2f660d2315d60569cae94ecd5b3b440b peeled014a。唯一ZIP48307378/SHA fbe14de7d68c519ddb817ef1f45166f3e39a24f0a27d290cd82d9c2c20717bdb，经原draft/public实际下载及主独立直接下载全部一致。publication COMPLETE/intent null/实际exit0，Cellar0775恢复，原1.0.0/0.2.0/v0.1.0保留。
+
+原工具曾因真实GitHub草稿release/asset `untagged-*` URL拒绝，两个失败及各自权限恢复均保留。主独立精确对象对账并审核任务本地adapter，最后23个边界检查通过；只扩展同一已观察ID的真实draft URL，published URL、receipt/source/tag/notes/asset/draft/public真实下载等原校验和Publisher状态机保持。没有修改正式source/App/ZIP、重建草稿、重传asset、关闭检查或接管陌生对象。以后发布需要单独修复transport兼容性，原CLI并非首次全链无故障成功。
+
+产品docs-only普通后继6f415266a78e6df06d54e1ae55d5da42afbf7e51已push main，五文件范围、41条本地链接、6/6 identity strict focused通过；不移动tag。实际297full来源和本次自动/独立/真实Human分别记录，不声称本轮重跑full或全部交互逐项覆盖。
+
+完整范围、AC/evidence/原本地hash见 [发布独立summary](../../evidence-summaries/whisper-1.1.0-publication-independent-review-20261011.md)。父Step1-5和REL1C关闭，无Active；历史machine/失败/REJECT、Static/REL1B封存、用户worktree不改。临时目录暂保留，清理另需具体授权；不自动激活新功能/公证/跨平台/P7。
 
 <!-- 1PCLOOP_RUNTIME_TRANSITION_RECORD -->
 ```json

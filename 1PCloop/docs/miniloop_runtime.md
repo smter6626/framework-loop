@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`ACTIVE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 FORMAL ARTIFACT REVIEW PASS / STEP4 HUMAN GATE`
+`IDLE -- FOUNDATION_V1 CLOSED / WHISPER_RELEASE_1_1_0_V1 HUMAN ACCEPTED AND RELEASE VERIFIED / NO ACTIVE TASK`
 
 本 Runtime 记录当前权威执行状态。稳定目标、硬约束和最终验收标准见：
 
@@ -39,28 +39,42 @@ P7 controlled REJECT -> REPAIR fault injection
 = MAY RESUME ONLY AFTER EXPLICIT HUMAN REACTIVATION
 
 Most recently closed engineering task
-= whisper_clean_fulltext_recovery_r2 / MACHINE + INDEPENDENT + HUMAN ACCEPTED
+= whisper_release_1_1_0_v1 / HUMAN ACCEPTED + SAME ZIP PUBLICATION INDEPENDENTLY VERIFIED
 = TASK CLOSED
-= 1PCloop/workloads/whisper_clean_fulltext_recovery_r2/workload_runtime.md
+= 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
-Current external engineering task
+Most recently closed external engineering task
 = whisper_release_1_1_0_v1 / REL1A MACHINE + INDEPENDENTLY ACCEPTED
 = REL1B MACHINE + INDEPENDENTLY ACCEPTED / IMPLEMENTATION CLOSED
 = REL1C AUTHORIZED / C1 ACCEPTED / C2-C3 LOCAL INDEPENDENTLY ACCEPTED AT0c3449b
 = LIGHTWEIGHT IMPLEMENTATION INDEPENDENTLY ACCEPTED AT6cb / 292 STRICT TESTS
 = STEP2 HISTORICAL FINAL MAIN79be ACCEPTED / STEP3 NARROW REPAIR FINAL MAIN014a ACCEPTED / 297 STRICT PASS / ACTUAL EXIT0
-= STEP3 FORMAL ARTIFACT AUTOMATED AND INDEPENDENT REVIEW PASS / HUMAN NOT EVALUATED
-= STEP4 EXACT ZIP HUMAN GATE IS THE SOLE ACTIVE STEP / AUTOMATION STOPPED
+= STEP3 FORMAL ARTIFACT AUTOMATED AND INDEPENDENT REVIEW PASS
+= STEP4 HUMAN ACCEPTED / STEP5 SAME ZIP PUBLICATION VERIFIED / TASK CLOSED / NO ACTIVE STEP
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_runtime.md
 
-Next-step authorized direction -- Human 2026-10-03, continuation 2026-10-07
+Completed authorized direction -- Human 2026-10-03, continuation 2026-10-07, publication 2026-10-11
 = SIMPLIFY TO PROMPT-BASED RELEASE / NO ROOT-SIGNING-AUTH-BRIDGE DEPLOYMENT / NO NEW LOOP RUN
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_static.md
 = 1PCloop/workloads/whisper_release_1_1_0_v1/rel1c_runtime.md
 = C1 PRIOR FAILURES PRESERVED / C2-C3 REVIEW IN CHILD RUNTIME SECTION20
 = READONLY REF/LOCAL APPROVAL PREPARATION -> REAL INTEGRATION/BUILD -> HUMAN EXACT ZIP TEST AND PERMISSION -> AGENT PUBLICATION
 = ACTUAL FAILED292 PRESERVED / NARROW TEST-ENVIRONMENT REPAIR ATc66ed63 ACCEPTED FOR NEW INTEGRATION GATE
-= NO FINAL ZIP HUMAN PASS OR RELEASE ACTION YET
+= HUMAN EXACT PACKAGE PASS AND EXPLICIT PUBLICATION PERMISSION RECORDED
+= RELEASE1.1.0 LATEST / ID409876735 / ASSET631624978 / SOURCE014a / ZIP48307378 SHA fbe14de7...
+= PRODUCT DOCS-ONLY FOLLOWUP6f41526 PUSHED / NO AUTOMATIC NEXT TASK
+
+2026-10-11 closure: Human reported no anomaly using the final retained App and
+authorized publication. Main independently verified session-file integrity and
+the exact published tag/source/latest/asset plus actual draft/public/direct-download
+bytes. The Homebrew Cellar temporary permission change was explicitly authorized
+and restored to0775 on every exit. Original Publisher draft release/asset URL
+rejections and exact-ID task-local compatibility recovery are preserved, not
+reported as a first-attempt success. No shipped source/App/ZIP was changed.
+Full scope/evidence and remaining limits:
+`1PCloop/evidence-summaries/whisper-1.1.0-publication-independent-review-20261011.md`.
+P4-P6/foundation/R2 remain closed; P7/research remain paused. No active task or
+implicit release-tool/GUI/notarization follow-up is authorized by closure.
 
 Most recently completed C1 operator configuration (historical, not resumable implementation)
 = 1PCloop/workloads/whisper_release_1_1_0_v1/workload_rel1c1_continuation_01.json
