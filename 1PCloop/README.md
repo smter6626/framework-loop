@@ -105,9 +105,14 @@ high-risk work. This is operational guidance, not a replacement for evidence and
 validation.
 
 The `~/.codex` symlink, foreground Codex GUI account, and open GUI windows do not select the role
-runtime. Every invocation binds the intended `CODEX_HOME` explicitly. Account labels A-D are
-credential identities, not Reviewer/Executor roles. Historical `~/.codex-A` and `~/.codex-B`
-homes are rejected as live role runtimes.
+runtime. Every invocation binds the intended `CODEX_HOME` explicitly. Codex Mix account aliases
+(A-E in the vault as of 2026-11-18) are credential identities, not Reviewer/Executor roles.
+Historical `~/.codex-A` and `~/.codex-B` homes are rejected as live role runtimes.
+
+Both role homes must already exist as distinct, non-nested directories strictly under
+`~/.codex-mix/.mix/runtimes/`, each with its own `config.toml` (no `.codex-A`/`.codex-B` path;
+`sqlite_home` absent or equal to that role home) and a role `auth.json` file. The runner never
+creates or migrates them.
 
 Tracked workloads use `account_source=codex_mix_active`: a new run pins the current Codex Mix
 active account, and both roles consume that account's quota while retaining separate runtime
@@ -117,6 +122,35 @@ to the Agent. Account drift, insufficient lifetime, A/B drift, or an unrecoverab
 transaction fails closed. See the
 [Codex Mix runtime-home and active-account guide](docs/codex-runtime-homes/README.md).
 
+Operational consequences with the current Codex Mix deployment:
+
+- choose the account in Codex Mix before starting a run; do not switch accounts during a run.
+  Every turn holds `~/.codex-mix/.mix/switch.lock`, so Codex Mix switcher commands (including
+  `codex-switch.py status`) report another operation in progress while a turn is active; a switch
+  between turns makes the next turn fail closed;
+- an unfinished record under `~/.codex-mix/.mix/transactions/1pcloop-auth/` makes Codex Mix refuse
+  account switch, rollback, and arm until 1PCloop preflight recovers it or verified manual
+  recovery is done; `codex-switch.py status` reports it as `auth_transactions_pending`;
+- `codex_mix_active` preflight requires `~/.codex` to remain a symlink to `~/.codex-mix` and
+  compares the retired `~/.codex-A`/`~/.codex-B` trees with the 21,091-entry snapshot under
+  `~/.codex-mix/.mix/forensics/runtime-cutover-20260918/` and with
+  `~/.codex-mix/.mix/original-baseline.json`. Keep both retired homes read-only: do not delete,
+  move, open them as `CODEX_HOME`, or touch their files, or every run fails closed.
+
+### Codex executable
+
+Set `execution.codex_bin` to an absolute path. The Codex Mix records name the global fnm/npm
+`@openai/codex` CLI for explicit CLI workflows such as 1PCloop; the most recent runs pinned
+`/Users/smterpro/.local/share/fnm/node-versions/v24.18.0/installation/bin/codex`, which still
+exists and reported `codex-cli 0.159.2` on 2026-11-18. A bare `codex` is resolved through `PATH`;
+under fnm that can be a per-shell `fnm_multishells` path. Codex Desktop and Codex Mix use the
+CLI bundled in `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`,
+which updates with ChatGPT.app and is not the 1PCloop CLI. Check the pinned version with
+`<codex_bin> --version`; `doctor` only checks that `--version` succeeds and does not report the
+version. The CLI must accept the
+models configured in the two role `config.toml` files; a CLI upgrade is a Human-authorized,
+recorded change, not an automatic fix.
+
 ## Installation
 
 From the repository root:
@@ -124,7 +158,7 @@ From the repository root:
 ```bash
 python3 -m venv 1PCloop/.local/venv
 1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
-codex --version
+/absolute/path/to/codex --version   # the execution.codex_bin you will configure
 ```
 
 `1PCloop/.local/` is Git-ignored and stores the Python environment, checkpoints, and future raw
@@ -242,8 +276,14 @@ next step automatically.
 
 ## Preflight
 
+The recommended and only policy-compliant entry is the workload-config CLI described in
+[Workload config and operator CLI](#workload-config-and-operator-cli):
+`onepcloop.py --config <workload.json> preflight` and then `run`. The long-argument examples in
+this section and the next are the legacy direct runner interface; see the authentication
+difference below before using them.
+
 Validate paths, branch, governance identity, profiles, schemas, framework remote, and working
-trees without invoking an Agent:
+trees without invoking an Agent (legacy long-argument form):
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -278,18 +318,28 @@ Common optional arguments:
 ```text
 --reviewer-home
 --executor-home
+--codex-bin
 --framework-repo
 --framework-branch
 --framework-remote
 --framework-push-ref
+--framework-static
+--framework-runtime
 --run-id
 --runs-root
 --state-root
 --summary-root
 ```
 
-This long-argument interface remains supported. The workload-config interface below compiles to
-the same arguments and state machine.
+Both interfaces drive the same state machine, but they do not compile to identical arguments.
+The long-argument parser has no `--account-source` and no retry arguments, so a direct
+`run_mutation_loop.py` invocation always uses `account_source=runtime_home`: it does not pin the
+Codex Mix active account, does not take `switch.lock` or project the active `auth.json`, does not
+run the retired A/B snapshot check, and lets each Codex child authenticate with whatever
+`auth.json` is already in its role runtime (a migration-era cache). That conflicts with the
+`codex_mix_active` requirement for tracked workloads. Treat the long-argument interface as legacy:
+use it for resuming legacy runs that carry a `null` operator config identity, not for new runs.
+Its `--codex-bin` default is the `codex` found on `PATH` at parse time.
 
 ## Workload config and operator CLI
 
@@ -302,7 +352,8 @@ the same arguments and state machine.
 # Replace doctor with: preflight, run, resume, status, inspect, human-gate, or tui.
 ```
 
-The strict JSON config has exactly these sections and fields:
+The strict JSON config has exactly these required sections and fields, plus the optional
+top-level `retry` section described below:
 
 ```json
 {
@@ -317,8 +368,9 @@ The strict JSON config has exactly these sections and fields:
     "framework_runtime": "../framework-loop/1PCloop/docs/miniloop_runtime.md"
   },
   "profiles": {
-    "reviewer_home": "/absolute/reviewer-profile",
-    "executor_home": "/absolute/executor-profile"
+    "reviewer_home": "/Users/<user>/.codex-mix/.mix/runtimes/1pcloop-reviewer",
+    "executor_home": "/Users/<user>/.codex-mix/.mix/runtimes/1pcloop-executor",
+    "account_source": "codex_mix_active"
   },
   "execution": {
     "codex_bin": "/absolute/path/to/codex",
@@ -340,6 +392,26 @@ The strict JSON config has exactly these sections and fields:
 }
 ```
 
+Replace `<user>` with the macOS user name; on this Mac the two homes are the
+`/Users/smterpro/...` paths listed under Runtime environment. Both homes must be absolute or
+config-relative paths that resolve strictly inside `~/.codex-mix/.mix/runtimes/`; a config that
+omits `account_source` fails with `CONFIG_INVALID`. The code also accepts
+`"account_source": "runtime_home"`, but that is the legacy authentication path described above
+and does not satisfy the tracked-workload requirement.
+
+Optional explicit retry of a failed run:
+
+```json
+"retry": {"retry_of": "<failed-run-id>", "retry_reason": "<non-empty reason>"}
+```
+
+`retry` must contain exactly these two fields. Preflight accepts it only when the source run's raw
+`manifest.json` and tracked summary exist, exactly one checkpoint with that run ID exists under
+the parent of `state_root`, that checkpoint is `FRAMEWORK_EVIDENCE_PUSHED` with logical outcome
+`FAILED_CLOSED`, and its initial target repo/branch/HEAD equal the current clean target. A retry
+is a new run, never `resume`; give it a new `state_root` (as the tracked `*_retry_01.json` configs
+do) and its run configuration records `retry_of` and `retry_reason`.
+
 Duplicate keys, unknown or missing fields, wrong types/versions, prohibited credential/prompt
 fields, and identical Reviewer/Executor profiles are rejected. Relative paths resolve from the
 config file's directory, never the caller's working directory. `~` is rejected and environment
@@ -350,11 +422,20 @@ target, governance, Git, or storage drift. Legacy invocations record a `null` op
 identity and remain resumable only through their legacy long arguments—they are never guessed
 into the new contract.
 
+The workload configs already tracked under `workloads/` are historical records bound to finished
+runs. Several point at target clones that no longer exist (for example
+`workloads/whisper_release_1_1_0_v1/workload_rel1c1_continuation_01.json`), and their config
+identity is part of recorded evidence. Do not edit or reuse them for new work: create a new
+workload directory with its own Static, Runtime, and config.
+
 Command behavior is:
 
-- `doctor` checks Python/jsonschema, Codex executable/version, distinct profile directories, Git,
-  target/framework identities, remote ref, governance/schemas, and ignored local storage. It
-  creates no run/checkpoint and invokes no Agent.
+- `doctor` checks Python/jsonschema, Codex executable/version, distinct profile directories, the
+  configured account source, Git, target/framework identities, remote ref, governance/schemas, and
+  ignored local storage. It creates no run/checkpoint and invokes no Agent. With
+  `codex_mix_active`, the account check is the same Codex Mix binding preflight uses: it reads the
+  active marker and credential identity (reporting only alias, account ID hash, and token TTL) and
+  may recover a pending 1PCloop auth transaction whose child is verified to have exited.
 - `preflight` calls the existing mutation-runner validator and emits its report without creating
   evidence or invoking an Agent.
 - `run` compiles config into the existing runner and executes the unchanged Reviewer–Executor
@@ -535,7 +616,14 @@ During a run, the terminal reports:
 - summary, Runtime-transition, framework commit/push state;
 - Human Gates, errors, and the final result.
 
-Resume an incomplete run with exactly the same arguments plus `--resume`:
+Resume an incomplete config-backed run with the unchanged config:
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json resume
+```
+
+A legacy long-argument run is resumed with exactly the same arguments plus `--resume`:
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -551,6 +639,34 @@ whether an Executor changed the target, it enters a Human Gate instead of replay
 The config-backed `status`, `inspect`, and `human-gate` commands use the same read-only Human Gate
 projection. They do not resume work or make Human decisions. Publication recovery may resume only
 evidence finalization after a logical terminal; it cannot replay Reviewer or Executor turns.
+
+### Stopping and resuming
+
+Each Codex child is started in its own session (`start_new_session=True`), so terminal Ctrl+C
+reaches the runner's foreground process group, not the Codex child directly. The runner then
+sends SIGTERM to the child's process group, waits 5 seconds, sends SIGKILL if needed, and unwinds
+the credential transaction, restoring and verifying the role `auth.json`; if that recovery cannot
+be verified, the transaction record stays for the next preflight. The interrupt is not converted
+into `FINAL_RESULT`; the checkpoint stays at its last control boundary.
+
+- Press Ctrl+C once and wait for the runner to exit. Do not press it repeatedly, and do not use
+  `kill -9` or `pkill` by process name: that can skip auth restoration, leave an unfinished
+  transaction that blocks Codex Mix switching, or leave tool subprocesses behind.
+- After stopping, run `status` and `inspect` with the same config. Also check the target branch,
+  HEAD, and cleanliness, and that no 1PCloop auth transaction is pending (`auth_transactions_pending`
+  in `codex-switch.py status`).
+- Run `resume` only when `status` reports `RESUME_ALLOWED` and the checks agree. An Executor that
+  committed without a receipt may lead to a Human Gate, and a dirty target fails closed. Resume
+  does not continue the interrupted Agent's internal reasoning; it restarts from the checkpoint.
+
+Optionally, for long runs, wrap the command with `/usr/bin/caffeinate -i` so the Mac does not
+idle-sleep; the assertion ends when the runner exits:
+
+```bash
+/usr/bin/caffeinate -i \
+  1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json run
+```
 
 ## Structured progress and live status
 
@@ -750,6 +866,8 @@ tests/test_mutation_contracts.py     pure contracts and runner compatibility
 tests/test_codex_mix_account.py      active-account, token, and A/B baseline binding
 tests/test_human_gate.py             Human Gate projection and read-only CLI
 tests/test_local_tui.py              read-only TUI presenter and disposable integration
+tests/test_prompt_templates.py       Chinese Static/Runtime prompt templates and provenance
+tests/test_runtime_home_migration.py runtime-home migration tooling and tracked home policy
 ```
 
 ## Code and documentation map
@@ -765,11 +883,18 @@ scripts/p63_evidence.py           summary, framework commit, and push helper
 scripts/progress_status.py        F2 progress journal, live snapshot, and renderer
 scripts/workload_operator.py      config, diagnostics, and read-only projections
 scripts/onepcloop.py              unified operator CLI
+scripts/codex_runtime_migration.py
+                                  validation/transaction helpers for runtime-home migration
+scripts/migrate_codex_mix_runtime_homes.sh
+                                  completed one-time A/B -> role runtime cold copy (--check-only default)
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance
 docs/miniloop_static.md           global stable contract
 docs/miniloop_runtime.md          global history and current task pointer
+docs/codex-runtime-homes/README.md
+                                  Codex Mix role runtime homes and active-account binding
+templates/                        default Chinese Static/Runtime prompt templates
 evidence-summaries/               tracked compact evidence
 runs/                             retained historical run evidence
 history/                          frozen early implementation

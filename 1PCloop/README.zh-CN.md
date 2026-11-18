@@ -96,14 +96,43 @@ Executor = CODEX_HOME=/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor
 任务可以给 Reviewer 更强配置；这只是运行建议，不能替代 evidence 和机械校验。
 
 `~/.codex` symlink、Codex GUI 当前前台账号和 GUI 窗口都不选择 role runtime。每次 CLI invocation
-都显式设置目标 `CODEX_HOME`。A-D 是 account identity，不是 Reviewer/Executor role；历史
-`~/.codex-A` 和 `~/.codex-B` 不再允许作为 live runtime。
+都显式设置目标 `CODEX_HOME`。Codex Mix 账号别名（2026-11-18 vault 中为 A-E）是 account identity，
+不是 Reviewer/Executor role；历史 `~/.codex-A` 和 `~/.codex-B` 不再允许作为 live runtime。
+
+两个 role home 必须已经存在，彼此不同、不互相嵌套，且都是 `~/.codex-mix/.mix/runtimes/` 的严格后代；
+各自要有独立的 `config.toml`（不得出现 `.codex-A`/`.codex-B` 路径，`sqlite_home` 缺省或等于该 role
+home）和 role `auth.json` 文件。Runner 不会创建或迁移它们。
 
 tracked workload 使用 `account_source=codex_mix_active`：新 run 会固定 Codex Mix 当前 active account，
 Reviewer/Executor 都以该账号消耗额度，但继续使用各自独立的 runtime state。账号在 run 中变化、token
 寿命不足、A/B baseline 变化或认证事务无法安全恢复时都会 fail closed。普通 ChatGPT 登录通过锁保护的
 完整 `auth.json` 临时文件投影使用；turn 后恢复 role 原 bytes/mode，认证环境变量不传给 Agent。完整边界见
 [Codex Mix runtime-home 与 active-account 说明](docs/codex-runtime-homes/README.md)。
+
+结合当前 Codex Mix 部署，操作上意味着：
+
+- 在启动 run 之前先在 Codex Mix 中选定账号；run 期间不要切号。每个 turn 都持有
+  `~/.codex-mix/.mix/switch.lock`，因此 turn 进行中 Codex Mix 切换器命令（包括
+  `codex-switch.py status`）会报告已有操作在进行；在两个 turn 之间切号会使下一个 turn fail closed；
+- `~/.codex-mix/.mix/transactions/1pcloop-auth/` 下存在未完成记录时，Codex Mix 拒绝切号、rollback
+  和 arm，直到 1PCloop preflight 完成恢复或经核实的人工恢复；`codex-switch.py status` 以
+  `auth_transactions_pending` 报告数量；
+- `codex_mix_active` preflight 要求 `~/.codex` 仍是指向 `~/.codex-mix` 的 symlink，并把退休的
+  `~/.codex-A`/`~/.codex-B` 全树与 `~/.codex-mix/.mix/forensics/runtime-cutover-20260918/` 下的
+  21,091-entry snapshot 以及 `~/.codex-mix/.mix/original-baseline.json` 比较。两个退休 home 必须保持
+  只读：不要删除、移动、作为 `CODEX_HOME` 打开或改动其中文件，否则之后每个 run 都会 fail closed。
+
+### Codex 可执行文件
+
+`execution.codex_bin` 应写绝对路径。Codex Mix 维护记录指定全局 fnm/npm `@openai/codex` CLI 供
+1PCloop 这类显式 CLI 工作流使用；最近几次 run 固定
+`/Users/smterpro/.local/share/fnm/node-versions/v24.18.0/installation/bin/codex`，该路径 2026-11-18
+仍存在，版本为 `codex-cli 0.159.2`。写裸 `codex` 时按 `PATH` 解析，在 fnm 下可能解析到每个 shell
+不同的 `fnm_multishells` 路径。Codex Desktop 和 Codex Mix 使用
+`/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` 内置 CLI，
+它随 ChatGPT.app 更新，不是 1PCloop 使用的 CLI。用 `<codex_bin> --version` 核对固定版本；`doctor`
+只检查 `--version` 能成功执行，不报告版本号。CLI 必须支持两个 role `config.toml` 中配置的模型；
+升级 CLI 属于需 Human 授权并记录的变更，不是自动修复手段。
 
 ## 安装
 
@@ -112,7 +141,7 @@ Reviewer/Executor 都以该账号消耗额度，但继续使用各自独立的 r
 ```bash
 python3 -m venv 1PCloop/.local/venv
 1PCloop/.local/venv/bin/python -m pip install -r 1PCloop/requirements.txt
-codex --version
+/absolute/path/to/codex --version   # 即将写入 execution.codex_bin 的路径
 ```
 
 `.local/` 被 Git 忽略，用于 Python 环境、checkpoint 和未来 raw run evidence。
@@ -223,7 +252,12 @@ stash 或改写历史。
 
 ## Preflight
 
-先验证路径、branch、治理 identity、profile、schema、framework remote 和工作树，不调用 Agent：
+推荐且唯一符合当前政策的入口是下文 [Workload config 与 operator CLI](#workload-config-与-operator-cli)
+中的 config CLI：先 `onepcloop.py --config <workload.json> preflight`，再 `run`。本节和下一节的长参数
+示例是直接调用 runner 的遗留入口；使用前先阅读下文的认证差异。
+
+先验证路径、branch、治理 identity、profile、schema、framework remote 和工作树，不调用 Agent（遗留
+长参数形式）：
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -258,18 +292,25 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 ```text
 --reviewer-home
 --executor-home
+--codex-bin
 --framework-repo
 --framework-branch
 --framework-remote
 --framework-push-ref
+--framework-static
+--framework-runtime
 --run-id
 --runs-root
 --state-root
 --summary-root
 ```
 
-该长参数入口继续受支持。下面的 workload config 入口只把同一配置编译成这些参数，仍调用同一个
-状态机。
+两个入口调用同一个状态机，但编译出的参数并不相同。长参数 parser 没有 `--account-source`，也没有
+retry 参数，因此直接调用 `run_mutation_loop.py` 总是使用 `account_source=runtime_home`：不固定 Codex
+Mix active account，不持有 `switch.lock`、不投影 active `auth.json`，不执行退休 A/B snapshot 检查，
+Codex child 直接使用 role runtime 中现有的 `auth.json`（迁移时留下的缓存）登录。这与 tracked workload
+必须使用 `codex_mix_active` 的要求冲突。长参数入口应视为遗留入口：用于 resume operator config identity
+为 `null` 的遗留 run，不用于新 run。其 `--codex-bin` 默认值是解析参数时 `PATH` 上找到的 `codex`。
 
 ## Workload config 与 operator CLI
 
@@ -282,7 +323,7 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 # doctor 可替换为：preflight、run、resume、status、inspect、human-gate 或 tui。
 ```
 
-严格 JSON config 只允许以下 section 和字段：
+严格 JSON config 只允许以下必填 section 和字段，以及下文说明的可选顶层 `retry` section：
 
 ```json
 {
@@ -297,8 +338,9 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
     "framework_runtime": "../framework-loop/1PCloop/docs/miniloop_runtime.md"
   },
   "profiles": {
-    "reviewer_home": "/absolute/reviewer-profile",
-    "executor_home": "/absolute/executor-profile"
+    "reviewer_home": "/Users/<user>/.codex-mix/.mix/runtimes/1pcloop-reviewer",
+    "executor_home": "/Users/<user>/.codex-mix/.mix/runtimes/1pcloop-executor",
+    "account_source": "codex_mix_active"
   },
   "execution": {
     "codex_bin": "/absolute/path/to/codex",
@@ -320,6 +362,23 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 }
 ```
 
+`<user>` 替换为 macOS 用户名；本机两个 home 即"运行环境"中列出的 `/Users/smterpro/...` 路径。两个
+home 必须是绝对路径或相对 config 的路径，且解析后严格位于 `~/.codex-mix/.mix/runtimes/` 内；缺少
+`account_source` 的 config 会以 `CONFIG_INVALID` 失败。代码也接受
+`"account_source": "runtime_home"`，但那是上文所述的遗留认证路径，不满足 tracked workload 要求。
+
+可选的失败 run 显式 retry：
+
+```json
+"retry": {"retry_of": "<failed-run-id>", "retry_reason": "<non-empty reason>"}
+```
+
+`retry` 必须恰好包含这两个字段。Preflight 只在以下条件全部满足时接受：来源 run 的 raw
+`manifest.json` 和 tracked summary 存在；`state_root` 的父目录下恰好有一个该 run ID 的 checkpoint；
+该 checkpoint 为 `FRAMEWORK_EVIDENCE_PUSHED` 且 logical outcome 为 `FAILED_CLOSED`；其初始 target
+repo/branch/HEAD 与当前 clean target 相同。Retry 是新 run，不是 `resume`；应使用新的 `state_root`
+（与 tracked `*_retry_01.json` 的做法一致），run configuration 会记录 `retry_of` 和 `retry_reason`。
+
 Duplicate key、未知/缺失字段、错误类型或版本、credential/prompt 类禁止字段以及相同的
 Reviewer/Executor profile 都会被拒绝。相对路径只按 config 文件目录解析，与调用 cwd 无关；不支持
 `~`，也不执行环境变量或 shell expansion。Raw 文件 SHA-256、canonical resolved-config SHA-256、
@@ -328,11 +387,18 @@ resume 对任何字节、resolved value、路径、profile、target、governance
 fail closed。Legacy invocation 的 operator config identity 明确为 `null`，只能继续使用原长参数
 resume，不会被猜测升级。
 
+`workloads/` 下已 tracked 的 workload config 都是绑定已完成 run 的历史记录。其中多份指向的 target
+clone 已不存在（例如 `workloads/whisper_release_1_1_0_v1/workload_rel1c1_continuation_01.json`），
+其 config identity 也是已记录 evidence 的一部分。不要为新工作修改或复用它们：新建 workload 目录，
+并编写对应的 Static、Runtime 和 config。
+
 各命令语义：
 
-- `doctor` 只读检查 Python/jsonschema、Codex executable/version、独立 profile、Git、target/
-  framework identity、remote ref、governance/schema 和 ignored local storage；不创建 run/
-  checkpoint，不调用 Agent。
+- `doctor` 检查 Python/jsonschema、Codex executable/version、独立 profile、所配置的 account
+  source、Git、target/framework identity、remote ref、governance/schema 和 ignored local storage；
+  不创建 run/checkpoint，不调用 Agent。使用 `codex_mix_active` 时，account 检查与 preflight 的
+  Codex Mix 绑定相同：读取 active marker 和 credential identity（只报告 alias、account ID hash 和
+  token TTL），并可能恢复已验证 child 已退出的 pending 1PCloop auth transaction。
 - `preflight` 直接调用现有 runner validator，不创建 evidence 或调用 Agent。
 - `run` 将 config 编译成现有参数并调用未复制、未改变的 Reviewer–Executor 状态机。
 - `resume` 只读取 `<state_root>/<workload_id>/checkpoint.json`，从中取得 run ID 并验证保存的精确
@@ -496,7 +562,14 @@ identity、correction attempt、Runtime transition、summary 和 publication rec
 - summary、Runtime transition、framework commit/push 状态；
 - Human Gate、error 和最终结果。
 
-恢复未完成 run 时，使用完全相同的参数并增加：
+恢复未完成的 config-backed run 时，使用未改动的同一 config：
+
+```bash
+1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json resume
+```
+
+遗留长参数 run 使用完全相同的参数并增加 `--resume`：
 
 ```bash
 1PCloop/.local/venv/bin/python 1PCloop/scripts/run_mutation_loop.py \
@@ -512,6 +585,29 @@ identity、correction attempt、Runtime transition、summary 和 publication rec
 Config-backed `status`、`inspect`、`human-gate` 使用同一个只读 Human Gate projection，不会自动
 resume 或替 Human 作决定。Logical terminal 后如需恢复 publication，最多只恢复 evidence
 finalization，不会重放 Reviewer 或 Executor turn。
+
+### 停止与恢复
+
+每个 Codex child 都在独立 session 中启动（`start_new_session=True`），因此终端 Ctrl+C 只到达 runner
+所在的前台进程组，不直接到达 Codex child。Runner 随后向 child 进程组发送 SIGTERM，等待 5 秒，必要时
+发送 SIGKILL，并展开认证事务，恢复并验证 role `auth.json`；若无法验证恢复，事务记录会保留给下一次
+preflight 处理。中断不会转换成 `FINAL_RESULT`；checkpoint 停留在最后一个控制边界。
+
+- 只按一次 Ctrl+C，并等待 runner 退出。不要连按，也不要用 `kill -9` 或按进程名 `pkill`：这可能跳过
+  auth 恢复、留下阻止 Codex Mix 切号的未完成事务，或残留工具子进程。
+- 停止后用同一 config 运行 `status` 和 `inspect`，并核对 target branch、HEAD、clean 状态，以及没有
+  pending 的 1PCloop auth transaction（`codex-switch.py status` 中的 `auth_transactions_pending`）。
+- 只有 `status` 给出 `RESUME_ALLOWED` 且上述检查一致时才运行 `resume`。Executor 已 commit 但缺少
+  receipt 时可能进入 Human Gate；target dirty 时 fail closed。Resume 不会延续被中断 Agent 的内部思路，
+  而是从 checkpoint 重新开始。
+
+长时间运行时可选用 `/usr/bin/caffeinate -i` 包裹命令，防止 Mac 空闲休眠；runner 退出时该断言随之结束：
+
+```bash
+/usr/bin/caffeinate -i \
+  1PCloop/.local/venv/bin/python 1PCloop/scripts/onepcloop.py \
+  --config /absolute/path/workload.json run
+```
 
 ## Evidence
 
@@ -639,6 +735,8 @@ tests/test_mutation_contracts.py     纯 contract 与 runner 兼容性
 tests/test_codex_mix_account.py      active account 绑定、token 和 A/B baseline
 tests/test_human_gate.py             Human Gate projection 与只读 CLI
 tests/test_local_tui.py              只读 TUI 呈现层与 disposable integration
+tests/test_prompt_templates.py       中文 Static/Runtime prompt 模板与 provenance
+tests/test_runtime_home_migration.py runtime-home 迁移工具与 tracked home 政策
 ```
 
 ## 代码和文档入口
@@ -654,11 +752,18 @@ scripts/p63_evidence.py           summary、framework commit 和 push helper
 scripts/progress_status.py        F2 progress journal、live snapshot 和 renderer
 scripts/workload_operator.py      config、diagnostics 和只读 projection
 scripts/onepcloop.py              统一 operator CLI
+scripts/codex_runtime_migration.py
+                                  runtime-home 迁移的校验与事务 helper
+scripts/migrate_codex_mix_runtime_homes.sh
+                                  已完成的一次性 A/B -> role runtime cold copy（默认 --check-only）
 schemas/                          runtime-enforced Agent output schemas
 roles/                            text-routing role prompts
 workloads/                        task-local governance
 docs/miniloop_static.md           全局稳定合同
 docs/miniloop_runtime.md          全局历史和当前 task 指针
+docs/codex-runtime-homes/README.md
+                                  Codex Mix role runtime home 与 active-account 绑定
+templates/                        默认中文 Static/Runtime prompt 模板
 evidence-summaries/               tracked compact evidence
 runs/                             已保留的历史运行 evidence
 history/                          已冻结的早期实现

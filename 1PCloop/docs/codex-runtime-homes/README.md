@@ -1,5 +1,12 @@
 # Codex Mix 与 1PCloop runtime home 架构
 
+> 2026-11-18 只读核对补充：`~/.codex` 仍指向 `~/.codex-mix`；两个 role runtime、退休 A/B、
+> `original-baseline.json` 与 21,091-entry retirement snapshot 均存在。Codex Mix vault 现有 A-E 五个
+> 账号别名；1PCloop 按 `active.json` marker 匹配 `accounts/` 下任一 vault，不限定 A-D，下文 "A-D"
+> 写法为迁移时状态。只有 config 入口能设置 `account_source=codex_mix_active`；直接调用
+> `run_mutation_loop.py` 的长参数入口总是 `runtime_home`，不执行本文的 active-account 绑定。Codex
+> 可执行文件的选择见 [1PCloop README](../../README.md#codex-executable)。
+
 ## 当前架构
 
 本机 Codex Mix 的稳定边界如下：

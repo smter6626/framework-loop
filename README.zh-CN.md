@@ -76,8 +76,9 @@ reasoning effort；Executor 负责高消耗实现，只有 Reviewer 基于实际
 
 可扩展形态是把高 token、高工具调用频率的工作交给本地或更便宜的 Executor，把任务编译、证据
 检查和最终 verdict 留给更强的云端 Reviewer。例如，在本机运行 Qwen 35B A3B MoE Q8 Executor，
-同时使用 GPT-5.6 Sol Reviewer。当前 Codex CLI 已支持 Ollama/LM Studio 本地 provider；1PCloop
-仍需为这种 mixed local/cloud 配置补充明确的 per-role provider 配置和端到端 evidence。
+同时使用云端 GPT Reviewer（当前 role runtime 记录为 `gpt-6.1-sol`）。当前 Codex CLI 已支持
+Ollama/LM Studio 本地 provider；1PCloop 仍需为这种 mixed local/cloud 配置补充明确的 per-role
+provider 配置和端到端 evidence。
 
 这种组合不保证本地模型首次生成质量与云端强模型相同。较弱 Executor 可能增加 repair 次数和
 总耗时；优势是只有达到 Reviewer evidence gate 的结果才被接受，从而有机会降低云端成本而不必

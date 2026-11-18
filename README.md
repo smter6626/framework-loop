@@ -84,8 +84,9 @@ final acceptance authority are therefore no longer tied to one Agent.
 An extensible deployment can assign high-token, tool-heavy implementation to a local or cheaper
 Executor while reserving task compilation, evidence inspection, and the final verdict for a
 stronger cloud Reviewer. One example is a local Qwen 35B A3B MoE Q8 Executor paired with a
-GPT-5.6 Sol Reviewer. Codex CLI already supports Ollama and LM Studio; 1PCloop still needs explicit
-per-role provider configuration and end-to-end evidence for a mixed local/cloud deployment.
+cloud GPT Reviewer (the current role runtimes record `gpt-6.1-sol`). Codex CLI already supports
+Ollama and LM Studio; 1PCloop still needs explicit per-role provider configuration and end-to-end
+evidence for a mixed local/cloud deployment.
 
 This setup does not claim that the local model's first attempt matches the stronger cloud model.
 A weaker Executor may require more repairs and more time. The advantage is that only results that

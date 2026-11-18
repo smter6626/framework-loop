@@ -51,6 +51,8 @@ Reviewer = dym   = CODEX_HOME=/Users/smterpro/.codex-B
 Executor = cheng = CODEX_HOME=/Users/smterpro/.codex-A
 ```
 
+> **已被取代（2026-09-18 runtime-home cutover）：** 上面的 `.codex-A` / `.codex-B` 绑定只保留为历史记录。现行 role binding 见下文 [Current role runtime and account behavior](#current-role-runtime-and-account-behavior) 和 [`codex-runtime-homes/README.md`](codex-runtime-homes/README.md)：Reviewer=`/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-reviewer`，Executor=`/Users/smterpro/.codex-mix/.mix/runtimes/1pcloop-executor`，退休 A/B 只读。
+
 两个角色由 deterministic local orchestrator 显式调用、路由和切换。权威项目状态仍由 Static、Runtime、repository、实际 artifact 与 evidence 承担，而不是依赖任一 Codex conversation history。
 
 目标链路为：
@@ -86,6 +88,8 @@ Reviewer reads Static + Runtime + repository evidence
 因此本项目仍属于 **1PCloop**。角色隔离来自独立 Codex identity/profile state，而不是来自两台物理机器。
 
 ### Codex identity binding
+
+> **已被取代的历史记录：** 本小节至 "Programmatic invocation" 小节结尾描述的是 2026-09-18 runtime-home cutover 之前的 `.codex-A` / `.codex-B` 绑定和调用方式，保留以便追溯，不再是现行规定。现行规定见下文 [Current role runtime and account behavior](#current-role-runtime-and-account-behavior) 和 [`codex-runtime-homes/README.md`](codex-runtime-homes/README.md)：两个 role 只使用 `~/.codex-mix/.mix/runtimes/` 下的独立 `CODEX_HOME`，额度账号来自 `account_source=codex_mix_active`，退休的 `.codex-A`、`.codex-B` 永远只读，不得作为 `CODEX_HOME` 调用。"当前"、"已确认"、"已实测" 等措辞指当时状态。
 
 当前存在两个独立 Codex profile：
 
@@ -147,7 +151,7 @@ Codex executable/runtime installation 在两个 profile 间共享。
 
 以下状态仍保持 profile-local：
 
-- auth/account identity；
+- auth/account identity（现行 `codex_mix_active` 下，role runtime 自带的 `auth.json` 不决定额度账号，见下文 Current role runtime and account behavior）；
 - sessions/history；
 - profile configuration/state。
 
@@ -465,6 +469,8 @@ evidence、Git、日志、通知或 Agent shell environment。任何无法证明
 - 角色调用不依赖 `~/.codex` symlink 或 GUI active profile；
 - 两边 auth/session state 保持独立；
 - 可以按 `Reviewer -> Executor -> Reviewer` 顺序稳定调用。
+
+> **注：** A 项前两条 `.codex-B` / `.codex-A` 绑定是本项 evidence 取得时的历史绑定。cutover 后现行等价绑定为 Reviewer=`~/.codex-mix/.mix/runtimes/1pcloop-reviewer`、Executor=`~/.codex-mix/.mix/runtimes/1pcloop-executor`，见 [Current role runtime and account behavior](#current-role-runtime-and-account-behavior)；`codex_mix_active` 下两边 session/runtime state 仍独立，但同一 run 内两个 role 使用同一 active account 额度。本项其余条件不变。
 
 ### B. Automatic inter-agent message routing
 
