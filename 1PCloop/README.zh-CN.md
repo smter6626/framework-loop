@@ -619,6 +619,65 @@ preflight 处理。中断不会转换成 `FINAL_RESULT`；checkpoint 停留在�
   --config /absolute/path/workload.json run
 ```
 
+## 结构化进度与实时状态
+
+每个非 preflight 的 mutation run 都会在既有的、被 Git 忽略的 run root 下写两个观测产物：
+
+```text
+<run-root>/control-events.jsonl
+<run-root>/live-status.json
+```
+
+`control-events.jsonl` 是只追加、带 schema 版本的 orchestrator 事件流。每个事件有连续的序号，以及对其
+规范化 envelope 计算的 SHA-256 `event_id`。固定字段投影出 run ID、cycle、role、checkpoint control
+state、target HEAD、run/stage 已用时间、当前 turn 剩余超时、最近一次 machine activity、聚合后的 tool
+activity、logical outcome、Runtime transition 和 evidence publication。不可得的值为 `null`；事件中从不
+包含 prompt、peer message、evidence summary、命令、命令输出、stderr 或 hidden reasoning。Codex 原始
+`events.jsonl` 单独保存，逐字节保留。
+
+`live-status.json` 是最新一条结构化事件的投影，以原子替换方式更新。它是派生的观测状态，不是另一份
+Runtime，也不能作为 transition 或恢复的依据。覆盖写入使用同目录临时文件、fsync 和 `os.replace`。
+
+计时语义：
+
+- run 已用时间只累计 orchestrator 实际运行期间的时间；崩溃到 resume 之间停摆的墙钟时间不计入；
+- stage 已用时间只在 checkpoint control state 变化时归零；resume 到同一 state 时，从 checkpoint 或事件
+  推导出的累计值继续计时；
+- 已用时间会钳住单调时钟回退，永不减少、永不为负；
+- 剩余超时只在 Codex 子进程 turn 运行期间存在，永不增加，最低钳到零，turn 结束后变为 `null`；
+- 最近一次 activity 只因显式的 state、resume、Codex machine、heartbeat、tool、logical、
+  evidence-finalization、error 或 finish 事件而改变，不会因 Agent 的自然语言输出而改变。
+
+Resume 时，日志会校验每一行完整的 JSONL、event ID、连续序号、run identity、checkpoint cursor，以及
+checkpoint 之后的所有事件后缀。checkpoint 中的 progress state 必须等于外层 checkpoint state。后缀中
+每个完整事件都必须保持 checkpoint 的 run ID、control state、cycle、target HEAD、logical outcome、
+Runtime transition 投影和 evidence publication 投影不变。序号、ID、时间、activity 和 tool 字段只能
+通过已声明的转换推进：state marker、resume、turn 开始、Codex 运行中/heartbeat/tool、turn 结束、
+correction、logical、evidence、error 和 finish。run/stage 的值不能早于 checkpoint 锚点；role 和超时的
+变化必须符合 turn 生命周期；`run_finished` 要求 logical outcome 已经写入 checkpoint。最后一行不完整的
+JSONL 视为未写完的观测记录而丢弃；任何完整但相冲突的行都会 fail closed，即使它自身不含密钥的事件
+哈希在内部是自洽的。已有事件不会重复写入。序号和运行中已用时间从校验得到的最大值继续，不会把旧的
+heartbeat 当作新的 activity。`live-status.json` 会从下一条事件安全地重新生成。
+
+Tool activity 只记录 machine item 类别（`command_execution`、`mcp_tool_call` 或 `web_search`）和聚合
+计数。首次立即输出，此后每个配置的 progress 间隔最多输出一次，必要时在结束时补一次。state 变化、
+error、Human Gate、logical outcome、evidence-finalization 变化和 `run_finished` 从不限流。
+
+结构化观测可用时，Codex 原始输出的转发不会再额外输出一条遗留的 machine 或 tool 行：终端是否显示
+以结构化记录器的输出/限流决定为准。如果事件追加不可用，会改走一条独立的、固定类别的
+`CODEX_FALLBACK` 路径，低频输出 machine 事件，tool 最多输出开头和结尾两条聚合行。它从不包含命令、
+参数、输出、peer 内容或 secret。
+
+终端渲染器消费同一个事件对象，输出固定格式的 `PROGRESS` 行，值为 JSON 标量。目前 TTY 和非 TTY
+使用同一种可持久的逐行格式。控制字符沿用 F1 的公开字符串边界。live-status 或终端渲染失败只会把该
+投影标记为不可用，不能应用、回滚或阻止一个本来有效的 Runtime transition；事件追加失败同样只降级
+观测，不改变权威控制状态。resume 时事件与 checkpoint 的 identity 冲突仍会 fail closed。
+
+F1 `FINAL_RESULT` 保持不变，在最后一次 `run_finished` 投影之后输出。F2 的首轮审核因 checkpoint 后缀
+校验不完整和遗留 tool 输出重复而被拒，之后通过独立验收；修复提交
+`54ccf66a1c95843ae680e0c8f50ed98c5df6c0a5` 关闭了这两项问题。F3 operator 命令消费这些结构化产物，
+不改变 F2 的恢复语义。本地 TUI 只显示它们的只读投影，不取代 F2 的终端输出或恢复合同。
+
 ## Evidence
 
 未来 mutation run 的 raw evidence 默认位于：
@@ -635,7 +694,9 @@ preflight 处理。中断不会转换成 `FINAL_RESULT`；checkpoint 停留在�
 - final message；
 - peer payload；
 - process metadata；
-- manifest。
+- manifest；
+- `control-events.jsonl`；
+- `live-status.json`。
 
 这些内容默认 Git-ignored，不作为长期 Git 历史。
 
@@ -713,7 +774,8 @@ Repository-backed evidence 已覆盖：
 - schema-invalid、stale state、错误 role/thread、缺失或错误 evidence 的 fail-closed；
 - Runtime transition 与 summary/commit/push 的 crash-boundary recovery；
 - Reviewer verdict correction 的同线程、次数上限和 Executor 幂等；
-- public terminal result 的控制字符、长度和字段注入防护。
+- public terminal result 的控制字符、长度和字段注入防护；
+- 结构化进度的序号/identity 恢复、单调的运行中计时、实时投影、tool activity 限流和观测失败隔离。
 
 Deterministic regression suite 在 `ResourceWarning` 提升为错误时通过。
 历史实验、阶段 verdict 和完整 evidence locator 位于 `docs/miniloop_runtime.md`、
