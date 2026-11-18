@@ -6,7 +6,7 @@ import os
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -175,6 +175,7 @@ class EvidenceSummaryTests(unittest.TestCase):
                 "--reviewer-home", str(args.reviewer_home),
                 "--executor-home", str(args.executor_home),
                 "--codex-bin", args.codex_bin,
+                "--account-source", "runtime_home",
                 "--run-id", args.run_id,
                 "--workload-id", args.workload_id,
                 "--preflight-only",
@@ -184,8 +185,20 @@ class EvidenceSummaryTests(unittest.TestCase):
             ), redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(M.main(argv), 0)
             report = json.loads(output.getvalue())
+            self.assertEqual(report["account_source"], "runtime_home")
             self.assertEqual(report["evidence_finalization"]["repo"], str(framework.resolve()))
             self.assertEqual(report["evidence_finalization"]["summary_path"], str(M.summary_path_for_args(args, args.run_id)))
+            self.assertEqual(self.git(framework, "rev-parse", "HEAD"), baseline)
+            self.assertFalse(args.runs_root.exists())
+
+            # Outside the test-isolation flag, the same new run is refused with a
+            # public error code before any Agent or evidence side effect.
+            with patch.object(M, "ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS", False), patch.object(
+                M.CONTRACTS, "ROLE_RUNTIME_ROOT", args.role_runtime_root
+            ), redirect_stdout(io.StringIO()) as rejected, redirect_stderr(io.StringIO()):
+                self.assertEqual(M.main(argv), 2)
+            self.assertIn('error_code="ACCOUNT_SOURCE_NOT_ALLOWED"', rejected.getvalue())
+            self.assertIn("runtime_home is accepted only to resume", rejected.getvalue())
             self.assertEqual(self.git(framework, "rev-parse", "HEAD"), baseline)
             self.assertFalse(args.runs_root.exists())
 

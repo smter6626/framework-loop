@@ -764,6 +764,10 @@ def doctor(config: WorkloadConfig) -> Dict[str, Any]:
         return "distinct-profile-directories"
 
     def account_source_check() -> Any:
+        try:
+            RUNNER.validate_account_source_policy(args)
+        except RUNNER.InvariantViolation as exc:
+            raise OperatorError(str(exc)) from exc
         if args.account_source == RUNNER.MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME:
             return {"account_source": args.account_source}
         binding = RUNNER.MIX_ACCOUNT.inspect_active_account(

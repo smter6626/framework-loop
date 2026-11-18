@@ -121,6 +121,13 @@ def load_codex_mix_account_helpers() -> ModuleType:
 
 
 MIX_ACCOUNT = load_codex_mix_account_helpers()
+# New runs must bind the Codex Mix active account. ``runtime_home`` uses each
+# role home's own auth.json without the switch lock, auth projection, or retired
+# A/B snapshot checks, so it is accepted only to resume a checkpoint that
+# already recorded it. Test fixtures that must not touch the real Codex Mix
+# control root set this flag on their own loaded copy of this module; no CLI
+# option or workload config field can enable it.
+ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS = False
 DEFAULT_REVIEWER_HOME = CONTRACTS.DEFAULT_REVIEWER_HOME
 DEFAULT_EXECUTOR_HOME = CONTRACTS.DEFAULT_EXECUTOR_HOME
 SCHEMAS_ROOT = CONTRACTS.SCHEMAS_ROOT
@@ -1862,6 +1869,29 @@ def framework_settings(args: argparse.Namespace) -> Dict[str, str]:
     }
 
 
+def account_source_for_args(args: argparse.Namespace) -> str:
+    """Return the selected account source; a bare programmatic namespace is runtime_home."""
+    return getattr(args, "account_source", MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME)
+
+
+def validate_account_source_policy(args: argparse.Namespace) -> str:
+    """Require codex_mix_active for every new run, including preflight-only checks."""
+    account_source = account_source_for_args(args)
+    if account_source not in MIX_ACCOUNT.ACCOUNT_SOURCES:
+        raise InvariantViolation("unsupported Codex account source")
+    if (
+        account_source == MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME
+        and not bool(getattr(args, "resume", False))
+        and not ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS
+    ):
+        raise ControlFailure(
+            ControlErrorCode.ACCOUNT_SOURCE_NOT_ALLOWED,
+            "new runs require account_source=codex_mix_active; runtime_home is "
+            "accepted only to resume a checkpoint that recorded it",
+        )
+    return account_source
+
+
 def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
     return state_root.resolve() / workload_id_for_args(args) / "checkpoint.json"
@@ -1870,11 +1900,7 @@ def checkpoint_path_for_args(args: argparse.Namespace) -> Path:
 def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
     state_root = getattr(args, "state_root", DEFAULT_STATE_ROOT)
     configuration = {
-        "account_source": getattr(
-            args,
-            "account_source",
-            MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
-        ),
+        "account_source": account_source_for_args(args),
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "executor_home": str(args.executor_home.resolve()),
         "enable_runtime_transition": bool(getattr(args, "enable_runtime_transition", False)),
@@ -1920,6 +1946,22 @@ def checkpoint_configuration(args: argparse.Namespace) -> Dict[str, Any]:
             "framework_repo": settings["repo"],
         })
     return configuration
+
+
+def resume_configuration_mismatch_reason(
+    saved: Any, current: Mapping[str, Any]
+) -> str:
+    """Name an account-source mismatch explicitly; other differences stay generic."""
+    saved_source = saved.get("account_source") if isinstance(saved, dict) else None
+    if (
+        saved_source in MIX_ACCOUNT.ACCOUNT_SOURCES
+        and saved_source != current.get("account_source")
+    ):
+        return (
+            "resume account_source must match the checkpoint "
+            f"(checkpoint recorded {saved_source})"
+        )
+    return "resume configuration does not match checkpoint"
 
 
 def checkpoint_configuration_matches(
@@ -2366,11 +2408,7 @@ def validate_preflight(args: argparse.Namespace) -> Tuple[TargetState, Governanc
         args.executor_home,
         runtime_root=getattr(args, "role_runtime_root", None),
     )
-    account_source = getattr(
-        args,
-        "account_source",
-        MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
-    )
+    account_source = validate_account_source_policy(args)
     if account_source == MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE:
         for home in (args.reviewer_home, args.executor_home):
             MIX_ACCOUNT.validate_role_runtime_config(home)
@@ -3163,7 +3201,12 @@ def orchestrate(
         if not checkpoint_configuration_matches(
             checkpoint.get("configuration"), configuration
         ):
-            raise InvariantViolation("resume configuration does not match checkpoint")
+            reason = resume_configuration_mismatch_reason(
+                checkpoint.get("configuration"), configuration
+            )
+            if reason.startswith("resume account_source"):
+                raise ControlFailure(ControlErrorCode.ACCOUNT_SOURCE_NOT_ALLOWED, reason)
+            raise InvariantViolation(reason)
         run_id = P4.validate_run_id(checkpoint.get("run_id"))
         run_root = Path(checkpoint.get("run_root", "")).resolve()
         if run_root != args.runs_root.resolve() / run_id or not run_root.is_dir():
@@ -3306,11 +3349,7 @@ def orchestrate(
             if evidence_finalization_enabled else None
         )
         run_configuration = {
-            "account_source": getattr(
-                args,
-                "account_source",
-                MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
-            ),
+            "account_source": account_source_for_args(args),
             "approval_policy": "bypassed",
             "approvals_and_sandbox_bypassed": True,
             "checkpoint_path": str(checkpoint_store.path.resolve()),
@@ -4792,11 +4831,7 @@ def preflight_report(
     target: TargetState, governance: GovernanceSnapshot, args: argparse.Namespace
 ) -> Dict[str, Any]:
     report = {
-        "account_source": getattr(
-            args,
-            "account_source",
-            MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
-        ),
+        "account_source": account_source_for_args(args),
         "codex_bin": str(Path(shutil.which(args.codex_bin) or args.codex_bin).resolve()),
         "execution_policy": {
             "approval_policy": "bypassed",
@@ -4867,6 +4902,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--reviewer-home", type=Path, default=DEFAULT_REVIEWER_HOME)
     parser.add_argument("--executor-home", type=Path, default=DEFAULT_EXECUTOR_HOME)
     parser.add_argument("--codex-bin", default=shutil.which("codex") or "codex")
+    parser.add_argument(
+        "--account-source",
+        choices=MIX_ACCOUNT.ACCOUNT_SOURCES,
+        default=MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE,
+        help=(
+            "codex_mix_active (required for new runs) or runtime_home "
+            "(only with --resume for a checkpoint that recorded it)"
+        ),
+    )
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--run-id", default=P4.default_run_id())
     parser.add_argument("--runs-root", type=Path)

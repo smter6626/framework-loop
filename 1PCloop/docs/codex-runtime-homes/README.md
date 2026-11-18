@@ -3,9 +3,13 @@
 > 2026-11-18 只读核对补充：`~/.codex` 仍指向 `~/.codex-mix`；两个 role runtime、退休 A/B、
 > `original-baseline.json` 与 21,091-entry retirement snapshot 均存在。Codex Mix vault 现有 A-E 五个
 > 账号别名；1PCloop 按 `active.json` marker 匹配 `accounts/` 下任一 vault，不限定 A-D，下文 "A-D"
-> 写法为迁移时状态。只有 config 入口能设置 `account_source=codex_mix_active`；直接调用
-> `run_mutation_loop.py` 的长参数入口总是 `runtime_home`，不执行本文的 active-account 绑定。Codex
-> 可执行文件的选择见 [1PCloop README](../../README.md#codex-executable)。
+> 写法为迁移时状态。Codex 可执行文件的选择见 [1PCloop README](../../README.md#codex-executable)。
+>
+> 2026-11-18 代码修正：config 入口和长参数入口的新 run（含 `doctor`、`preflight`）都强制
+> `account_source=codex_mix_active`，在启动任何 Agent 之前拒绝 `runtime_home`。长参数入口新增
+> `--account-source`，默认 `codex_mix_active`。`runtime_home` 只能与 resume 一起使用，用来完成已经
+> 记录它的 checkpoint。两种拒绝（新 run 用 `runtime_home`、resume 时账号来源与 checkpoint 不一致）
+> 都在 `FINAL_RESULT` 中报告 `ACCOUNT_SOURCE_NOT_ALLOWED`。
 
 ## 当前架构
 

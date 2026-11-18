@@ -279,8 +279,8 @@ next step automatically.
 The recommended and only policy-compliant entry is the workload-config CLI described in
 [Workload config and operator CLI](#workload-config-and-operator-cli):
 `onepcloop.py --config <workload.json> preflight` and then `run`. The long-argument examples in
-this section and the next are the legacy direct runner interface; see the authentication
-difference below before using them.
+this section and the next are the legacy direct runner interface; see the account policy below
+before using them.
 
 Validate paths, branch, governance identity, profiles, schemas, framework remote, and working
 trees without invoking an Agent (legacy long-argument form):
@@ -319,6 +319,7 @@ Common optional arguments:
 --reviewer-home
 --executor-home
 --codex-bin
+--account-source
 --framework-repo
 --framework-branch
 --framework-remote
@@ -331,15 +332,20 @@ Common optional arguments:
 --summary-root
 ```
 
-Both interfaces drive the same state machine, but they do not compile to identical arguments.
-The long-argument parser has no `--account-source` and no retry arguments, so a direct
-`run_mutation_loop.py` invocation always uses `account_source=runtime_home`: it does not pin the
-Codex Mix active account, does not take `switch.lock` or project the active `auth.json`, does not
-run the retired A/B snapshot check, and lets each Codex child authenticate with whatever
-`auth.json` is already in its role runtime (a migration-era cache). That conflicts with the
-`codex_mix_active` requirement for tracked workloads. Treat the long-argument interface as legacy:
-use it for resuming legacy runs that carry a `null` operator config identity, not for new runs.
-Its `--codex-bin` default is the `codex` found on `PATH` at parse time.
+Both interfaces drive the same state machine and enforce the same account policy. Every new
+run requires `account_source=codex_mix_active`: `run`, `preflight`, `doctor`, and a long-argument
+invocation without `--resume` reject `runtime_home` before any Agent starts. The long-argument
+parser exposes `--account-source {codex_mix_active,runtime_home}` with default
+`codex_mix_active`. `runtime_home` lets each Codex child authenticate with whatever `auth.json`
+is already in its role runtime (a migration-era cache) without `switch.lock`, active-account
+projection, or the retired A/B snapshot check; it is accepted only together with `--resume`, to
+finish a checkpoint that recorded it. Both refusals—`runtime_home` for a new run, and a resume
+whose account source differs from the checkpoint—report `error_code="ACCOUNT_SOURCE_NOT_ALLOWED"`
+in `FINAL_RESULT` with the reason in plain text.
+
+The long-argument interface remains legacy: it has no retry arguments and records a `null`
+operator config identity. Use the config CLI for new work. Its `--codex-bin` default is the
+`codex` found on `PATH` at parse time.
 
 ## Workload config and operator CLI
 
@@ -395,9 +401,10 @@ top-level `retry` section described below:
 Replace `<user>` with the macOS user name; on this Mac the two homes are the
 `/Users/smterpro/...` paths listed under Runtime environment. Both homes must be absolute or
 config-relative paths that resolve strictly inside `~/.codex-mix/.mix/runtimes/`; a config that
-omits `account_source` fails with `CONFIG_INVALID`. The code also accepts
-`"account_source": "runtime_home"`, but that is the legacy authentication path described above
-and does not satisfy the tracked-workload requirement.
+omits `account_source` fails with `CONFIG_INVALID`. A config may still name
+`"account_source": "runtime_home"`, but only to resume a checkpoint that recorded it: `doctor`
+reports the `account_source` check as `FAIL`, and `preflight` and `run` refuse to start a new run
+with it.
 
 Optional explicit retry of a failed run:
 
@@ -630,6 +637,9 @@ A legacy long-argument run is resumed with exactly the same arguments plus `--re
   <all arguments from the original run> \
   --resume
 ```
+
+Long-argument runs started before `--account-source` existed recorded `runtime_home`; resume them
+by adding `--account-source runtime_home`.
 
 Resume revalidates configuration, target, governance, turns, evidence, and framework identity.
 Mechanically attributable Agent turns, Executor commits, corrections, Runtime transitions,

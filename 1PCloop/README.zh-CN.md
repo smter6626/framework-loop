@@ -254,7 +254,7 @@ stash 或改写历史。
 
 推荐且唯一符合当前政策的入口是下文 [Workload config 与 operator CLI](#workload-config-与-operator-cli)
 中的 config CLI：先 `onepcloop.py --config <workload.json> preflight`，再 `run`。本节和下一节的长参数
-示例是直接调用 runner 的遗留入口；使用前先阅读下文的认证差异。
+示例是直接调用 runner 的遗留入口；使用前先阅读下文的账号来源规则。
 
 先验证路径、branch、治理 identity、profile、schema、framework remote 和工作树，不调用 Agent（遗留
 长参数形式）：
@@ -293,6 +293,7 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 --reviewer-home
 --executor-home
 --codex-bin
+--account-source
 --framework-repo
 --framework-branch
 --framework-remote
@@ -305,12 +306,17 @@ Preflight 是只读检查。失败时不会创建 run 或启动 Reviewer/Executo
 --summary-root
 ```
 
-两个入口调用同一个状态机，但编译出的参数并不相同。长参数 parser 没有 `--account-source`，也没有
-retry 参数，因此直接调用 `run_mutation_loop.py` 总是使用 `account_source=runtime_home`：不固定 Codex
-Mix active account，不持有 `switch.lock`、不投影 active `auth.json`，不执行退休 A/B snapshot 检查，
-Codex child 直接使用 role runtime 中现有的 `auth.json`（迁移时留下的缓存）登录。这与 tracked workload
-必须使用 `codex_mix_active` 的要求冲突。长参数入口应视为遗留入口：用于 resume operator config identity
-为 `null` 的遗留 run，不用于新 run。其 `--codex-bin` 默认值是解析参数时 `PATH` 上找到的 `codex`。
+两个入口调用同一个状态机，执行同一条账号来源规则：每个新 run 都必须使用
+`account_source=codex_mix_active`。`run`、`preflight`、`doctor` 以及不带 `--resume` 的长参数调用，
+都会在启动任何 Agent 之前拒绝 `runtime_home`。长参数 parser 提供
+`--account-source {codex_mix_active,runtime_home}`，默认 `codex_mix_active`。`runtime_home` 让 Codex
+child 直接使用 role runtime 中现有的 `auth.json`（迁移时留下的缓存）登录，不持有 `switch.lock`、不投影
+active account、不执行退休 A/B snapshot 检查；它只能与 `--resume` 一起使用，用来完成一个已经记录了
+`runtime_home` 的 checkpoint。新 run 使用 `runtime_home`，或 resume 时账号来源与 checkpoint
+不一致，都会在 `FINAL_RESULT` 中报告 `error_code="ACCOUNT_SOURCE_NOT_ALLOWED"`，并在 reason 中写明原因。
+
+长参数入口仍是遗留入口：没有 retry 参数，并记录 `null` operator config identity。新工作请用 config
+CLI。其 `--codex-bin` 默认值是解析参数时 `PATH` 上找到的 `codex`。
 
 ## Workload config 与 operator CLI
 
@@ -364,8 +370,9 @@ Codex child 直接使用 role runtime 中现有的 `auth.json`（迁移时留下
 
 `<user>` 替换为 macOS 用户名；本机两个 home 即"运行环境"中列出的 `/Users/smterpro/...` 路径。两个
 home 必须是绝对路径或相对 config 的路径，且解析后严格位于 `~/.codex-mix/.mix/runtimes/` 内；缺少
-`account_source` 的 config 会以 `CONFIG_INVALID` 失败。代码也接受
-`"account_source": "runtime_home"`，但那是上文所述的遗留认证路径，不满足 tracked workload 要求。
+`account_source` 的 config 会以 `CONFIG_INVALID` 失败。config 仍可写
+`"account_source": "runtime_home"`，但只能用于 resume 已记录它的 checkpoint：`doctor` 会把
+`account_source` 检查报为 `FAIL`，`preflight` 和 `run` 拒绝用它启动新 run。
 
 可选的失败 run 显式 retry：
 
@@ -576,6 +583,9 @@ identity、correction attempt、Runtime transition、summary 和 publication rec
   <原运行的完整参数> \
   --resume
 ```
+
+在 `--account-source` 出现之前启动的长参数 run 记录的是 `runtime_home`；resume 时需加
+`--account-source runtime_home`。
 
 恢复时重新验证配置、target、governance、turn、evidence 和 framework identity。已完成且可机械
 归因的 Agent turn、Executor commit、correction、Runtime transition、summary、framework commit

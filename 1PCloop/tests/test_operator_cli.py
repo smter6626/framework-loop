@@ -26,6 +26,9 @@ assert OP_SPEC is not None and OP_SPEC.loader is not None
 OP = importlib.util.module_from_spec(OP_SPEC)
 sys.modules[OP_SPEC.name] = OP
 OP_SPEC.loader.exec_module(OP)
+# Operator fixtures use runtime_home configs with fake role homes so tests never
+# touch the real Codex Mix account. Policy tests patch this back to False.
+OP.RUNNER.ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS = True
 
 CLI_SPEC = importlib.util.spec_from_file_location("onepcloop", SCRIPTS / "onepcloop.py")
 assert CLI_SPEC is not None and CLI_SPEC.loader is not None
@@ -251,6 +254,24 @@ class OperatorCliTests(unittest.TestCase):
                 {item["name"]: item for item in result["checks"]}["target"]["status"],
                 "FAIL",
             )
+
+    def test_new_run_commands_reject_runtime_home_account_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path, _, args, framework, *_ = self.fixture(Path(temporary))
+            config = OP.load_config(config_path)
+            baseline = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=framework, text=True).strip()
+            with patch.object(OP.RUNNER, "ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS", False):
+                doctor = OP.doctor(config)
+                checks = {item["name"]: item for item in doctor["checks"]}
+                self.assertEqual(checks["account_source"]["status"], "FAIL")
+                self.assertEqual(checks["storage_preflight"]["status"], "FAIL")
+                self.assertEqual(doctor["overall_status"], "FAIL")
+                self.assertEqual(OP.preflight(config)["overall_status"], "FAIL")
+                with self.assertRaisesRegex(OP.RUNNER.InvariantViolation, "codex_mix_active"):
+                    OP.run_mutation(config)
+            self.assertFalse(args.runs_root.exists())
+            self.assertFalse(args.state_root.exists())
+            self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=framework, text=True).strip(), baseline)
 
     def test_preflight_reuses_runner_without_evidence_side_effects(self):
         with tempfile.TemporaryDirectory() as temporary:

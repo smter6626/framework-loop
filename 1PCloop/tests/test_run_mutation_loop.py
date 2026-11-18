@@ -22,6 +22,9 @@ assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+# Fixtures use fake role homes with runtime_home auth so tests never read or
+# project the real Codex Mix account. Policy tests patch this back to False.
+MODULE.ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS = True
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
@@ -718,6 +721,67 @@ class MutationLoopTests(unittest.TestCase):
             self.assertIn('last_activity="turn_finished_success@', progress)
             self.assertIn('state="HUMAN_GATE"', progress)
             self.assertIn("target_head=", progress)
+
+    def test_new_runs_reject_runtime_home_account_source(self):
+        runtime_home = MODULE.MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            args, _, _, _ = self.make_fixture(Path(temporary_directory))
+            with patch.object(MODULE, "ALLOW_RUNTIME_HOME_NEW_RUNS_FOR_TESTS", False):
+                # A bare namespace and an explicit runtime_home are both rejected.
+                with self.assertRaisesRegex(MODULE.InvariantViolation, "codex_mix_active"):
+                    MODULE.validate_preflight(args)
+                args.account_source = runtime_home
+                with self.assertRaisesRegex(MODULE.InvariantViolation, "codex_mix_active") as raised:
+                    MODULE.validate_preflight(args)
+                self.assertEqual(
+                    MODULE.control_error_code(raised.exception), "ACCOUNT_SOURCE_NOT_ALLOWED"
+                )
+                # Resume may still finish a checkpoint that recorded runtime_home.
+                args.resume = True
+                self.assertEqual(MODULE.validate_account_source_policy(args), runtime_home)
+                args.resume = False
+                args.account_source = MODULE.MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE
+                self.assertEqual(
+                    MODULE.validate_account_source_policy(args),
+                    MODULE.MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE,
+                )
+                args.account_source = "unknown"
+                with self.assertRaisesRegex(MODULE.InvariantViolation, "unsupported"):
+                    MODULE.validate_account_source_policy(args)
+
+    def test_long_argument_entry_defaults_to_codex_mix_active(self):
+        base = [
+            "--target-repo", "/tmp/target", "--target-branch", "fixture",
+            "--workload-static", "/tmp/static", "--workload-runtime", "/tmp/runtime",
+        ]
+        self.assertEqual(
+            MODULE.parse_args(base).account_source,
+            MODULE.MIX_ACCOUNT.ACCOUNT_SOURCE_CODEX_MIX_ACTIVE,
+        )
+        self.assertEqual(
+            MODULE.parse_args(base + ["--account-source", "runtime_home"]).account_source,
+            MODULE.MIX_ACCOUNT.ACCOUNT_SOURCE_RUNTIME_HOME,
+        )
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            MODULE.parse_args(base + ["--account-source", "other"])
+
+    def test_resume_mismatch_names_account_source(self):
+        current = {"account_source": "codex_mix_active", "max_cycles": 1}
+        self.assertEqual(
+            MODULE.resume_configuration_mismatch_reason(
+                {"account_source": "runtime_home", "max_cycles": 1}, current
+            ),
+            "resume account_source must match the checkpoint "
+            "(checkpoint recorded runtime_home)",
+        )
+        generic = "resume configuration does not match checkpoint"
+        self.assertEqual(
+            MODULE.resume_configuration_mismatch_reason(
+                {"account_source": "codex_mix_active", "max_cycles": 2}, current
+            ),
+            generic,
+        )
+        self.assertEqual(MODULE.resume_configuration_mismatch_reason(None, current), generic)
 
 
 if __name__ == "__main__":
